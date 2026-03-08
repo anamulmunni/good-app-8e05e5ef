@@ -35,6 +35,8 @@ export default function AdminPanel() {
   const [bonusStatus, setBonusStatus] = useState("off");
   const [bonusTarget, setBonusTarget] = useState("10");
   const [customNotice, setCustomNotice] = useState("");
+  const [paymentNumberSearch, setPaymentNumberSearch] = useState("");
+  const [showPaymentSearch, setShowPaymentSearch] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
