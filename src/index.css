@@ -44,7 +44,8 @@
     --sidebar-ring: 152 68% 50%;
 
     /* Custom tokens */
-    --emerald: 152 68% 50%;
+    --emerald: 152 56% 38%;
+    --emerald-foreground: 152 56% 90%;
     --emerald-foreground: 152 68% 95%;
     --amber: 38 92% 50%;
     --pink: 330 80% 60%;
