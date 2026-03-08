@@ -5,7 +5,7 @@ import {
   getAllUsers, getAllTransactions, getPublicSettings, getPoolStats,
   getSubmittedNumbers, getResetHistory, getPaymentUsers,
   toggleBlockUser, updateUserBalance, resetUserKeyCount,
-  updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys,
+  updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
   addResetHistory,
 } from "@/lib/api";
@@ -98,6 +98,11 @@ export default function AdminPanel() {
   const deleteUsedKeysMutation = useMutation({
     mutationFn: deleteUsedKeys,
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pool"] }); toast({ title: "সব Used Key ডিলিট হয়েছে" }); },
+  });
+
+  const deleteAllKeysMutation = useMutation({
+    mutationFn: deleteAllPoolKeys,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pool"] }); toast({ title: "সব Key ডিলিট হয়েছে" }); },
   });
 
   const clearSubmittedMutation = useMutation({
@@ -332,12 +337,18 @@ export default function AdminPanel() {
                 <div className="space-y-4">
                   <button onClick={() => { navigator.clipboard.writeText(pool?.map(i => i.private_key).join("\n") || ""); toast({ title: "সব Key কপি হয়েছে" }); }}
                     className="btn-primary bg-[hsl(var(--emerald))]"><Copy className="w-4 h-4" /> সব Private Key কপি ({pool?.length || 0})</button>
-                  {pool?.some(p => p.is_used) && (
-                    <button onClick={() => deleteUsedKeysMutation.mutate()} disabled={deleteUsedKeysMutation.isPending}
-                      className="btn-primary bg-destructive">
-                      {deleteUsedKeysMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> সব Used Key ডিলিট ({pool?.filter(p => p.is_used).length})</>}
-                    </button>
-                  )}
+                    {pool?.some(p => p.is_used) && (
+                      <button onClick={() => deleteUsedKeysMutation.mutate()} disabled={deleteUsedKeysMutation.isPending}
+                        className="btn-primary bg-destructive">
+                        {deleteUsedKeysMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> সব Used Key ডিলিট ({pool?.filter(p => p.is_used).length})</>}
+                      </button>
+                    )}
+                    {pool && pool.length > 0 && (
+                      <button onClick={() => { if (confirm("সত্যিই সব Key ডিলিট করতে চান?")) deleteAllKeysMutation.mutate(); }} disabled={deleteAllKeysMutation.isPending}
+                        className="btn-primary bg-destructive/80">
+                        {deleteAllKeysMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> সব Key ডিলিট ({pool?.length})</>}
+                      </button>
+                    )}
                   <div className="space-y-2 max-h-[400px] overflow-y-auto">
                     {pool?.map(item => (
                       <div key={item.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl border border-border">

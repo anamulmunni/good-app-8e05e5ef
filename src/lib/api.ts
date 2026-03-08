@@ -233,6 +233,10 @@ export async function deleteUsedKeys() {
   await supabase.from("verification_pool").delete().eq("is_used", true);
 }
 
+export async function deleteAllPoolKeys() {
+  await supabase.from("verification_pool").delete().neq("id", 0);
+}
+
 // Admin
 export async function getAllUsers(): Promise<User[]> {
   const { data } = await supabase.from("users").select("*").order("created_at", { ascending: false });
