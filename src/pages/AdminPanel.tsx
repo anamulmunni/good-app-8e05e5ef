@@ -100,6 +100,11 @@ export default function AdminPanel() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pool"] }); toast({ title: "সব Used Key ডিলিট হয়েছে" }); },
   });
 
+  const deleteAllKeysMutation = useMutation({
+    mutationFn: deleteAllPoolKeys,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pool"] }); toast({ title: "সব Key ডিলিট হয়েছে" }); },
+  });
+
   const clearSubmittedMutation = useMutation({
     mutationFn: clearAllSubmittedNumbers,
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-submitted"] }); toast({ title: "সব নম্বর ক্লিয়ার হয়েছে" }); },
