@@ -35,6 +35,8 @@ export default function AdminPanel() {
   const [bonusStatus, setBonusStatus] = useState("off");
   const [bonusTarget, setBonusTarget] = useState("10");
   const [customNotice, setCustomNotice] = useState("");
+  const [paymentNumberSearch, setPaymentNumberSearch] = useState("");
+  const [showPaymentSearch, setShowPaymentSearch] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -43,7 +45,7 @@ export default function AdminPanel() {
   const { data: allTx } = useQuery({ queryKey: ["admin-transactions"], queryFn: getAllTransactions, enabled: isLoggedIn });
   const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: getPublicSettings, enabled: isLoggedIn });
   const { data: submittedNumbers } = useQuery({ queryKey: ["admin-submitted"], queryFn: getSubmittedNumbers, enabled: isLoggedIn });
-  const { data: resetHistoryData } = useQuery({ queryKey: ["admin-reset-history"], queryFn: getResetHistory, enabled: isLoggedIn && showResetHistory });
+  const { data: resetHistoryData } = useQuery({ queryKey: ["admin-reset-history"], queryFn: getResetHistory, enabled: isLoggedIn && (showResetHistory || showPaymentSearch) });
   const { data: receivedList } = useQuery({ queryKey: ["admin-payments-received"], queryFn: () => getPaymentUsers("received"), enabled: isLoggedIn && showPaymentLists });
   const { data: notReceivedList } = useQuery({ queryKey: ["admin-payments-not-received"], queryFn: () => getPaymentUsers("not_received"), enabled: isLoggedIn && showPaymentLists });
 
@@ -214,6 +216,70 @@ export default function AdminPanel() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* Payment Number Search */}
+        <section className="glass-card p-6 rounded-2xl border-2 border-[hsl(var(--amber))]/30">
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowPaymentSearch(!showPaymentSearch)}>
+            <div className="flex items-center gap-3"><Search className="w-6 h-6 text-[hsl(var(--amber))]" /><h2 className="text-xl font-bold">পেমেন্ট নম্বর দিয়ে সার্চ</h2></div>
+            {showPaymentSearch ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </div>
+          {showPaymentSearch && (
+            <div className="mt-6 space-y-4">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input type="text" placeholder="bKash/Nagad নম্বর দিন..." value={paymentNumberSearch} onChange={(e) => setPaymentNumberSearch(e.target.value)} className="input-field pl-10" />
+              </div>
+              {paymentNumberSearch.trim() && (
+                <>
+                  {/* Submitted Numbers Results */}
+                  {(() => {
+                    const results = submittedNumbers?.filter(s => s.payment_number?.includes(paymentNumberSearch.trim())) || [];
+                    if (results.length === 0) return <p className="text-sm text-muted-foreground text-center py-4">সাবমিটেড নম্বরে কিছু পাওয়া যায়নি</p>;
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-sm font-bold text-[hsl(var(--amber))]">সাবমিটেড রেকর্ড ({results.length}টি)</p>
+                        {results.map(item => (
+                          <div key={item.id} className="bg-secondary/50 border border-[hsl(var(--amber))]/20 rounded-xl p-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-sm font-bold">{item.phone_number}</span>
+                              <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{item.verified_count} টা ভেরিফাইড</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">অ্যাডমিন: <span className="text-foreground font-bold">{item.submitted_by}</span></p>
+                            <p className="text-xs text-muted-foreground">পেমেন্ট: <span className="text-foreground font-bold">{item.payment_method?.toUpperCase()} - {item.payment_number}</span></p>
+                            <p className="text-[10px] text-muted-foreground">{new Date(item.submitted_at || "").toLocaleString("bn-BD")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Reset History Results */}
+                  {(() => {
+                    const results = resetHistoryData?.filter(r => r.payment_number?.includes(paymentNumberSearch.trim())) || [];
+                    if (results.length === 0 && !resetHistoryData) return <p className="text-xs text-muted-foreground">রিসেট হিস্ট্রি লোড করতে উপরের সেকশন খুলুন</p>;
+                    if (results.length === 0) return null;
+                    return (
+                      <div className="space-y-2 mt-4">
+                        <p className="text-sm font-bold text-[hsl(var(--cyan))]">রিসেট পরবর্তী রেকর্ড ({results.length}টি)</p>
+                        {results.map(item => (
+                          <div key={item.id} className="bg-secondary/50 border border-[hsl(var(--cyan))]/20 rounded-xl p-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-sm font-bold">{item.phone_number}</span>
+                              <span className="text-[hsl(var(--cyan))] font-bold text-sm bg-[hsl(var(--cyan))]/10 px-2 py-1 rounded-lg">{item.verified_count} টা (রিসেটের আগে)</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">অ্যাডমিন: <span className="text-foreground font-bold">{item.submitted_by}</span></p>
+                            <p className="text-xs text-muted-foreground">পেমেন্ট: <span className="text-foreground font-bold">{item.payment_method?.toUpperCase()} - {item.payment_number}</span></p>
+                            <p className="text-[10px] text-muted-foreground">রিসেট: {new Date(item.reset_at || "").toLocaleString("bn-BD")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </div>
           )}
         </section>

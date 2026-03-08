@@ -11,6 +11,7 @@ export type User = {
   payment_status: string;
   payment_scheduled_at: string | null;
   created_at: string | null;
+  avatar_url: string | null;
 };
 
 export type Transaction = {

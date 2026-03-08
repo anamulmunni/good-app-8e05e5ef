@@ -179,9 +179,13 @@ export default function Dashboard() {
       <header className="sticky top-0 z-50 glass-card border-b-0 rounded-none bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center border border-border">
-              <User className="w-5 h-5 text-muted-foreground" />
-            </div>
+            <button onClick={() => navigate("/profile")} className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center border border-border overflow-hidden hover:border-primary transition-colors">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
             <div>
               <p className="text-xs text-muted-foreground">স্বাগতম,</p>
               <div className="flex flex-col">

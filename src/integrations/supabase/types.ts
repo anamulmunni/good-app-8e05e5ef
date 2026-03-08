@@ -132,6 +132,7 @@ export type Database = {
       }
       users: {
         Row: {
+          avatar_url: string | null
           balance: number
           created_at: string | null
           display_name: string | null
@@ -143,6 +144,7 @@ export type Database = {
           payment_status: string
         }
         Insert: {
+          avatar_url?: string | null
           balance?: number
           created_at?: string | null
           display_name?: string | null
@@ -154,6 +156,7 @@ export type Database = {
           payment_status?: string
         }
         Update: {
+          avatar_url?: string | null
           balance?: number
           created_at?: string | null
           display_name?: string | null

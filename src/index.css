@@ -13,7 +13,7 @@
     --popover: 222 47% 8%;
     --popover-foreground: 210 40% 96%;
 
-    --primary: 152 68% 50%;
+    --primary: 152 56% 38%;
     --primary-foreground: 222 47% 6%;
 
     --secondary: 222 30% 14%;
@@ -30,21 +30,22 @@
 
     --border: 222 20% 16%;
     --input: 222 20% 16%;
-    --ring: 152 68% 50%;
+    --ring: 152 56% 38%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 222 47% 8%;
     --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 152 68% 50%;
+    --sidebar-primary: 152 56% 38%;
     --sidebar-primary-foreground: 222 47% 6%;
     --sidebar-accent: 222 30% 14%;
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 222 20% 16%;
-    --sidebar-ring: 152 68% 50%;
+    --sidebar-ring: 152 56% 38%;
 
     /* Custom tokens */
-    --emerald: 152 68% 50%;
+    --emerald: 152 56% 38%;
+    --emerald-foreground: 152 56% 90%;
     --emerald-foreground: 152 68% 95%;
     --amber: 38 92% 50%;
     --pink: 330 80% 60%;
