@@ -118,14 +118,10 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-4">
-            <div className="bg-secondary/50 rounded-xl p-4 border border-border">
+          <div className="pt-4">
+            <div className="bg-secondary/50 rounded-xl p-4 border border-border text-center">
               <p className="text-xs text-muted-foreground">ভেরিফাইড কি</p>
               <p className="text-2xl font-black text-primary">{user.key_count || 0}</p>
-            </div>
-            <div className="bg-secondary/50 rounded-xl p-4 border border-border">
-              <p className="text-xs text-muted-foreground">ব্যালেন্স</p>
-              <p className="text-2xl font-black text-primary">৳{user.balance || 0}</p>
             </div>
           </div>
         </motion.div>
