@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requestWithdraw } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, Loader2, CreditCard } from "lucide-react";
@@ -15,7 +16,22 @@ export function WithdrawForm({ balance }: { balance: number }) {
   const queryClient = useQueryClient();
 
   const { mutate: withdraw, isPending } = useMutation({
-    mutationFn: () => requestWithdraw(user!.id, method, number, Number(amount)),
+    mutationFn: async () => {
+      const result = await requestWithdraw(user!.id, method, number, Number(amount));
+
+      // Send withdrawal notification to Telegram
+      try {
+        await supabase.functions.invoke("send-telegram", {
+          body: {
+            message: `💸 <b>Withdrawal Request</b>\n👤 User: ${user!.guest_id}\n📱 Method: ${method.toUpperCase()}\n📞 Number: ${number}\n💰 Amount: ${amount} TK`,
+          },
+        });
+      } catch (e) {
+        console.error("Telegram notification failed:", e);
+      }
+
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
