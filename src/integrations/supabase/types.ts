@@ -132,6 +132,7 @@ export type Database = {
       }
       users: {
         Row: {
+          auth_id: string | null
           avatar_url: string | null
           balance: number
           created_at: string | null
@@ -144,6 +145,7 @@ export type Database = {
           payment_status: string
         }
         Insert: {
+          auth_id?: string | null
           avatar_url?: string | null
           balance?: number
           created_at?: string | null
@@ -156,6 +158,7 @@ export type Database = {
           payment_status?: string
         }
         Update: {
+          auth_id?: string | null
           avatar_url?: string | null
           balance?: number
           created_at?: string | null
