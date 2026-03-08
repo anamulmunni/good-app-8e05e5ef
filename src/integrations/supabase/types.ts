@@ -14,7 +14,185 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      reset_history: {
+        Row: {
+          id: number
+          payment_method: string | null
+          payment_number: string | null
+          phone_number: string
+          reset_at: string | null
+          submitted_by: string
+          verified_count: number
+        }
+        Insert: {
+          id?: number
+          payment_method?: string | null
+          payment_number?: string | null
+          phone_number: string
+          reset_at?: string | null
+          submitted_by?: string
+          verified_count?: number
+        }
+        Update: {
+          id?: number
+          payment_method?: string | null
+          payment_number?: string | null
+          phone_number?: string
+          reset_at?: string | null
+          submitted_by?: string
+          verified_count?: number
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          id: number
+          key: string
+          value: string
+        }
+        Insert: {
+          id?: number
+          key: string
+          value: string
+        }
+        Update: {
+          id?: number
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      submitted_numbers: {
+        Row: {
+          id: number
+          payment_method: string | null
+          payment_number: string | null
+          phone_number: string
+          submitted_at: string | null
+          submitted_by: string
+          verified_count: number
+        }
+        Insert: {
+          id?: number
+          payment_method?: string | null
+          payment_number?: string | null
+          phone_number: string
+          submitted_at?: string | null
+          submitted_by?: string
+          verified_count?: number
+        }
+        Update: {
+          id?: number
+          payment_method?: string | null
+          payment_number?: string | null
+          phone_number?: string
+          submitted_at?: string | null
+          submitted_by?: string
+          verified_count?: number
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          details: string | null
+          id: number
+          status: string | null
+          type: string
+          user_id: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          details?: string | null
+          id?: number
+          status?: string | null
+          type: string
+          user_id: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          details?: string | null
+          id?: number
+          status?: string | null
+          type?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          balance: number
+          created_at: string | null
+          display_name: string | null
+          guest_id: string
+          id: number
+          is_blocked: boolean
+          key_count: number
+          payment_scheduled_at: string | null
+          payment_status: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string | null
+          display_name?: string | null
+          guest_id: string
+          id?: number
+          is_blocked?: boolean
+          key_count?: number
+          payment_scheduled_at?: string | null
+          payment_status?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string | null
+          display_name?: string | null
+          guest_id?: string
+          id?: number
+          is_blocked?: boolean
+          key_count?: number
+          payment_scheduled_at?: string | null
+          payment_status?: string
+        }
+        Relationships: []
+      }
+      verification_pool: {
+        Row: {
+          added_by: string
+          created_at: string | null
+          id: number
+          is_used: boolean
+          private_key: string
+          verify_url: string
+        }
+        Insert: {
+          added_by?: string
+          created_at?: string | null
+          id?: number
+          is_used?: boolean
+          private_key: string
+          verify_url: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string | null
+          id?: number
+          is_used?: boolean
+          private_key?: string
+          verify_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
