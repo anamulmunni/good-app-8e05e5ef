@@ -12,11 +12,11 @@ export function useAuth() {
     const { data: existing } = await supabase
       .from("users")
       .select("*")
-      .eq("auth_id", authUser.id)
+      .eq("auth_id" as any, authUser.id)
       .single();
 
     if (existing) {
-      setUser(existing);
+      setUser(existing as any);
       return existing;
     }
 
@@ -31,7 +31,7 @@ export function useAuth() {
         auth_id: authUser.id,
         guest_id: phone || authUser.email || authUser.id,
         display_name: displayName,
-      })
+      } as any)
       .select()
       .single();
 
@@ -40,15 +40,13 @@ export function useAuth() {
       return null;
     }
 
-    setUser(newUser);
+    setUser(newUser as any);
     return newUser;
   }, []);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        // Use setTimeout to avoid potential deadlocks with Supabase client
         setTimeout(() => {
           fetchOrCreateAppUser(session.user).finally(() => setIsLoading(false));
         }, 0);
@@ -58,7 +56,6 @@ export function useAuth() {
       }
     });
 
-    // THEN check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         fetchOrCreateAppUser(session.user).finally(() => setIsLoading(false));
