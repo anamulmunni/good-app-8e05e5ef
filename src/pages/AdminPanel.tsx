@@ -282,6 +282,8 @@ export default function AdminPanel() {
               )}
             </div>
           )}
+          )}
+        </section>
 
         {/* Reset History */}
         <section className="glass-card p-6 rounded-2xl border-2 border-[hsl(var(--cyan))]/30">
