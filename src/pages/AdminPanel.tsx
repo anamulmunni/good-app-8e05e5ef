@@ -5,7 +5,7 @@ import {
   getAllUsers, getAllTransactions, getPublicSettings, getPoolStats,
   getSubmittedNumbers, getResetHistory, getPaymentUsers,
   toggleBlockUser, updateUserBalance, resetUserKeyCount,
-  updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys,
+  updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
   addResetHistory,
 } from "@/lib/api";
