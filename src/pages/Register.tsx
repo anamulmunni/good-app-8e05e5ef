@@ -38,10 +38,10 @@ export default function Register() {
       if (error) throw error;
 
       toast({
-        title: "ভেরিফিকেশন ইমেইল পাঠানো হয়েছে!",
-        description: "আপনার Gmail চেক করুন এবং লিংকে ক্লিক করুন।",
+        title: "রেজিস্ট্রেশন সফল!",
+        description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।",
       });
-      navigate("/verify-email", { state: { email } });
+      navigate("/dashboard");
     } catch (err: any) {
       toast({
         title: "রেজিস্ট্রেশন ব্যর্থ",
