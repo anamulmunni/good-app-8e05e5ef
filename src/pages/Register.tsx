@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldCheck, Loader2, ArrowRight, Mail, Lock, User, Phone } from "lucide-react";
+import { Loader2, ArrowRight, Mail, Lock, User, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -81,9 +81,7 @@ export default function Register() {
         className="w-full max-w-md relative z-10"
       >
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-tr from-primary to-[hsl(var(--emerald-foreground))] rounded-2xl mx-auto flex items-center justify-center mb-6 shadow-2xl shadow-primary/20 rotate-3">
-            <ShieldCheck className="w-10 h-10 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="Good App" className="w-20 h-20 mx-auto mb-6 drop-shadow-2xl" />
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60 mb-2">
             নতুন অ্যাকাউন্ট
           </h1>
