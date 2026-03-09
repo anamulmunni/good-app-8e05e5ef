@@ -38,7 +38,8 @@ export function KeySubmitter() {
   });
 
   const isOff = publicSettings?.buyStatus === "off";
-
+  const currentVideoUrl = publicSettings?.videoUrl || "";
+  const hasWatchedVideo = !currentVideoUrl || user?.watched_video_url === currentVideoUrl;
   // Auto generate private key + lz signature and build GoodDollar FV link
   const generateKeyMutation = useMutation({
     mutationFn: async () => {
