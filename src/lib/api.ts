@@ -322,3 +322,8 @@ export async function getPaymentUsers(status: string): Promise<User[]> {
   const { data } = await supabase.from("users").select("*").eq("payment_status", status);
   return data || [];
 }
+
+// Update user watched video URL
+export async function updateUserWatchedVideo(userId: number, videoUrl: string) {
+  await supabase.from("users").update({ watched_video_url: videoUrl }).eq("id", userId);
+}
