@@ -12,7 +12,7 @@ import {
 import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History } from "lucide-react";
 import { motion } from "framer-motion";
 
-const ADMIN_PASSWORD = "admin123";
+const ADMIN_PASSWORD = "Anamul-965050";
 const POOL_SECRET = "Anamul-984516";
 
 export default function AdminPanel() {
