@@ -78,14 +78,15 @@ export default function AdminPanel() {
   });
 
   const rateMutation = useMutation({
-    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string }) => {
+    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string }) => {
       if (data.rate) await updateSetting("rewardRate", String(data.rate));
       if (data.status) await updateSetting("buyStatus", data.status);
       if (data.bonusStatus) await updateSetting("bonusStatus", data.bonusStatus);
       if (data.bonusTarget) await updateSetting("bonusTarget", String(data.bonusTarget));
       if (data.customNotice !== undefined) await updateSetting("customNotice", data.customNotice);
+      if (data.videoUrl !== undefined) await updateSetting("videoUrl", data.videoUrl);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-settings"] }); toast({ title: "সেটিংস আপডেট হয়েছে" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-settings"] }); queryClient.invalidateQueries({ queryKey: ["public-settings"] }); toast({ title: "সেটিংস আপডেট হয়েছে" }); },
   });
 
   const statusMutation = useMutation({
