@@ -32,33 +32,16 @@ export default function Login() {
 
       // If phone number, look up email from users table
       if (isPhone(identifier)) {
-        const { data: userData } = await supabase
+        const { data: userData } = await (supabase
           .from("users")
-          .select("auth_id")
+          .select("email") as any)
           .eq("guest_id", identifier.trim())
           .single();
 
-        if (!userData?.auth_id) {
+        if (!userData?.email) {
           throw new Error("এই ফোন নম্বর দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি");
         }
-
-        // Get email from auth user via admin lookup - use a different approach
-        // We need to store email in users table or use a workaround
-        // For now, let's look up via the auth_id by trying to get session
-        const { data: allUsers } = await supabase
-          .from("users")
-          .select("guest_id, auth_id, display_name")
-          .eq("guest_id", identifier.trim())
-          .single();
-
-        if (!allUsers) {
-          throw new Error("এই ফোন নম্বর দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি");
-        }
-
-        // We can't get email from auth_id on client side
-        // So we need users to have stored their email - let's check transactions or find another way
-        // Better approach: store email in users table
-        throw new Error("ফোন নম্বর দিয়ে লগইন করতে আপনার ইমেইল দরকার। অনুগ্রহ করে ইমেইল ব্যবহার করুন।");
+        loginEmail = userData.email;
       }
 
       const { error } = await supabase.auth.signInWithPassword({
