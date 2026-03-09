@@ -236,9 +236,19 @@ export default function AdminPanel() {
               </div>
               {submittedNumbers?.map(item => (
                 <div key={item.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl border border-border">
-                  <div><p className="font-mono text-sm font-bold">{item.phone_number}</p><p className="text-[10px] text-muted-foreground">{item.submitted_by}</p></div>
-                  <div className="flex items-center gap-3">
+                  <div><p className="font-mono text-sm font-bold">{item.phone_number}</p><p className="text-[10px] text-muted-foreground">{item.submitted_by} {item.payment_number ? `| ${item.payment_method?.toUpperCase()}: ${item.payment_number}` : ""}</p></div>
+                  <div className="flex items-center gap-2">
                     <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{item.verified_count} টা</span>
+                    <button onClick={async () => {
+                      const user = users?.find(u => u.guest_id === item.phone_number);
+                      await addResetHistory(item.phone_number, user?.key_count || item.verified_count, item.submitted_by, item.payment_number || undefined, item.payment_method || undefined);
+                      if (user) await resetUserKeyCount(user.id);
+                      await deleteSubmittedNumber(item.id);
+                      queryClient.invalidateQueries({ queryKey: ["admin-submitted"] });
+                      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                      queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] });
+                      toast({ title: "রিসেট হয়ে হিস্ট্রিতে সেভ হয়েছে" });
+                    }} className="px-2 py-1 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] font-bold rounded-lg text-xs hover:bg-[hsl(var(--cyan))]/30">Reset</button>
                     <button onClick={() => deleteSubmittedMutation.mutate(item.id)} className="p-1.5 hover:bg-destructive/20 rounded-lg text-destructive"><XCircle className="w-4 h-4" /></button>
                   </div>
                 </div>
