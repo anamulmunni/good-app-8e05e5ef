@@ -74,8 +74,21 @@ export default function AdminPanel() {
   });
 
   const resetCountMutation = useMutation({
-    mutationFn: (id: number) => resetUserKeyCount(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-users"] }); toast({ title: "কাউন্ট রিসেট হয়েছে" }); },
+    mutationFn: async (id: number) => {
+      const user = users?.find(u => u.id === id);
+      if (user) {
+        const submittedInfo = submittedNumbers?.find(s => s.phone_number === user.guest_id);
+        await addResetHistory(
+          user.guest_id,
+          user.key_count,
+          "Admin",
+          submittedInfo?.payment_number || undefined,
+          submittedInfo?.payment_method || undefined
+        );
+        await resetUserKeyCount(id);
+      }
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-users"] }); queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] }); toast({ title: "কাউন্ট রিসেট হয়েছে" }); },
   });
 
   const rateMutation = useMutation({
