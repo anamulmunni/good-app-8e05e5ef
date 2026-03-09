@@ -46,14 +46,18 @@ export function TransactionList() {
                   {isEarning ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
                 </div>
                 <div>
-                  <p className="font-medium text-sm">{isEarning ? "কি রিডিম করা হয়েছে" : `উইথড্র: ${tx.details}`}</p>
+                  <p className="font-medium text-sm">{isEarning ? "কি ভেরিফাইড হয়েছে" : `উইথড্র: ${tx.details}`}</p>
                   <p className="text-xs text-muted-foreground">{format(new Date(tx.created_at || Date.now()), "MMM d, h:mm a")}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className={`font-bold ${isRejected ? "text-destructive" : isEarning ? "text-primary" : "text-[hsl(var(--orange))]"}`}>
-                  {isEarning ? "+" : "-"}৳{tx.amount}
-                </p>
+                {isEarning ? (
+                  <p className="font-bold text-primary">✓ Verified</p>
+                ) : (
+                  <p className={`font-bold ${isRejected ? "text-destructive" : "text-[hsl(var(--orange))]"}`}>
+                    -৳{tx.amount}
+                  </p>
+                )}
                 <div className="flex items-center justify-end gap-1 mt-1">
                   {isPending ? (
                     <><Clock className="w-3 h-3 text-accent" /><span className="text-[10px] text-accent uppercase font-bold">Pending</span></>
