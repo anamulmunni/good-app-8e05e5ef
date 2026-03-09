@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldCheck, Loader2, ArrowRight, Mail, Lock, User, Phone } from "lucide-react";
+import { Loader2, ArrowRight, Mail, Lock, User, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
