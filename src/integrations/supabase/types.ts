@@ -137,6 +137,7 @@ export type Database = {
           balance: number
           created_at: string | null
           display_name: string | null
+          email: string | null
           guest_id: string
           id: number
           is_blocked: boolean
@@ -151,6 +152,7 @@ export type Database = {
           balance?: number
           created_at?: string | null
           display_name?: string | null
+          email?: string | null
           guest_id: string
           id?: number
           is_blocked?: boolean
@@ -165,6 +167,7 @@ export type Database = {
           balance?: number
           created_at?: string | null
           display_name?: string | null
+          email?: string | null
           guest_id?: string
           id?: number
           is_blocked?: boolean
