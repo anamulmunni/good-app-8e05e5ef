@@ -1,0 +1,1 @@
+INSERT INTO settings (key, value) VALUES ('videoUrl', 'https://youtube.com/shorts/xPEM62ZUV_0?feature=share') ON CONFLICT DO NOTHING;
