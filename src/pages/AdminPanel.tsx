@@ -58,6 +58,7 @@ export default function AdminPanel() {
       setBonusStatus(settingsData.bonusStatus);
       setBonusTarget(String(settingsData.bonusTarget));
       setCustomNotice(settingsData.customNotice);
+      setVideoUrl(settingsData.videoUrl || "");
     }
   }, [settingsData]);
 
