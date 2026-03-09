@@ -167,23 +167,22 @@ export async function submitKey(userId: number, privateKey: string): Promise<{ n
   if (!user) throw new Error("User not found");
   if (user.is_blocked) throw new Error("Account blocked");
 
-  // Credit user
-  const newBalance = user.balance + rewardRate;
+  // Increment key count only (no balance added)
+  const newKeyCount = user.key_count + 1;
   await supabase.from("users").update({
-    balance: newBalance,
-    key_count: user.key_count + 1,
+    key_count: newKeyCount,
   }).eq("id", userId);
 
-  // Create transaction
+  // Create transaction record
   await createTransaction({
     user_id: userId,
     type: "earning",
-    amount: rewardRate,
+    amount: 0,
     details: `Key: ${privateKey.substring(0, 10)}...`,
     status: "completed",
   });
 
-  return { newBalance, message: `Key verified! +${rewardRate} TK added` };
+  return { newBalance: user.balance, message: `Verified! Total count: ${newKeyCount}` };
 }
 
 // Withdraw

