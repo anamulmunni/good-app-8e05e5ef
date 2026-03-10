@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { TransactionList } from "@/components/TransactionList";
-import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone } from "lucide-react";
+import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
