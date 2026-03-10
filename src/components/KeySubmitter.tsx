@@ -26,7 +26,7 @@ type GeneratedKey = {
 };
 
 export function KeySubmitter() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [activeKey, setActiveKey] = useState<GeneratedKey | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const { toast } = useToast();
@@ -132,7 +132,8 @@ export function KeySubmitter() {
 
       return result;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      await refreshUser();
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       setActiveKey(null);

@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowRight, Mail, Lock, Phone } from "lucide-react";
+import { Loader2, ArrowRight, Lock, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function Login() {
-  const [identifier, setIdentifier] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
@@ -20,38 +20,22 @@ export default function Login() {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
-  const isPhone = (value: string) => /^[0-9+]{10,15}$/.test(value.trim());
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identifier.trim() || !password) return;
+    if (!phone.trim() || !password) return;
 
     setIsSubmitting(true);
     try {
-      let loginEmail = identifier.trim();
-
-      // If phone number, look up email from users table
-      if (isPhone(identifier)) {
-        const { data: userData } = await (supabase
-          .from("users")
-          .select("email") as any)
-          .eq("guest_id", identifier.trim())
-          .single();
-
-        if (!userData?.email) {
-          throw new Error("এই ফোন নম্বর দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি");
-        }
-        loginEmail = userData.email;
-      }
+      const fakeEmail = `${phone.trim()}@goodapp.local`;
 
       const { error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
+        email: fakeEmail,
         password,
       });
 
       if (error) {
         if (error.message === "Invalid login credentials") {
-          throw new Error("ইমেইল/ফোন বা পাসওয়ার্ড ভুল");
+          throw new Error("ফোন নম্বর বা পাসওয়ার্ড ভুল");
         }
         throw error;
       }
@@ -103,13 +87,13 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-muted-foreground mb-2 ml-1 flex items-center gap-2">
-                {isPhone(identifier) ? <Phone className="w-4 h-4" /> : <Mail className="w-4 h-4" />} ইমেইল বা ফোন নম্বর
+                <Phone className="w-4 h-4" /> ফোন নম্বর
               </label>
               <input
-                type="text"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="example@gmail.com বা 01XXXXXXXXX"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="01XXXXXXXXX"
                 className="input-field text-lg py-4"
                 autoFocus
               />
@@ -130,7 +114,7 @@ export default function Login() {
 
             <button
               type="submit"
-              disabled={isSubmitting || !identifier || !password}
+              disabled={isSubmitting || !phone || !password}
               className="btn-primary py-4 text-lg"
             >
               {isSubmitting ? (

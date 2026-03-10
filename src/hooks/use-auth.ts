@@ -22,16 +22,15 @@ export function useAuth() {
 
     // Create new user entry
     const meta = authUser.user_metadata || {};
-    const displayName = meta.display_name || authUser.email?.split("@")[0] || "User";
+    const displayName = meta.display_name || "User";
     const phone = meta.phone || "";
 
     const { data: newUser, error } = await (supabase
       .from("users")
       .insert({
         auth_id: authUser.id,
-        guest_id: phone || authUser.email || authUser.id,
+        guest_id: phone || authUser.id,
         display_name: displayName,
-        email: authUser.email || null,
       } as any)
       .select() as any)
       .single();

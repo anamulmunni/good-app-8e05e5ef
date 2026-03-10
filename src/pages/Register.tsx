@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowRight, Mail, Lock, User, Phone } from "lucide-react";
+import { Loader2, ArrowRight, Lock, User, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 export default function Register() {
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -17,15 +16,18 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (step < 4) {
+    if (step < 3) {
       setStep(step + 1);
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // Use phone number as fake email for Supabase auth
+      const fakeEmail = `${phone.trim()}@goodapp.local`;
+
       const { error } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: fakeEmail,
         password,
         options: {
           data: {
@@ -35,7 +37,12 @@ export default function Register() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("already registered")) {
+          throw new Error("এই ফোন নম্বর দিয়ে আগেই অ্যাকাউন্ট তৈরি হয়েছে");
+        }
+        throw error;
+      }
 
       toast({
         title: "রেজিস্ট্রেশন সফল!",
@@ -56,15 +63,14 @@ export default function Register() {
   const isStepValid = () => {
     switch (step) {
       case 1: return displayName.trim().length >= 2;
-      case 2: return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-      case 3: return password.length >= 6;
-      case 4: return phone.trim().length >= 10;
+      case 2: return password.length >= 6;
+      case 3: return phone.trim().length >= 10;
       default: return false;
     }
   };
 
-  const stepLabels = ["আপনার নাম", "ইমেইল", "পাসওয়ার্ড", "ফোন নম্বর"];
-  const stepIcons = [User, Mail, Lock, Phone];
+  const stepLabels = ["আপনার নাম", "পাসওয়ার্ড", "ফোন নম্বর"];
+  const stepIcons = [User, Lock, Phone];
   const StepIcon = stepIcons[step - 1];
 
   return (
@@ -85,12 +91,12 @@ export default function Register() {
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60 mb-2">
             নতুন অ্যাকাউন্ট
           </h1>
-          <p className="text-muted-foreground">ধাপ {step}/4 — {stepLabels[step - 1]}</p>
+          <p className="text-muted-foreground">ধাপ {step}/3 — {stepLabels[step - 1]}</p>
         </div>
 
         {/* Progress bar */}
         <div className="flex gap-2 mb-6">
-          {[1, 2, 3, 4].map(s => (
+          {[1, 2, 3].map(s => (
             <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${s <= step ? "bg-primary" : "bg-secondary"}`} />
           ))}
         </div>
@@ -110,14 +116,10 @@ export default function Register() {
                   placeholder="আপনার নাম লিখুন..." className="input-field text-lg py-4" autoFocus />
               )}
               {step === 2 && (
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@gmail.com" className="input-field text-lg py-4" autoFocus />
-              )}
-              {step === 3 && (
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                   placeholder="কমপক্ষে ৬ অক্ষর..." className="input-field text-lg py-4" autoFocus />
               )}
-              {step === 4 && (
+              {step === 3 && (
                 <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
                   placeholder="01XXXXXXXXX" className="input-field text-lg py-4" autoFocus />
               )}
@@ -134,7 +136,7 @@ export default function Register() {
                 className="btn-primary py-4 text-lg flex-1">
                 {isSubmitting ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
-                ) : step < 4 ? (
+                ) : step < 3 ? (
                   <> পরবর্তী <ArrowRight className="w-5 h-5" /> </>
                 ) : (
                   <> রেজিস্টার করুন <ArrowRight className="w-5 h-5" /> </>
