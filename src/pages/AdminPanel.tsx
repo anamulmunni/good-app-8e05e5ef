@@ -241,7 +241,7 @@ export default function AdminPanel() {
                 <div key={item.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl border border-border">
                   <div><p className="font-mono text-sm font-bold">{item.phone_number}</p><p className="text-[10px] text-muted-foreground">{item.submitted_by} {item.payment_number ? `| ${item.payment_method?.toUpperCase()}: ${item.payment_number}` : ""}</p></div>
                   <div className="flex items-center gap-2">
-                    <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{item.verified_count} টা</span>
+                    <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{users?.find(u => u.guest_id === item.phone_number)?.key_count || 0} টা</span>
                     <button onClick={async () => {
                       const user = users?.find(u => u.guest_id === item.phone_number);
                       await addResetHistory(item.phone_number, user?.key_count || item.verified_count, item.submitted_by, item.payment_number || undefined, item.payment_method || undefined);

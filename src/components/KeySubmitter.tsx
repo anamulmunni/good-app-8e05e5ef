@@ -132,7 +132,8 @@ export function KeySubmitter() {
 
       return result;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      await refreshUser();
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       setActiveKey(null);
