@@ -26,7 +26,7 @@ type GeneratedKey = {
 };
 
 export function KeySubmitter() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [activeKey, setActiveKey] = useState<GeneratedKey | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const { toast } = useToast();
