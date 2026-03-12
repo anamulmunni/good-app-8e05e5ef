@@ -199,12 +199,12 @@ export default function Profile() {
                   <p className="font-bold text-sm text-[hsl(var(--emerald))]">01892564963</p>
                 </div>
               </a>
-              <a href="https://t.me/gooddollar_earn" target="_blank" rel="noopener noreferrer"
+              <a href="https://t.me/+6a3iUf1_GAhiMWY1" target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-3 p-3 bg-[hsl(var(--blue))]/10 border border-[hsl(var(--blue))]/20 rounded-xl hover:bg-[hsl(var(--blue))]/20 transition-colors">
                 <Send className="w-5 h-5 text-[hsl(var(--blue))] flex-shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Telegram Group</p>
-                  <p className="font-bold text-sm text-[hsl(var(--blue))]">@gooddollar_earn</p>
+                  <p className="font-bold text-sm text-[hsl(var(--blue))]">Join Telegram Group</p>
                 </div>
               </a>
             </div>
