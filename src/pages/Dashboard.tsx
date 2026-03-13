@@ -47,6 +47,12 @@ export default function Dashboard() {
     enabled: isPasswordVerified,
   });
 
+  const { data: incomingRequests = [] } = useQuery({
+    queryKey: ["incoming-user-transfer-requests", user?.guest_id],
+    queryFn: () => getIncomingTransferRequests(user?.guest_id || ""),
+    enabled: !!user?.guest_id,
+  });
+
   const checkServerDuplicates = async (nums: string[]) => {
     try {
       const existing = await getExistingPhoneNumbers();
