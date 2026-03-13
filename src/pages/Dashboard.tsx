@@ -145,6 +145,7 @@ export default function Dashboard() {
       setRequestSubmitPassword("");
       queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests", user?.guest_id] });
       queryClient.invalidateQueries({ queryKey: ["admin-submitted"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-request-submissions"] });
       toast({ title: "লিস্ট অ্যাডমিন প্যানেলে পাঠানো হয়েছে" });
     },
     onError: (error: Error) => {
