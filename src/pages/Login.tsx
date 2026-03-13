@@ -155,7 +155,7 @@ export default function Login() {
             onClick={async () => {
               try {
                 const result = await lovable.auth.signInWithOAuth("google", {
-                  redirect_uri: window.location.origin,
+                  redirect_uri: `${window.location.origin}/dashboard`,
                 });
                 if (result?.error) {
                   toast({ title: "Google লগইন ব্যর্থ", description: String(result.error.message || result.error), variant: "destructive" });
