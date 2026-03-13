@@ -360,6 +360,7 @@ export default function Dashboard() {
         </section>
 
         {/* Telegram Admin Section */}
+        <section className="glass-card p-6 rounded-3xl border-2 border-primary/30">
           <button onClick={() => setShowTelegramAdmin(!showTelegramAdmin)} className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3 text-primary">
               <Send className="w-6 h-6" />
