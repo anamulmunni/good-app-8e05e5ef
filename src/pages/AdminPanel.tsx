@@ -234,6 +234,53 @@ export default function AdminPanel() {
           </div>
         </div>
 
+        {/* User Request Submissions */}
+        <section className="glass-card p-6 rounded-2xl border-2 border-primary/30">
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowUserRequestSubmissions(!showUserRequestSubmissions)}>
+            <div className="flex items-center gap-3">
+              <Send className="w-6 h-6 text-primary" />
+              <h2 className="text-xl font-bold">ইউজার Request Submission ({userRequestSubmissions?.length || 0})</h2>
+            </div>
+            {showUserRequestSubmissions ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </div>
+
+          {showUserRequestSubmissions && (
+            <div className="mt-6 space-y-4">
+              {userRequestSubmissions && userRequestSubmissions.length > 0 ? (
+                userRequestSubmissions.map((batch) => (
+                  <div key={batch.id} className="bg-secondary/50 border border-border rounded-xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-sm font-bold">Target: {batch.target_guest_id}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {batch.target_display_name || "Unknown"} • Verified: {batch.target_verified_count} • Submitter: {batch.submitted_to_admin_by}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">{new Date(batch.submitted_at).toLocaleString("bn-BD")}</p>
+                      </div>
+                      <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">{batch.request_count} requests</span>
+                    </div>
+
+                    <div className="space-y-2 border-t border-border pt-3">
+                      {batch.requests.map((request) => (
+                        <div key={request.id} className="p-2 rounded-lg bg-background/50 border border-border/60">
+                          <p className="text-xs text-muted-foreground">
+                            From <span className="font-mono text-foreground font-bold">{request.requester_guest_id}</span> • Verified: <span className="text-primary font-bold">{request.requester_verified_count}</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Payment: <span className="text-foreground font-bold">{request.requester_payment_method?.toUpperCase()} - {request.requester_payment_number}</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">এখনও কোনো submission আসেনি।</p>
+              )}
+            </div>
+          )}
+        </section>
+
         {/* Submitted Numbers */}
         <section className="glass-card p-6 rounded-2xl border-2 border-[hsl(var(--purple))]/30">
           <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowSubmittedNumbers(!showSubmittedNumbers)}>
