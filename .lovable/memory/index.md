@@ -7,18 +7,15 @@
 - Custom CSS classes: glass-card, input-field, btn-primary
 
 ## Architecture
-- Supabase Auth with phone-based fake email (phone@goodapp.local)
-- Old accounts may use real emails - login fallback checks users.email
-- No Gmail/email in registration or login - phone number only
-- No TK/balance shown to users - only verified count
-- Direct Supabase client queries in src/lib/api.ts
-- Tables: users, settings, verification_pool, submitted_numbers, reset_history, transactions
+- Guest login (no Supabase Auth, uses localStorage for session)
+- Direct Supabase client queries (no edge functions)
+- Tables: users, settings, verification_pool, submitted_numbers, reset_history, transactions, user_transfer_requests, user_request_submissions
 - Admin password: Anamul-963050, Pool secret: Anamul-984516
-- Edge function: admin-reset-password (for admin to change user passwords)
+- User request submit password: Anamul-341321 (hidden, no hint shown)
 
 ## Key Decisions
-- Admin panel shows user's key_count from users table, not submitted_numbers.verified_count
-- Verified count updates immediately via refreshUser() after submission
-- Telegram gets only clean private key, no metadata
-- RLS is permissive (USING true)
-- Profile support: Developer Md Anamul Haque, WhatsApp 01892564963
+- RLS is permissive (USING true) because app uses guest login, not Supabase auth
+- All data access via client-side Supabase queries in src/lib/api.ts
+- User can only have ONE pending request at a time (duplicate prevention)
+- When submitting to admin: submitter's bKash number goes to admin, individual payment numbers stay in user history
+- Google login: uses lovable managed auth on lovable domains, skipBrowserRedirect on custom domains

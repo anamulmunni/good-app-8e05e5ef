@@ -253,25 +253,73 @@ export default function AdminPanel() {
                       <div>
                         <p className="font-mono text-sm font-bold">Target: {batch.target_guest_id}</p>
                         <p className="text-xs text-muted-foreground">
-                          {batch.target_display_name || "Unknown"} • Verified: {batch.target_verified_count} • Submitter: {batch.submitted_to_admin_by}
+                          {batch.target_display_name || "Unknown"} • Submitter: {batch.submitted_to_admin_by}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">{new Date(batch.submitted_at).toLocaleString("bn-BD")}</p>
+                        {batch.submitter_payment_number && (
+                          <p className="text-xs mt-1">
+                            <span className={`font-bold px-2 py-0.5 rounded-lg text-xs ${
+                              batch.submitter_payment_method === "bkash" 
+                                ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]" 
+                                : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
+                            }`}>
+                              {batch.submitter_payment_method?.toUpperCase() || "N/A"}
+                            </span>
+                            <span className="font-mono font-bold text-foreground ml-2">{batch.submitter_payment_number}</span>
+                          </p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground mt-1">{new Date(batch.submitted_at).toLocaleString("bn-BD")}</p>
                       </div>
                       <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">{batch.request_count} requests</span>
                     </div>
 
                     <div className="space-y-2 border-t border-border pt-3">
-                      {batch.requests.map((request) => (
-                        <div key={request.id} className="p-2 rounded-lg bg-background/50 border border-border/60">
-                          <p className="text-xs text-muted-foreground">
-                            From <span className="font-mono text-foreground font-bold">{request.requester_guest_id}</span> • Verified: <span className="text-primary font-bold">{request.requester_verified_count}</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Payment: <span className="text-foreground font-bold">{request.requester_payment_method?.toUpperCase()} - {request.requester_payment_number}</span>
-                          </p>
-                        </div>
-                      ))}
+                      {batch.requests.map((request) => {
+                        const reqUser = users?.find(u => u.guest_id === request.requester_guest_id);
+                        return (
+                          <div key={request.id} className="p-3 rounded-lg bg-background/50 border border-border/60 flex items-center justify-between">
+                            <div>
+                              <p className="font-mono text-sm font-bold">{request.requester_guest_id}</p>
+                              <p className="text-xs text-muted-foreground">Verified: <span className="text-primary font-bold">{reqUser?.key_count || request.requester_verified_count}</span></p>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                const u = users?.find(u => u.guest_id === request.requester_guest_id);
+                                if (u) {
+                                  await addResetHistory(u.guest_id, u.key_count, batch.submitted_to_admin_by);
+                                  await resetUserKeyCount(u.id);
+                                  queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                                  queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] });
+                                  toast({ title: `${u.guest_id} রিসেট হয়েছে` });
+                                } else {
+                                  toast({ title: "ইউজার পাওয়া যায়নি", variant: "destructive" });
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] font-bold rounded-lg text-xs hover:bg-[hsl(var(--cyan))]/30 transition-colors"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
+
+                    <button
+                      onClick={async () => {
+                        for (const request of batch.requests) {
+                          const u = users?.find(u => u.guest_id === request.requester_guest_id);
+                          if (u) {
+                            await addResetHistory(u.guest_id, u.key_count, batch.submitted_to_admin_by);
+                            await resetUserKeyCount(u.id);
+                          }
+                        }
+                        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                        queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] });
+                        toast({ title: `${batch.requests.length} টি নম্বর রিসেট হয়েছে` });
+                      }}
+                      className="btn-primary py-2.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] border border-[hsl(var(--cyan))]/30 hover:bg-[hsl(var(--cyan))]/30"
+                    >
+                      <RefreshCcw className="w-4 h-4" /> সব Reset করুন ({batch.requests.length})
+                    </button>
                   </div>
                 ))
               ) : (

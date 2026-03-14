@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { TransactionList } from "@/components/TransactionList";
-import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones } from "lucide-react";
+import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones, ChevronDown, ChevronUp, History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { getUserRequestHistory, getUserSubmittedBatches } from "@/lib/user-requests";
 
 export default function Profile() {
   const { user, isLoading, refreshUser } = useAuth();
@@ -16,7 +18,21 @@ export default function Profile() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [showSentRequests, setShowSentRequests] = useState(false);
+  const [showSubmittedBatches, setShowSubmittedBatches] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: sentRequests = [] } = useQuery({
+    queryKey: ["user-sent-requests", user?.guest_id],
+    queryFn: () => getUserRequestHistory(user?.guest_id || ""),
+    enabled: !!user?.guest_id && showSentRequests,
+  });
+
+  const { data: submittedBatches = [] } = useQuery({
+    queryKey: ["user-submitted-batches", user?.guest_id],
+    queryFn: () => getUserSubmittedBatches(user?.guest_id || ""),
+    enabled: !!user?.guest_id && showSubmittedBatches,
+  });
 
   const copyId = () => {
     if (user?.guest_id) {
@@ -86,7 +102,6 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Decorative background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-15%] right-[-15%] w-[500px] h-[500px] bg-primary/15 rounded-full blur-[100px]" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-[hsl(var(--purple))]/10 rounded-full blur-[100px]" />
@@ -104,11 +119,8 @@ export default function Profile() {
       <main className="max-w-md mx-auto px-4 pt-8 space-y-6 relative z-10">
         {/* Avatar & Name Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl overflow-hidden">
-          {/* Cover gradient */}
           <div className="h-24 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative" />
-
           <div className="px-8 pb-8 -mt-12 text-center">
-            {/* Avatar */}
             <div className="relative inline-block mb-4">
               <button onClick={handleAvatarClick} disabled={uploading} className="relative group">
                 <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-background bg-secondary flex items-center justify-center shadow-xl shadow-primary/10">
@@ -129,7 +141,6 @@ export default function Profile() {
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
             </div>
 
-            {/* Name with edit */}
             <AnimatePresence mode="wait">
               {isEditingName ? (
                 <motion.div key="editing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center justify-center gap-2 mb-2">
@@ -153,7 +164,6 @@ export default function Profile() {
               )}
             </AnimatePresence>
 
-            {/* ID */}
             <div className="flex items-center justify-center gap-2">
               <p className="text-xs text-muted-foreground font-mono bg-secondary/50 px-3 py-1 rounded-full">{user.guest_id}</p>
               <button onClick={copyId} className="p-1 hover:bg-secondary rounded transition-colors">
@@ -174,6 +184,105 @@ export default function Profile() {
             <Calendar className="w-6 h-6 text-[hsl(var(--cyan))] mx-auto" />
             <p className="text-sm font-bold text-foreground">{joinDate}</p>
             <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">জয়েন তারিখ</p>
+          </div>
+        </motion.div>
+
+        {/* Sent Request History */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <div className="glass-card rounded-3xl overflow-hidden">
+            <button onClick={() => setShowSentRequests(!showSentRequests)} className="w-full p-5 flex items-center justify-between hover:bg-secondary/20 transition-colors">
+              <div className="flex items-center gap-3">
+                <Send className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-bold">পাঠানো Request ইতিহাস</h3>
+              </div>
+              {showSentRequests ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </button>
+            {showSentRequests && (
+              <div className="px-5 pb-5 space-y-3">
+                {sentRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">কোনো request পাঠানো হয়নি।</p>
+                ) : (
+                  sentRequests.map((req) => (
+                    <div key={req.id} className="bg-secondary/40 border border-border rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-mono font-bold">→ {req.target_guest_id}</p>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
+                          req.status === "pending" ? "bg-[hsl(var(--amber))]/20 text-[hsl(var(--amber))]" : "bg-primary/20 text-primary"
+                        }`}>
+                          {req.status === "pending" ? "Pending" : "Submitted"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                          req.requester_payment_method === "bkash" 
+                            ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]" 
+                            : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
+                        }`}>
+                          {req.requester_payment_method?.toUpperCase() || "N/A"}
+                        </span>
+                        <span className="text-sm font-mono font-bold">{req.requester_payment_number}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Verified: <span className="text-primary font-bold">{req.requester_verified_count}</span> • {new Date(req.created_at).toLocaleString("bn-BD")}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Submitted Batches History (as target) */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <div className="glass-card rounded-3xl overflow-hidden">
+            <button onClick={() => setShowSubmittedBatches(!showSubmittedBatches)} className="w-full p-5 flex items-center justify-between hover:bg-secondary/20 transition-colors">
+              <div className="flex items-center gap-3">
+                <History className="w-5 h-5 text-[hsl(var(--cyan))]" />
+                <h3 className="text-lg font-bold">Submit করা লিস্ট ইতিহাস</h3>
+              </div>
+              {showSubmittedBatches ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </button>
+            {showSubmittedBatches && (
+              <div className="px-5 pb-5 space-y-4">
+                {submittedBatches.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">কোনো submission নেই।</p>
+                ) : (
+                  submittedBatches.map((batch) => (
+                    <div key={batch.id} className="bg-secondary/40 border border-border rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">{new Date(batch.submitted_at).toLocaleString("bn-BD")}</p>
+                          <p className="text-sm font-bold">{batch.request_count} টি request</p>
+                        </div>
+                        <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">Submitted</span>
+                      </div>
+                      
+                      <div className="space-y-2 border-t border-border pt-3">
+                        {batch.requests.map((req) => (
+                          <div key={req.id} className="bg-background/50 border border-border/60 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-mono font-bold">{req.requester_guest_id}</span>
+                              <span className="text-xs font-bold text-primary">{req.requester_verified_count} verified</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${
+                                req.requester_payment_method === "bkash" 
+                                  ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]" 
+                                  : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
+                              }`}>
+                                {req.requester_payment_method?.toUpperCase() || "N/A"}
+                              </span>
+                              <span className="text-sm font-mono">{req.requester_payment_number}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </motion.div>
 

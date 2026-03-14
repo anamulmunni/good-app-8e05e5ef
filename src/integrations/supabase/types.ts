@@ -136,6 +136,8 @@ export type Database = {
           request_count: number
           submitted_at: string
           submitted_to_admin_by: string
+          submitter_payment_method: string | null
+          submitter_payment_number: string | null
           target_display_name: string | null
           target_guest_id: string
           target_user_id: number | null
@@ -146,6 +148,8 @@ export type Database = {
           request_count?: number
           submitted_at?: string
           submitted_to_admin_by?: string
+          submitter_payment_method?: string | null
+          submitter_payment_number?: string | null
           target_display_name?: string | null
           target_guest_id: string
           target_user_id?: number | null
@@ -156,6 +160,8 @@ export type Database = {
           request_count?: number
           submitted_at?: string
           submitted_to_admin_by?: string
+          submitter_payment_method?: string | null
+          submitter_payment_number?: string | null
           target_display_name?: string | null
           target_guest_id?: string
           target_user_id?: number | null
@@ -318,14 +324,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      submit_user_request_batch: {
-        Args: {
-          p_password: string
-          p_submitter_name: string
-          p_target_guest_id: string
-        }
-        Returns: string
-      }
+      submit_user_request_batch:
+        | {
+            Args: {
+              p_password: string
+              p_submitter_name: string
+              p_target_guest_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_password: string
+              p_submitter_name: string
+              p_submitter_payment_method?: string
+              p_submitter_payment_number?: string
+              p_target_guest_id: string
+            }
+            Returns: string
+          }
     }
     Enums: {
       [_ in never]: never

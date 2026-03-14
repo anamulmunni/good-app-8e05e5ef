@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus, addSubmittedNumbers, getExistingPhoneNumbers, getAllUsers } from "@/lib/api";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
+
 export default function Dashboard() {
   const { user, logout, isLoading, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -30,6 +31,8 @@ export default function Dashboard() {
   const [requestPaymentNumber, setRequestPaymentNumber] = useState("");
   const [showRequestSubmitPassword, setShowRequestSubmitPassword] = useState(false);
   const [requestSubmitPassword, setRequestSubmitPassword] = useState("");
+  const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
+  const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [serverDuplicates, setServerDuplicates] = useState<string[]>([]);
   const [lookupResults, setLookupResults] = useState<any[]>([]);
 
@@ -138,11 +141,18 @@ export default function Dashboard() {
   const submitIncomingRequestsMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
-      return submitIncomingTransferRequests(user.guest_id, user.display_name || user.guest_id, requestSubmitPassword);
+      return submitIncomingTransferRequests(
+        user.guest_id, 
+        user.display_name || user.guest_id, 
+        requestSubmitPassword,
+        submitterPaymentNumber.trim() || undefined,
+        submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined
+      );
     },
     onSuccess: () => {
       setShowRequestSubmitPassword(false);
       setRequestSubmitPassword("");
+      setSubmitterPaymentNumber("");
       queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests", user?.guest_id] });
       queryClient.invalidateQueries({ queryKey: ["admin-submitted"] });
       queryClient.invalidateQueries({ queryKey: ["admin-user-request-submissions"] });
@@ -315,35 +325,77 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground">এখনও কোনো request আসেনি।</p>
             ) : (
               <>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-3 max-h-80 overflow-y-auto">
                   {incomingRequests.map((item) => (
-                    <div key={item.id} className="bg-secondary/40 border border-border rounded-xl p-3 space-y-1">
-                      <p className="text-xs text-muted-foreground">From: <span className="font-mono text-foreground font-bold">{item.requester_guest_id}</span></p>
-                      <p className="text-xs text-muted-foreground">Verified Count: <span className="text-primary font-bold">{item.requester_verified_count}</span></p>
-                      <p className="text-xs text-muted-foreground">Payment: <span className="text-foreground font-bold">{item.requester_payment_method?.toUpperCase()} - {item.requester_payment_number}</span></p>
+                    <div key={item.id} className="bg-secondary/40 border border-border rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-foreground font-mono">{item.requester_guest_id}</p>
+                        <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">
+                          {item.requester_verified_count} verified
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                          item.requester_payment_method === "bkash" 
+                            ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]" 
+                            : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
+                        }`}>
+                          {item.requester_payment_method?.toUpperCase() || "N/A"}
+                        </span>
+                        <span className="text-sm font-mono font-bold text-foreground">{item.requester_payment_number}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
 
                 {showRequestSubmitPassword ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3 bg-secondary/30 p-4 rounded-xl border border-border">
                     <input
                       type="password"
                       value={requestSubmitPassword}
                       onChange={(e) => setRequestSubmitPassword(e.target.value)}
-                      placeholder="পাসওয়ার্ড দিন (Anamul-984516)"
+                      placeholder="পাসওয়ার্ড দিন"
                       className="input-field"
                     />
+                    
+                    <div className="bg-secondary/50 p-3 rounded-xl border border-border space-y-2">
+                      <p className="text-sm font-bold text-muted-foreground">আপনার bKash/Nagad নম্বর (Admin এ যাবে)</p>
+                      <div className="flex gap-2">
+                        <div className="flex items-center gap-1 bg-secondary p-1 rounded-xl border border-border">
+                          <button
+                            onClick={() => setSubmitterPaymentMethod("bkash")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${submitterPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}
+                          >
+                            bKash
+                          </button>
+                          <button
+                            onClick={() => setSubmitterPaymentMethod("nagad")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${submitterPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}
+                          >
+                            Nagad
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="01XXXXXXXXX"
+                          value={submitterPaymentNumber}
+                          onChange={(e) => setSubmitterPaymentNumber(e.target.value)}
+                          className="input-field flex-1"
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => submitIncomingRequestsMutation.mutate()}
                         className="btn-primary py-3"
-                        disabled={submitIncomingRequestsMutation.isPending || !requestSubmitPassword}
+                        disabled={submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}
                       >
                         {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin" /> : "Admin এ পাঠান"}
                       </button>
                       <button
-                        onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); }}
+                        onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
                         className="px-4 py-3 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-colors font-bold"
                       >
                         Cancel
