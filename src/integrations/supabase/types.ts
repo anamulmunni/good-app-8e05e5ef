@@ -324,25 +324,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      submit_user_request_batch:
-        | {
-            Args: {
-              p_password: string
-              p_submitter_name: string
-              p_target_guest_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_password: string
-              p_submitter_name: string
-              p_submitter_payment_method?: string
-              p_submitter_payment_number?: string
-              p_target_guest_id: string
-            }
-            Returns: string
-          }
+      admin_cancel_requests_by_requester: {
+        Args: { p_requester_guest_id: string }
+        Returns: number
+      }
+      admin_dismiss_transfer_request: {
+        Args: { p_request_id: number }
+        Returns: boolean
+      }
+      admin_reset_transfer_batch: {
+        Args: { p_admin_name?: string; p_batch_id: string }
+        Returns: number
+      }
+      admin_reset_transfer_request: {
+        Args: { p_admin_name?: string; p_request_id: number }
+        Returns: boolean
+      }
+      submit_user_request_batch: {
+        Args: {
+          p_password: string
+          p_submitter_name: string
+          p_submitter_payment_method?: string
+          p_submitter_payment_number?: string
+          p_target_guest_id: string
+        }
+        Returns: string
+      }
+      sync_user_request_submission_count: {
+        Args: { p_batch_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
