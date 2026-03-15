@@ -54,18 +54,26 @@ export default function AdminPanel() {
   const [newPasswordValue, setNewPasswordValue] = useState("");
   const [showPassword, setShowPassword] = useState<Record<number, boolean>>({});
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [requesterRequestSearch, setRequesterRequestSearch] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const trimmedRequesterSearch = requesterRequestSearch.trim();
 
   const { data: pool } = useQuery({ queryKey: ["admin-pool"], queryFn: getPoolStats, enabled: isLoggedIn });
   const { data: users } = useQuery({ queryKey: ["admin-users"], queryFn: getAllUsers, enabled: isLoggedIn });
   const { data: allTx } = useQuery({ queryKey: ["admin-transactions"], queryFn: getAllTransactions, enabled: isLoggedIn });
   const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: getPublicSettings, enabled: isLoggedIn });
   const { data: submittedNumbers } = useQuery({ queryKey: ["admin-submitted"], queryFn: getSubmittedNumbers, enabled: isLoggedIn });
-  const { data: userRequestSubmissions } = useQuery({
+  const { data: userRequestSubmissions = [] } = useQuery({
     queryKey: ["admin-user-request-submissions"],
-    queryFn: getUserRequestSubmissions,
+    queryFn: () => getUserRequestSubmissions(true),
     enabled: isLoggedIn && showUserRequestSubmissions,
+  });
+  const { data: requesterActiveRequests = [] } = useQuery({
+    queryKey: ["admin-requester-active-requests", trimmedRequesterSearch],
+    queryFn: () => getActiveRequestsByRequester(trimmedRequesterSearch),
+    enabled: isLoggedIn && showUserRequestSubmissions && trimmedRequesterSearch.length > 0,
   });
   const { data: resetHistoryData } = useQuery({ queryKey: ["admin-reset-history"], queryFn: getResetHistory, enabled: isLoggedIn && (showResetHistory || showPaymentSearch) });
   const { data: receivedList } = useQuery({ queryKey: ["admin-payments-received"], queryFn: () => getPaymentUsers("received"), enabled: isLoggedIn && showPaymentLists });
