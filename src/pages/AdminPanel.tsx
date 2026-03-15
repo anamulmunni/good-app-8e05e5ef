@@ -428,6 +428,21 @@ export default function AdminPanel() {
                   <div className="flex items-center gap-2">
                     <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{users?.find(u => u.guest_id === item.phone_number)?.key_count || 0} টা</span>
                     <button onClick={async () => {
+                      if (item.submitted_by?.startsWith("Request→")) {
+                        const { data: activeRequest } = await supabase
+                          .from("user_transfer_requests")
+                          .select("id")
+                          .eq("requester_guest_id", item.phone_number)
+                          .eq("status", "submitted")
+                          .limit(1)
+                          .maybeSingle();
+
+                        if (activeRequest?.id) {
+                          await resetTransferRequestMutation.mutateAsync(Number(activeRequest.id));
+                          return;
+                        }
+                      }
+
                       const user = users?.find(u => u.guest_id === item.phone_number);
                       await addResetHistory(item.phone_number, user?.key_count || item.verified_count, item.submitted_by, item.payment_number || undefined, item.payment_method || undefined);
                       if (user) await resetUserKeyCount(user.id);
