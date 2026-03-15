@@ -9,7 +9,14 @@ import {
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
   addResetHistory,
 } from "@/lib/api";
-import { getUserRequestSubmissions } from "@/lib/user-requests";
+import {
+  getUserRequestSubmissions,
+  getActiveRequestsByRequester,
+  adminCancelRequestsByRequester,
+  adminResetTransferRequest,
+  adminResetTransferBatch,
+  adminDismissTransferRequest,
+} from "@/lib/user-requests";
 import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
