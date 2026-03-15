@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const ACTIVE_REQUEST_STATUSES = ["pending", "submitted"] as const;
+
 export type UserTransferRequest = {
   id: number;
   requester_user_id: number;
@@ -34,11 +36,11 @@ export async function checkUserHasPendingRequest(requesterGuestId: string): Prom
     .from("user_transfer_requests")
     .select("id")
     .eq("requester_guest_id", requesterGuestId)
-    .eq("status", "pending")
+    .in("status", [...ACTIVE_REQUEST_STATUSES])
     .limit(1);
 
   if (error) throw error;
-  return (data && data.length > 0);
+  return !!(data && data.length > 0);
 }
 
 export async function createUserTransferRequest(payload: {
@@ -49,10 +51,9 @@ export async function createUserTransferRequest(payload: {
   requesterPaymentMethod?: string;
   targetGuestId: string;
 }) {
-  // Check duplicate
   const hasPending = await checkUserHasPendingRequest(payload.requesterGuestId);
   if (hasPending) {
-    throw new Error("আপনার আগের request এখনও pending আছে। আগে সেটা complete হলে নতুন request দিতে পারবেন।");
+    throw new Error("আপনার আগের request এখনও active আছে। Admin reset/cancel না করা পর্যন্ত নতুন request দিতে পারবেন না।");
   }
 
   const { error } = await supabase.from("user_transfer_requests").insert({
@@ -64,7 +65,12 @@ export async function createUserTransferRequest(payload: {
     target_guest_id: payload.targetGuestId,
   });
 
-  if (error) throw error;
+  if (error) {
+    if ((error as any).code === "23505") {
+      throw new Error("আপনার আগের request এখনও active আছে। Admin reset/cancel না করা পর্যন্ত নতুন request দিতে পারবেন না।");
+    }
+    throw error;
+  }
 }
 
 export async function getIncomingTransferRequests(targetGuestId: string): Promise<UserTransferRequest[]> {
@@ -80,8 +86,8 @@ export async function getIncomingTransferRequests(targetGuestId: string): Promis
 }
 
 export async function submitIncomingTransferRequests(
-  targetGuestId: string, 
-  submitterName: string, 
+  targetGuestId: string,
+  submitterName: string,
   password: string,
   submitterPaymentNumber?: string,
   submitterPaymentMethod?: string
@@ -98,7 +104,7 @@ export async function submitIncomingTransferRequests(
   return data;
 }
 
-export async function getUserRequestSubmissions(): Promise<UserRequestSubmission[]> {
+export async function getUserRequestSubmissions(activeOnly = false): Promise<UserRequestSubmission[]> {
   const { data: submissions, error: submissionsError } = await supabase
     .from("user_request_submissions")
     .select("*")
@@ -109,23 +115,80 @@ export async function getUserRequestSubmissions(): Promise<UserRequestSubmission
 
   const batchIds = submissions.map((submission) => submission.id);
 
-  const { data: requests, error: requestsError } = await supabase
+  let requestsQuery = supabase
     .from("user_transfer_requests")
     .select("*")
     .in("submitted_batch_id", batchIds)
     .order("created_at", { ascending: false });
 
+  if (activeOnly) {
+    requestsQuery = requestsQuery.eq("status", "submitted");
+  }
+
+  const { data: requests, error: requestsError } = await requestsQuery;
   if (requestsError) throw requestsError;
 
-  return submissions.map((submission) => ({
+  const mapped = submissions.map((submission) => ({
     ...submission,
     submitter_payment_number: (submission as any).submitter_payment_number || null,
     submitter_payment_method: (submission as any).submitter_payment_method || null,
     requests: (requests || []).filter((request) => request.submitted_batch_id === submission.id),
   }));
+
+  return activeOnly ? mapped.filter((submission) => submission.requests.length > 0) : mapped;
 }
 
-// Get all requests (pending + submitted) for a user (as requester) for history
+export async function getActiveRequestsByRequester(requesterGuestId: string): Promise<UserTransferRequest[]> {
+  const { data, error } = await supabase
+    .from("user_transfer_requests")
+    .select("*")
+    .eq("requester_guest_id", requesterGuestId)
+    .in("status", [...ACTIVE_REQUEST_STATUSES])
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function adminCancelRequestsByRequester(requesterGuestId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_cancel_requests_by_requester", {
+    p_requester_guest_id: requesterGuestId,
+  } as any);
+
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+export async function adminResetTransferRequest(requestId: number): Promise<boolean> {
+  const { data, error } = await supabase.rpc("admin_reset_transfer_request", {
+    p_request_id: requestId,
+    p_admin_name: "Admin",
+  } as any);
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function adminResetTransferBatch(batchId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_reset_transfer_batch", {
+    p_batch_id: batchId,
+    p_admin_name: "Admin",
+  } as any);
+
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+export async function adminDismissTransferRequest(requestId: number): Promise<boolean> {
+  const { data, error } = await supabase.rpc("admin_dismiss_transfer_request", {
+    p_request_id: requestId,
+  } as any);
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
+// Get all requests (pending + submitted + others) for a user (as requester) for history
 export async function getUserRequestHistory(requesterGuestId: string): Promise<UserTransferRequest[]> {
   const { data, error } = await supabase
     .from("user_transfer_requests")

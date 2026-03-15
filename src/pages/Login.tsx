@@ -71,34 +71,15 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     try {
-      const isCustomDomain =
-        !window.location.hostname.includes("lovable.app") &&
-        !window.location.hostname.includes("lovableproject.com") &&
-        !window.location.hostname.includes("localhost");
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+        extraParams: {
+          prompt: "select_account",
+        },
+      });
 
-      if (isCustomDomain) {
-        // Bypass auth-bridge for custom domains (e.g. Render)
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: `${window.location.origin}/dashboard`,
-            skipBrowserRedirect: true,
-          },
-        });
-
-        if (error) throw error;
-
-        if (data?.url) {
-          window.location.href = data.url;
-        }
-      } else {
-        // For Lovable domains, use managed auth
-        const result = await lovable.auth.signInWithOAuth("google", {
-          redirect_uri: window.location.origin,
-        });
-        if (result?.error) {
-          toast({ title: "Google লগইন ব্যর্থ", description: String(result.error.message || result.error), variant: "destructive" });
-        }
+      if (result?.error) {
+        toast({ title: "Google লগইন ব্যর্থ", description: String(result.error.message || result.error), variant: "destructive" });
       }
     } catch (err: any) {
       toast({ title: "Google লগইন ব্যর্থ", description: err.message, variant: "destructive" });

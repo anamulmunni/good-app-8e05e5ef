@@ -100,6 +100,14 @@ export default function Profile() {
 
   const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString("bn-BD", { year: "numeric", month: "long", day: "numeric" }) : "—";
 
+  const requestStatusLabel: Record<string, { text: string; className: string }> = {
+    pending: { text: "Pending", className: "bg-[hsl(var(--amber))]/20 text-[hsl(var(--amber))]" },
+    submitted: { text: "Submitted", className: "bg-primary/20 text-primary" },
+    reset: { text: "Reset", className: "bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))]" },
+    cancelled: { text: "Cancelled", className: "bg-destructive/20 text-destructive" },
+    dismissed: { text: "Dismissed", className: "bg-muted text-muted-foreground" },
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -206,10 +214,8 @@ export default function Profile() {
                     <div key={req.id} className="bg-secondary/40 border border-border rounded-xl p-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-mono font-bold">→ {req.target_guest_id}</p>
-                        <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
-                          req.status === "pending" ? "bg-[hsl(var(--amber))]/20 text-[hsl(var(--amber))]" : "bg-primary/20 text-primary"
-                        }`}>
-                          {req.status === "pending" ? "Pending" : "Submitted"}
+                        <span className={`text-xs font-bold px-2 py-1 rounded-lg ${requestStatusLabel[req.status]?.className || "bg-secondary text-muted-foreground"}`}>
+                          {requestStatusLabel[req.status]?.text || req.status}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">

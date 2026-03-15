@@ -9,7 +9,14 @@ import {
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
   addResetHistory,
 } from "@/lib/api";
-import { getUserRequestSubmissions } from "@/lib/user-requests";
+import {
+  getUserRequestSubmissions,
+  getActiveRequestsByRequester,
+  adminCancelRequestsByRequester,
+  adminResetTransferRequest,
+  adminResetTransferBatch,
+  adminDismissTransferRequest,
+} from "@/lib/user-requests";
 import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,18 +54,26 @@ export default function AdminPanel() {
   const [newPasswordValue, setNewPasswordValue] = useState("");
   const [showPassword, setShowPassword] = useState<Record<number, boolean>>({});
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [requesterRequestSearch, setRequesterRequestSearch] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const trimmedRequesterSearch = requesterRequestSearch.trim();
 
   const { data: pool } = useQuery({ queryKey: ["admin-pool"], queryFn: getPoolStats, enabled: isLoggedIn });
   const { data: users } = useQuery({ queryKey: ["admin-users"], queryFn: getAllUsers, enabled: isLoggedIn });
   const { data: allTx } = useQuery({ queryKey: ["admin-transactions"], queryFn: getAllTransactions, enabled: isLoggedIn });
   const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: getPublicSettings, enabled: isLoggedIn });
   const { data: submittedNumbers } = useQuery({ queryKey: ["admin-submitted"], queryFn: getSubmittedNumbers, enabled: isLoggedIn });
-  const { data: userRequestSubmissions } = useQuery({
+  const { data: userRequestSubmissions = [] } = useQuery({
     queryKey: ["admin-user-request-submissions"],
-    queryFn: getUserRequestSubmissions,
+    queryFn: () => getUserRequestSubmissions(true),
     enabled: isLoggedIn && showUserRequestSubmissions,
+  });
+  const { data: requesterActiveRequests = [] } = useQuery({
+    queryKey: ["admin-requester-active-requests", trimmedRequesterSearch],
+    queryFn: () => getActiveRequestsByRequester(trimmedRequesterSearch),
+    enabled: isLoggedIn && showUserRequestSubmissions && trimmedRequesterSearch.length > 0,
   });
   const { data: resetHistoryData } = useQuery({ queryKey: ["admin-reset-history"], queryFn: getResetHistory, enabled: isLoggedIn && (showResetHistory || showPaymentSearch) });
   const { data: receivedList } = useQuery({ queryKey: ["admin-payments-received"], queryFn: () => getPaymentUsers("received"), enabled: isLoggedIn && showPaymentLists });
@@ -147,24 +162,55 @@ export default function AdminPanel() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-submitted"] }); toast({ title: "ডিলিট হয়েছে" }); },
   });
 
-  const batchResetMutation = useMutation({
-    mutationFn: async (numbers: string[]) => {
-      for (const phoneNumber of numbers) {
-        const user = users?.find(u => u.guest_id === phoneNumber);
-        if (user) {
-          const submittedInfo = submittedNumbers?.find(s => s.phone_number === phoneNumber);
-          await addResetHistory(
-            phoneNumber,
-            user.key_count,
-            "Admin",
-            submittedInfo?.payment_number || undefined,
-            submittedInfo?.payment_method || undefined
-          );
-          await resetUserKeyCount(user.id);
-        }
+  const refreshRequestPanels = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-submitted"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-user-request-submissions"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-requester-active-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["user-sent-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["user-submitted-batches"] });
+  };
+
+  const resetTransferRequestMutation = useMutation({
+    mutationFn: adminResetTransferRequest,
+    onSuccess: (ok) => {
+      if (!ok) {
+        toast({ title: "রিকুয়েস্ট রিসেট করা যায়নি", variant: "destructive" });
+        return;
       }
+      refreshRequestPanels();
+      toast({ title: "রিকুয়েস্ট রিসেট হয়েছে" });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-users"] }); queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] }); setBatchNumbers(""); toast({ title: "রিসেট হয়েছে" }); },
+  });
+
+  const dismissTransferRequestMutation = useMutation({
+    mutationFn: adminDismissTransferRequest,
+    onSuccess: (ok) => {
+      if (!ok) {
+        toast({ title: "রিকুয়েস্ট বাদ দেওয়া যায়নি", variant: "destructive" });
+        return;
+      }
+      refreshRequestPanels();
+      toast({ title: "রিকুয়েস্ট লিস্ট থেকে সরানো হয়েছে" });
+    },
+  });
+
+  const resetTransferBatchMutation = useMutation({
+    mutationFn: adminResetTransferBatch,
+    onSuccess: (count) => {
+      refreshRequestPanels();
+      toast({ title: `${count} টি রিকুয়েস্ট রিসেট হয়েছে` });
+    },
+  });
+
+  const cancelRequesterRequestsMutation = useMutation({
+    mutationFn: adminCancelRequestsByRequester,
+    onSuccess: (count) => {
+      refreshRequestPanels();
+      toast({ title: `${count} টি active request cancel হয়েছে` });
+    },
   });
 
   const filteredUsers = users?.filter(u => searchQuery ? u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) : true);
@@ -239,14 +285,54 @@ export default function AdminPanel() {
           <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowUserRequestSubmissions(!showUserRequestSubmissions)}>
             <div className="flex items-center gap-3">
               <Send className="w-6 h-6 text-primary" />
-              <h2 className="text-xl font-bold">ইউজার Request Submission ({userRequestSubmissions?.length || 0})</h2>
+              <h2 className="text-xl font-bold">ইউজার Request Submission ({userRequestSubmissions.length || 0})</h2>
             </div>
             {showUserRequestSubmissions ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </div>
 
           {showUserRequestSubmissions && (
             <div className="mt-6 space-y-4">
-              {userRequestSubmissions && userRequestSubmissions.length > 0 ? (
+              <div className="bg-secondary/30 border border-border rounded-xl p-4 space-y-3">
+                <p className="text-sm font-bold">রিকুয়েস্ট পাঠানো নম্বর দিয়ে সার্চ করে Cancel করুন</p>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={requesterRequestSearch}
+                    onChange={(e) => setRequesterRequestSearch(e.target.value)}
+                    placeholder="রিকুয়েস্ট পাঠানো নম্বর লিখুন (01XXXXXXXXX)"
+                    className="input-field pl-10"
+                  />
+                </div>
+
+                {trimmedRequesterSearch && (
+                  <div className="space-y-2">
+                    {requesterActiveRequests.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">এই নম্বরের active request নেই।</p>
+                    ) : (
+                      <>
+                        <div className="space-y-2 max-h-44 overflow-y-auto">
+                          {requesterActiveRequests.map((item) => (
+                            <div key={item.id} className="bg-background/50 border border-border rounded-lg p-3">
+                              <p className="text-sm font-mono font-bold">{item.requester_guest_id} → {item.target_guest_id}</p>
+                              <p className="text-xs text-muted-foreground">Status: {item.status} • Verified: {item.requester_verified_count}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => cancelRequesterRequestsMutation.mutate(trimmedRequesterSearch)}
+                          disabled={cancelRequesterRequestsMutation.isPending}
+                          className="btn-primary py-2.5 bg-destructive text-destructive-foreground"
+                        >
+                          {cancelRequesterRequestsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : `এই নম্বরের সব Active Request Cancel`}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {userRequestSubmissions.length > 0 ? (
                 userRequestSubmissions.map((batch) => (
                   <div key={batch.id} className="bg-secondary/50 border border-border rounded-xl p-4 space-y-3">
                     <div className="flex items-start justify-between gap-3">
@@ -258,8 +344,8 @@ export default function AdminPanel() {
                         {batch.submitter_payment_number && (
                           <p className="text-xs mt-1">
                             <span className={`font-bold px-2 py-0.5 rounded-lg text-xs ${
-                              batch.submitter_payment_method === "bkash" 
-                                ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]" 
+                              batch.submitter_payment_method === "bkash"
+                                ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]"
                                 : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
                             }`}>
                               {batch.submitter_payment_method?.toUpperCase() || "N/A"}
@@ -274,56 +360,46 @@ export default function AdminPanel() {
 
                     <div className="space-y-2 border-t border-border pt-3">
                       {batch.requests.map((request) => {
-                        const reqUser = users?.find(u => u.guest_id === request.requester_guest_id);
+                        const reqUser = users?.find((u) => u.guest_id === request.requester_guest_id);
                         return (
-                          <div key={request.id} className="p-3 rounded-lg bg-background/50 border border-border/60 flex items-center justify-between">
+                          <div key={request.id} className="p-3 rounded-lg bg-background/50 border border-border/60 flex items-center justify-between gap-2">
                             <div>
                               <p className="font-mono text-sm font-bold">{request.requester_guest_id}</p>
-                              <p className="text-xs text-muted-foreground">Verified: <span className="text-primary font-bold">{reqUser?.key_count || request.requester_verified_count}</span></p>
+                              <p className="text-xs text-muted-foreground">Verified: <span className="text-primary font-bold">{reqUser?.key_count ?? request.requester_verified_count}</span></p>
                             </div>
-                            <button
-                              onClick={async () => {
-                                const u = users?.find(u => u.guest_id === request.requester_guest_id);
-                                if (u) {
-                                  await addResetHistory(u.guest_id, u.key_count, batch.submitted_to_admin_by);
-                                  await resetUserKeyCount(u.id);
-                                  queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-                                  queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] });
-                                  toast({ title: `${u.guest_id} রিসেট হয়েছে` });
-                                } else {
-                                  toast({ title: "ইউজার পাওয়া যায়নি", variant: "destructive" });
-                                }
-                              }}
-                              className="px-3 py-1.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] font-bold rounded-lg text-xs hover:bg-[hsl(var(--cyan))]/30 transition-colors"
-                            >
-                              Reset
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => resetTransferRequestMutation.mutate(request.id)}
+                                disabled={resetTransferRequestMutation.isPending}
+                                className="px-3 py-1.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] font-bold rounded-lg text-xs hover:bg-[hsl(var(--cyan))]/30 transition-colors disabled:opacity-60"
+                              >
+                                Reset
+                              </button>
+                              <button
+                                onClick={() => dismissTransferRequestMutation.mutate(request.id)}
+                                disabled={dismissTransferRequestMutation.isPending}
+                                className="p-1.5 rounded-lg text-destructive hover:bg-destructive/20 disabled:opacity-60"
+                                title="Reset ছাড়া লিস্ট থেকে সরান"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
 
                     <button
-                      onClick={async () => {
-                        for (const request of batch.requests) {
-                          const u = users?.find(u => u.guest_id === request.requester_guest_id);
-                          if (u) {
-                            await addResetHistory(u.guest_id, u.key_count, batch.submitted_to_admin_by);
-                            await resetUserKeyCount(u.id);
-                          }
-                        }
-                        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-                        queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] });
-                        toast({ title: `${batch.requests.length} টি নম্বর রিসেট হয়েছে` });
-                      }}
-                      className="btn-primary py-2.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] border border-[hsl(var(--cyan))]/30 hover:bg-[hsl(var(--cyan))]/30"
+                      onClick={() => resetTransferBatchMutation.mutate(batch.id)}
+                      disabled={resetTransferBatchMutation.isPending}
+                      className="btn-primary py-2.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] border border-[hsl(var(--cyan))]/30 hover:bg-[hsl(var(--cyan))]/30 disabled:opacity-60"
                     >
-                      <RefreshCcw className="w-4 h-4" /> সব Reset করুন ({batch.requests.length})
+                      {resetTransferBatchMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><RefreshCcw className="w-4 h-4" /> সব Reset করুন ({batch.requests.length})</>}
                     </button>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">এখনও কোনো submission আসেনি।</p>
+                <p className="text-sm text-muted-foreground">এখনও কোনো active submission নেই।</p>
               )}
             </div>
           )}
@@ -352,6 +428,21 @@ export default function AdminPanel() {
                   <div className="flex items-center gap-2">
                     <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{users?.find(u => u.guest_id === item.phone_number)?.key_count || 0} টা</span>
                     <button onClick={async () => {
+                      if (item.submitted_by?.startsWith("Request→")) {
+                        const { data: activeRequest } = await supabase
+                          .from("user_transfer_requests")
+                          .select("id")
+                          .eq("requester_guest_id", item.phone_number)
+                          .eq("status", "submitted")
+                          .limit(1)
+                          .maybeSingle();
+
+                        if (activeRequest?.id) {
+                          await resetTransferRequestMutation.mutateAsync(Number(activeRequest.id));
+                          return;
+                        }
+                      }
+
                       const user = users?.find(u => u.guest_id === item.phone_number);
                       await addResetHistory(item.phone_number, user?.key_count || item.verified_count, item.submitted_by, item.payment_number || undefined, item.payment_method || undefined);
                       if (user) await resetUserKeyCount(user.id);
