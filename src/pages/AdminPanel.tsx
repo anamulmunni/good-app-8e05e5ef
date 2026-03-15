@@ -162,24 +162,55 @@ export default function AdminPanel() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-submitted"] }); toast({ title: "ডিলিট হয়েছে" }); },
   });
 
-  const batchResetMutation = useMutation({
-    mutationFn: async (numbers: string[]) => {
-      for (const phoneNumber of numbers) {
-        const user = users?.find(u => u.guest_id === phoneNumber);
-        if (user) {
-          const submittedInfo = submittedNumbers?.find(s => s.phone_number === phoneNumber);
-          await addResetHistory(
-            phoneNumber,
-            user.key_count,
-            "Admin",
-            submittedInfo?.payment_number || undefined,
-            submittedInfo?.payment_method || undefined
-          );
-          await resetUserKeyCount(user.id);
-        }
+  const refreshRequestPanels = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-submitted"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-user-request-submissions"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-requester-active-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["user-sent-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["user-submitted-batches"] });
+  };
+
+  const resetTransferRequestMutation = useMutation({
+    mutationFn: adminResetTransferRequest,
+    onSuccess: (ok) => {
+      if (!ok) {
+        toast({ title: "রিকুয়েস্ট রিসেট করা যায়নি", variant: "destructive" });
+        return;
       }
+      refreshRequestPanels();
+      toast({ title: "রিকুয়েস্ট রিসেট হয়েছে" });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-users"] }); queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] }); setBatchNumbers(""); toast({ title: "রিসেট হয়েছে" }); },
+  });
+
+  const dismissTransferRequestMutation = useMutation({
+    mutationFn: adminDismissTransferRequest,
+    onSuccess: (ok) => {
+      if (!ok) {
+        toast({ title: "রিকুয়েস্ট বাদ দেওয়া যায়নি", variant: "destructive" });
+        return;
+      }
+      refreshRequestPanels();
+      toast({ title: "রিকুয়েস্ট লিস্ট থেকে সরানো হয়েছে" });
+    },
+  });
+
+  const resetTransferBatchMutation = useMutation({
+    mutationFn: adminResetTransferBatch,
+    onSuccess: (count) => {
+      refreshRequestPanels();
+      toast({ title: `${count} টি রিকুয়েস্ট রিসেট হয়েছে` });
+    },
+  });
+
+  const cancelRequesterRequestsMutation = useMutation({
+    mutationFn: adminCancelRequestsByRequester,
+    onSuccess: (count) => {
+      refreshRequestPanels();
+      toast({ title: `${count} টি active request cancel হয়েছে` });
+    },
   });
 
   const filteredUsers = users?.filter(u => searchQuery ? u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) : true);
