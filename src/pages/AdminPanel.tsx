@@ -373,7 +373,7 @@ export default function AdminPanel() {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => resetBatchMutation.mutate(batch.id)} disabled={resetBatchMutation.isPending} className="p-2 rounded-lg bg-primary/20 hover:bg-primary/40 transition" title="Reset Batch">
+                        <button onClick={() => resetTransferBatchMutation.mutate(batch.id)} disabled={resetTransferBatchMutation.isPending} className="p-2 rounded-lg bg-primary/20 hover:bg-primary/40 transition" title="Reset Batch">
                           <RefreshCcw className="w-4 h-4 text-primary" />
                         </button>
                       </div>
