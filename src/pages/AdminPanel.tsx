@@ -302,8 +302,8 @@ export default function AdminPanel() {
                     await recalculateAllBalances(rate);
                     toast({ title: `পেমেন্ট মোড ON — ব্যালেন্স ${rate} TK/key হিসেবে আপডেট` });
                   } else {
-                    await resetAllBalances();
-                    toast({ title: "পেমেন্ট মোড OFF — সব ব্যালেন্স রিসেট" });
+                    // Don't reset balances — just hide the UI. Balances stay safe.
+                    toast({ title: "পেমেন্ট মোড OFF — উইথড্র ও ব্যালেন্স ইউজারদের কাছে লুকানো হয়েছে" });
                   }
                   setPaymentModeSetting(newMode);
                   queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
