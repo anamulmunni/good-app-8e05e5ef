@@ -547,7 +547,7 @@ export default function Dashboard() {
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.section>
+        </motion.section>}
 
         {/* Key Submitter */}
         <motion.div custom={5} variants={cardVariants} initial="hidden" animate="visible">
