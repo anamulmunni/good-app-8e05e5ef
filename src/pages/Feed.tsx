@@ -374,15 +374,22 @@ export default function Feed() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[200] bg-black flex flex-col" onClick={() => setViewingStory(null)}>
             <div className="p-4 flex items-center gap-3 relative z-10">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+              <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/user/${viewingStory.user_id}`); }}
+                className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
                 {viewingStory.user?.avatar_url ? <img src={viewingStory.user.avatar_url} className="w-full h-full object-cover" /> :
                   <span className="text-white text-xs font-bold">{viewingStory.user?.display_name?.[0] || "?"}</span>}
-              </div>
-              <div className="flex-1">
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/user/${viewingStory.user_id}`); }} className="flex-1 text-left">
                 <p className="text-white font-bold text-sm">{viewingStory.user?.display_name || "User"}</p>
                 <p className="text-white/60 text-[10px]">{timeAgo(viewingStory.created_at)}</p>
+              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/chat`); startChatWith(viewingStory.user_id); }}
+                  className="text-white/80 hover:text-white p-1"><MessageCircle size={20} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/call/${viewingStory.user_id}`); }}
+                  className="text-white/80 hover:text-white p-1"><Phone size={20} /></button>
+                <button onClick={() => setViewingStory(null)} className="text-white/80"><X size={24} /></button>
               </div>
-              <button onClick={() => setViewingStory(null)} className="text-white/80"><X size={24} /></button>
             </div>
             <div className="flex-1 flex items-center justify-center p-4">
               <img src={viewingStory.image_url} alt="" className="max-w-full max-h-full object-contain rounded-2xl" />

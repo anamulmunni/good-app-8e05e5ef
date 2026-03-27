@@ -226,9 +226,13 @@ export default function Chat() {
           <button onClick={() => navigate(`/user/${otherUser.id}`)} className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm overflow-hidden">
             {otherUser.avatar_url ? <img src={otherUser.avatar_url} alt="" className="w-full h-full object-cover" /> : otherUser.display_name?.[0]?.toUpperCase() || "?"}
           </button>
-          <button onClick={() => navigate(`/user/${otherUser.id}`)} className="text-left">
+          <button onClick={() => navigate(`/user/${otherUser.id}`)} className="text-left flex-1">
             <p className="font-semibold text-foreground text-sm">{otherUser.display_name || "User"}</p>
             <p className="text-xs text-muted-foreground">{otherUser.guest_id}</p>
+          </button>
+          <button onClick={() => navigate(`/call/${otherUser.id}`)}
+            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-[hsl(var(--emerald))]">
+            <Phone size={20} />
           </button>
         </div>
 
