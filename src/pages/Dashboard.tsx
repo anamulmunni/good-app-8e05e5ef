@@ -211,45 +211,45 @@ export default function Dashboard() {
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-5 relative z-10">
         {/* Stats Cards Row */}
-        <div className={`grid gap-3 ${paymentMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <motion.div
-            custom={0}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            className="glass-card rounded-2xl p-4 border border-primary/20 relative overflow-hidden group"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
-                  <Shield className="w-4 h-4 text-primary" />
+        <div className="grid grid-cols-1 gap-3">
+          {paymentMode ? (
+            <motion.div
+              custom={0}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="glass-card rounded-2xl p-5 border border-[hsl(var(--cyan))]/20 relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-xl bg-[hsl(var(--cyan))]/20 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-[hsl(var(--cyan))]" />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ব্যালেন্স</p>
                 </div>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ভেরিফাইড</p>
+                <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">৳</span></p>
               </div>
-              <p className="text-3xl font-black text-foreground">{user.key_count || 0}</p>
-            </div>
-          </motion.div>
-
-          {paymentMode && (
-          <motion.div
-            custom={1}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            className="glass-card rounded-2xl p-4 border border-[hsl(var(--cyan))]/20 relative overflow-hidden group"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-[hsl(var(--cyan))]/20 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-[hsl(var(--cyan))]" />
+            </motion.div>
+          ) : (
+            <motion.div
+              custom={0}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="glass-card rounded-2xl p-5 border border-primary/20 relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-primary" />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ভেরিফাইড</p>
                 </div>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ব্যালেন্স</p>
+                <p className="text-3xl font-black text-foreground">{user.key_count || 0}</p>
               </div>
-              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">৳</span></p>
-            </div>
-          </motion.div>
+            </motion.div>
           )}
         </div>
 
