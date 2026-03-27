@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowRight, Lock, Phone } from "lucide-react";
+import { Loader2, ArrowRight, Lock, Phone, PlayCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { getPublicSettings } from "@/lib/api";
 
 export default function Login() {
   const [phone, setPhone] = useState("");
@@ -13,6 +15,12 @@ export default function Login() {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: getPublicSettings,
+  });
+  const videoUrl = publicSettings?.videoUrl;
 
   const normalizePhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -160,13 +168,24 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-3">
             <p className="text-sm text-muted-foreground">
               অ্যাকাউন্ট নেই?{" "}
               <button onClick={() => navigate("/register")} className="text-primary font-bold hover:underline">
                 রেজিস্টার করুন
               </button>
             </p>
+            {videoUrl && (
+              <a
+                href={videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-destructive/15 border border-destructive/25 text-destructive font-bold text-sm hover:bg-destructive/25 transition-colors"
+              >
+                <PlayCircle className="w-5 h-5" />
+                ভিডিও দেখুন — কিভাবে রেজিস্টার করবেন
+              </a>
+            )}
           </div>
         </div>
       </motion.div>

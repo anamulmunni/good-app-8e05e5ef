@@ -267,8 +267,8 @@ export default function Dashboard() {
                     </div>
                     <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">আমার ওয়ালেট</p>
                   </div>
-                  <div className="px-2.5 py-1 rounded-lg bg-[hsl(var(--emerald))]/15 border border-[hsl(var(--emerald))]/20">
-                    <p className="text-[10px] font-bold text-[hsl(var(--emerald))]">{currentRate} TK/ভেরি</p>
+                  <div className="px-3 py-1.5 rounded-xl bg-[hsl(var(--emerald))]/15 border border-[hsl(var(--emerald))]/25">
+                    <p className="text-sm font-black text-[hsl(var(--emerald))]">💰 {currentRate} TK/ভেরিফাই</p>
                   </div>
                 </div>
                 <div className="text-center py-3">
@@ -404,8 +404,8 @@ export default function Dashboard() {
         )}
 
 
-        {/* User Request Section */}
-        <motion.section
+        {/* User Request Section - hidden when payment mode is ON */}
+        {!paymentMode && <motion.section
           custom={4}
           variants={cardVariants}
           initial="hidden"
@@ -547,7 +547,7 @@ export default function Dashboard() {
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.section>
+        </motion.section>}
 
         {/* Key Submitter */}
         <motion.div custom={5} variants={cardVariants} initial="hidden" animate="visible">
