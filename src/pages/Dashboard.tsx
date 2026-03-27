@@ -253,11 +253,11 @@ export default function Dashboard() {
               animate="visible"
               className="glass-card rounded-2xl border border-[hsl(var(--cyan))]/20 relative group"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/5 via-[hsl(var(--emerald))]/5 to-[hsl(var(--purple))]/5" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/5 via-[hsl(var(--emerald))]/5 to-[hsl(var(--purple))]/5" />
               <motion.div
                 animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-[hsl(var(--cyan))]/5 to-transparent"
+                className="pointer-events-none absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-[hsl(var(--cyan))]/5 to-transparent"
               />
               <div className="relative z-10 p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -297,7 +297,7 @@ export default function Dashboard() {
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="border-t border-[hsl(var(--cyan))]/10"
+                    className="relative z-10 overflow-hidden border-t border-[hsl(var(--cyan))]/10"
                   >
                     <div className="p-5">
                       <WithdrawForm balance={user.balance || 0} />
@@ -312,17 +312,30 @@ export default function Dashboard() {
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="glass-card rounded-2xl p-5 border border-primary/20 relative overflow-hidden group"
+              className="glass-card rounded-2xl border border-primary/25 relative overflow-hidden group"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
-                    <Shield className="w-4 h-4 text-primary" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-[hsl(var(--cyan))]/10" />
+              <motion.div
+                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                className="pointer-events-none absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-primary/10 to-transparent"
+              />
+              <div className="relative z-10 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-primary" />
+                    </div>
+                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">ভেরিফাইড কী</p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ভেরিফাইড</p>
+                  <span className="text-[10px] px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/20 text-primary font-black">LIVE COUNT</span>
                 </div>
-                <p className="text-3xl font-black text-foreground">{user.key_count || 0}</p>
+                <div className="text-center py-1">
+                  <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wider">মোট ভেরিফিকেশন</p>
+                  <p className="text-6xl sm:text-7xl font-black leading-none text-foreground drop-shadow-[0_10px_24px_hsl(var(--primary)/0.28)]">
+                    {user.key_count || 0}
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
