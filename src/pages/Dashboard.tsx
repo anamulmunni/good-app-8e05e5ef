@@ -223,7 +223,7 @@ export default function Dashboard() {
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-5 relative z-10">
         {/* Stats Cards Row */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${paymentMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <motion.div
             custom={0}
             variants={cardVariants}
