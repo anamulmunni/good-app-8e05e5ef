@@ -403,32 +403,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* Current Rate & Withdraw Section */}
-        {paymentMode && (
-          <>
-            <motion.div
-              custom={3.5}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              className="glass-card rounded-2xl p-4 border border-[hsl(var(--emerald))]/20 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--emerald))]/20 flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-[hsl(var(--emerald))]" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">বর্তমান রেট</p>
-                  <p className="text-xl font-black text-[hsl(var(--emerald))]">{currentRate} TK <span className="text-xs text-muted-foreground font-medium">/ প্রতি ভেরিফাই</span></p>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div custom={3.7} variants={cardVariants} initial="hidden" animate="visible">
-              <WithdrawForm balance={user.balance || 0} />
-            </motion.div>
-          </>
-        )}
 
         {/* User Request Section */}
         <motion.section
