@@ -57,10 +57,17 @@ export default function Feed() {
     enabled: !!user,
   });
 
+  const { data: onlineUsers = [] } = useQuery({
+    queryKey: ["online-users"],
+    queryFn: () => getOnlineUsers(user!.id),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
   const { data: suggestedUsers = [] } = useQuery({
     queryKey: ["suggested-users"],
     queryFn: () => getSuggestedUsers(user!.id),
-    enabled: !!user && showSearch,
+    enabled: !!user && showSearch && onlineUsers.length === 0,
   });
 
   const { data: searchResults = [] } = useQuery({
