@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
 import AddKeys from "./pages/AddKeys";
 import Chat from "./pages/Chat";
+import Feed from "./pages/Feed";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/add-keys" element={<AddKeys />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/feed" element={<Feed />} />
           <Route path="/~oauth" element={<Login />} />
           <Route path="/~c" element={<Login />} />
           <Route path="*" element={<NotFound />} />
