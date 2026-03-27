@@ -63,6 +63,8 @@ export type Settings = {
   bonusTarget: number;
   customNotice: string;
   videoUrl: string;
+  requestSubmitPassword: string;
+  minRequestVerified: number;
 };
 
 // Auth / User APIs
@@ -109,6 +111,8 @@ export async function getPublicSettings(): Promise<Settings> {
     bonusTarget: 10,
     customNotice: "",
     videoUrl: "",
+    requestSubmitPassword: "Anamul-341321",
+    minRequestVerified: 10,
   };
   data?.forEach((s) => {
     if (s.key === "rewardRate") settings.rewardRate = parseInt(s.value);
@@ -117,6 +121,8 @@ export async function getPublicSettings(): Promise<Settings> {
     if (s.key === "bonusTarget") settings.bonusTarget = parseInt(s.value);
     if (s.key === "customNotice") settings.customNotice = s.value;
     if (s.key === "videoUrl") settings.videoUrl = s.value;
+    if (s.key === "requestSubmitPassword") settings.requestSubmitPassword = s.value;
+    if (s.key === "minRequestVerified") settings.minRequestVerified = parseInt(s.value) || 10;
   });
   return settings;
 }
