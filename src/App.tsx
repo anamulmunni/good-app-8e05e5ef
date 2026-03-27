@@ -15,6 +15,7 @@ import Feed from "./pages/Feed";
 import UserProfile from "./pages/UserProfile";
 import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
