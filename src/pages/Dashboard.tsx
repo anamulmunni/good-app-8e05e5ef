@@ -294,11 +294,10 @@ export default function Dashboard() {
                 {showWithdraw && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1, overflow: "visible" }}
-                    exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.3 }}
                     className="border-t border-[hsl(var(--cyan))]/10"
-                    style={{ overflow: "hidden" }}
                   >
                     <div className="p-5">
                       <WithdrawForm balance={user.balance || 0} />
