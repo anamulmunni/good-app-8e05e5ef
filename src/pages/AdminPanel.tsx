@@ -278,8 +278,7 @@ export default function AdminPanel() {
                 try {
                   await updateSetting("paymentMode", newMode);
                   if (newMode === "on") {
-                    // Recalculate all balances retroactively
-                    const rate = parseInt(rewardRate) || 40;
+                    const rate = parseInt(rewardRate) || parseInt(String(settingsData?.rewardRate)) || 30;
                     await recalculateAllBalances(rate);
                     toast({ title: `পেমেন্ট মোড ON — সব ইউজারের ব্যালেন্স ${rate} TK/key হিসেবে আপডেট হয়েছে` });
                   } else {
