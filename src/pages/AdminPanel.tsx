@@ -59,8 +59,6 @@ export default function AdminPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const ADMIN_PASSWORD = settingsData?.requestSubmitPassword ? "Anamul-963050" : "Anamul-963050";
-
   const trimmedRequesterSearch = requesterRequestSearch.trim();
 
   const { data: pool } = useQuery({ queryKey: ["admin-pool"], queryFn: getPoolStats, enabled: isLoggedIn });
