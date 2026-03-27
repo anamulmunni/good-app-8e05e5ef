@@ -146,21 +146,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background pb-24 relative">
       {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.08, 0.15, 0.08] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.1, 1], opacity: [0.05, 0.1, 0.05] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-[hsl(var(--purple))] rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], opacity: [0.03, 0.08, 0.03] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }}
-          className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-[hsl(var(--cyan))] rounded-full blur-[150px]"
-        />
+        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary opacity-10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-[hsl(var(--purple))] opacity-[0.07] rounded-full blur-[150px]" />
+        <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-[hsl(var(--cyan))] opacity-[0.05] rounded-full blur-[150px]" />
       </div>
 
       {/* Payment confirmation overlay */}
@@ -185,7 +173,7 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/60 backdrop-blur-2xl">
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95">
         <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <motion.button
@@ -259,7 +247,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ব্যালেন্স</p>
               </div>
-              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">TK</span></p>
+              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">৳</span></p>
             </div>
           </motion.div>
           )}
