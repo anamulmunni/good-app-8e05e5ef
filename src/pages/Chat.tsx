@@ -9,7 +9,7 @@ import {
   type Conversation, type Message
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
-import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Video } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
