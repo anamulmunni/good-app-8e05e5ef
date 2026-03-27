@@ -15,6 +15,7 @@ export type User = {
   watched_video_url: string | null;
   email: string | null;
   auth_id: string | null;
+  online_at?: string | null;
 };
 
 export type Transaction = {
