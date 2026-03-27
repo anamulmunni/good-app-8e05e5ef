@@ -17,8 +17,36 @@ import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
+import { useOnlineHeartbeat } from "@/hooks/use-online";
 
 const queryClient = new QueryClient();
+
+function AppInner() {
+  useOnlineHeartbeat();
+  return (
+    <>
+      <IncomingCallHandler />
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/index" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/add-keys" element={<AddKeys />} />
+        <Route path="/chat" element={<Chat />} />
+        <Route path="/feed" element={<Feed />} />
+        <Route path="/user/:userId" element={<UserProfile />} />
+        <Route path="/call/:userId" element={<CallPage />} />
+        <Route path="/install" element={<Install />} />
+        <Route path="/~oauth" element={<Login />} />
+        <Route path="/~c" element={<Login />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -26,25 +54,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <IncomingCallHandler />
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/index" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/add-keys" element={<AddKeys />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/feed" element={<Feed />} />
-          <Route path="/user/:userId" element={<UserProfile />} />
-          <Route path="/call/:userId" element={<CallPage />} />
-          <Route path="/install" element={<Install />} />
-          <Route path="/~oauth" element={<Login />} />
-          <Route path="/~c" element={<Login />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppInner />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
