@@ -404,8 +404,8 @@ export default function Dashboard() {
         )}
 
 
-        {/* User Request Section */}
-        <motion.section
+        {/* User Request Section - hidden when payment mode is ON */}
+        {!paymentMode && <motion.section
           custom={4}
           variants={cardVariants}
           initial="hidden"
