@@ -204,13 +204,40 @@ export default function Feed() {
     try { await getOrCreateConversation(user.id, targetUserId); navigate("/chat"); } catch {}
   };
 
-  const sharePost = (post: Post) => {
+  const sharePost = async (post: Post) => {
     const text = post.content || "দেখুন এই পোস্টটি!";
+    const shareUrl = window.location.origin;
+    
     if (navigator.share) {
-      navigator.share({ title: "পোস্ট শেয়ার", text, url: window.location.origin });
+      const shareData: ShareData = {
+        title: "Good App - পোস্ট শেয়ার",
+        text: text,
+        url: shareUrl,
+      };
+
+      // Try to share image if available
+      if (post.image_url) {
+        try {
+          const response = await fetch(post.image_url);
+          const blob = await response.blob();
+          const file = new File([blob], "post-image.jpg", { type: blob.type });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            shareData.files = [file];
+          }
+        } catch (e) {
+          // If image fetch fails, share without image
+        }
+      }
+
+      try {
+        await navigator.share(shareData);
+      } catch (e) {
+        // User cancelled share
+      }
     } else {
-      navigator.clipboard.writeText(text);
-      toast({ title: "কপি করা হয়েছে" });
+      // Fallback: copy text
+      navigator.clipboard.writeText(`${text}\n${shareUrl}`);
+      toast({ title: "লিংক কপি করা হয়েছে!", description: "এখন যেকোনো জায়গায় পেস্ট করে শেয়ার করুন" });
     }
   };
 
