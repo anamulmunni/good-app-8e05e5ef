@@ -14,6 +14,8 @@ export function WithdrawForm({ balance }: { balance: number }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: publicSettings } = useQuery({ queryKey: ["public-settings"], queryFn: getPublicSettings });
+  const minWithdraw = publicSettings?.minWithdraw || 50;
 
   const { mutate: withdraw, isPending } = useMutation({
     mutationFn: async () => {
