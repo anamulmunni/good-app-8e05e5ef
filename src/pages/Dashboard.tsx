@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
 
 const cardVariants = {
@@ -102,6 +103,37 @@ export default function Dashboard() {
       toast({ title: "আপনার ফিডব্যাক জমা হয়েছে" });
     },
   });
+
+  // Realtime: auto-refresh settings & user data when admin changes them
+  useEffect(() => {
+    const settingsChannel = supabase
+      .channel('dashboard-settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["public-settings"] });
+      })
+      .subscribe();
+
+    const usersChannel = supabase
+      .channel('dashboard-user')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: user ? `id=eq.${user.id}` : undefined }, () => {
+        refreshUser();
+      })
+      .subscribe();
+
+    const txChannel = supabase
+      .channel('dashboard-transactions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: user ? `user_id=eq.${user.id}` : undefined }, () => {
+        queryClient.invalidateQueries({ queryKey: ["user-transactions"] });
+        refreshUser();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(settingsChannel);
+      supabase.removeChannel(usersChannel);
+      supabase.removeChannel(txChannel);
+    };
+  }, [user?.id, queryClient, refreshUser]);
 
   const bonusEnabled = publicSettings?.bonusStatus === "on";
   const targetAmount = publicSettings?.bonusTarget || 10;
