@@ -128,6 +128,7 @@ export async function getPublicSettings(): Promise<Settings> {
     if (s.key === "requestSubmitPassword") settings.requestSubmitPassword = s.value;
     if (s.key === "minRequestVerified") settings.minRequestVerified = parseInt(s.value) || 10;
     if (s.key === "paymentMode") settings.paymentMode = s.value;
+    if (s.key === "minWithdraw") settings.minWithdraw = parseInt(s.value) || 50;
   });
   return settings;
 }
