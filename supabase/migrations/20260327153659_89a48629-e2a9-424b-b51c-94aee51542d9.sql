@@ -1,0 +1,1 @@
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS online_at timestamp with time zone DEFAULT NULL;
