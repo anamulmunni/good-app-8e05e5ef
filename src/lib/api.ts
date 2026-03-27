@@ -286,7 +286,24 @@ export async function getAllTransactions(): Promise<Transaction[]> {
 }
 
 export async function updateTransactionStatus(txId: number, status: string) {
+  // Get the transaction first
+  const { data: tx } = await supabase.from("transactions").select("*").eq("id", txId).single();
+  if (!tx) throw new Error("Transaction not found");
+
   await supabase.from("transactions").update({ status }).eq("id", txId);
+
+  if (tx.type === "withdrawal") {
+    if (status === "rejected") {
+      // Refund: add the amount back to user's balance
+      const user = await getUser(tx.user_id);
+      if (user) {
+        await supabase.from("users").update({ balance: user.balance + tx.amount }).eq("id", tx.user_id);
+      }
+    } else if (status === "completed") {
+      // Approved: reset key_count to 0
+      await supabase.from("users").update({ key_count: 0 }).eq("id", tx.user_id);
+    }
+  }
 }
 
 export async function updateUserPaymentStatus(userId: number, status: string) {
