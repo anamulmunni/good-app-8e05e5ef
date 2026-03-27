@@ -146,21 +146,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background pb-24 relative">
       {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.08, 0.15, 0.08] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.1, 1], opacity: [0.05, 0.1, 0.05] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-[hsl(var(--purple))] rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], opacity: [0.03, 0.08, 0.03] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }}
-          className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-[hsl(var(--cyan))] rounded-full blur-[150px]"
-        />
+        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary opacity-10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-[hsl(var(--purple))] opacity-[0.07] rounded-full blur-[150px]" />
+        <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-[hsl(var(--cyan))] opacity-[0.05] rounded-full blur-[150px]" />
       </div>
 
       {/* Payment confirmation overlay */}
