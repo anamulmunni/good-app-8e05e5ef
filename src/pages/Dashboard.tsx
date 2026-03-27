@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getPublicSettings, updateUserPaymentStatus, addSubmittedNumbers, getExistingPhoneNumbers, getAllUsers } from "@/lib/api";
+import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
 
 export default function Dashboard() {
@@ -17,15 +17,6 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
-  const [showTelegramAdmin, setShowTelegramAdmin] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [batchNumbers, setBatchNumbers] = useState("");
-  const [duplicates, setDuplicates] = useState<string[]>([]);
-  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
-  const [adminName, setAdminName] = useState("");
-  const [isNameSet, setIsNameSet] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("bkash");
-  const [paymentNumber, setPaymentNumber] = useState("");
   const [requestTargetNumber, setRequestTargetNumber] = useState("");
   const [requestPaymentMethod, setRequestPaymentMethod] = useState("bkash");
   const [requestPaymentNumber, setRequestPaymentNumber] = useState("");
@@ -33,88 +24,17 @@ export default function Dashboard() {
   const [requestSubmitPassword, setRequestSubmitPassword] = useState("");
   const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
-  const [serverDuplicates, setServerDuplicates] = useState<string[]>([]);
-  const [lookupResults, setLookupResults] = useState<any[]>([]);
   const [showRequestSection, setShowRequestSection] = useState(false);
-
-  const lookupTimerRef = useRef<any>(null);
-  const dupCheckTimerRef = useRef<any>(null);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
   });
 
-  const { data: allUsers } = useQuery({
-    queryKey: ["all-users"],
-    queryFn: getAllUsers,
-    enabled: isPasswordVerified,
-  });
-
   const { data: incomingRequests = [] } = useQuery({
     queryKey: ["incoming-user-transfer-requests", user?.guest_id],
     queryFn: () => getIncomingTransferRequests(user?.guest_id || ""),
     enabled: !!user?.guest_id,
-  });
-
-  const checkServerDuplicates = async (nums: string[]) => {
-    try {
-      const existing = await getExistingPhoneNumbers();
-      setServerDuplicates(nums.filter(n => existing.includes(n)));
-    } catch { setServerDuplicates([]); }
-  };
-
-  const handleBatchNumbersChange = (val: string) => {
-    setBatchNumbers(val);
-    const lines = val.split("\n").map(l => l.trim()).filter(Boolean);
-    const seen = new Set<string>();
-    const dups = new Set<string>();
-    lines.forEach(num => {
-      if (seen.has(num)) dups.add(num);
-      seen.add(num);
-    });
-    setDuplicates(Array.from(dups));
-    if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
-    if (dupCheckTimerRef.current) clearTimeout(dupCheckTimerRef.current);
-    if (lines.length > 0) {
-      lookupTimerRef.current = setTimeout(() => lookupNumbers(lines), 500);
-      dupCheckTimerRef.current = setTimeout(() => checkServerDuplicates(lines), 500);
-    } else {
-      setLookupResults([]);
-      setServerDuplicates([]);
-    }
-  };
-
-  const removeDuplicate = (num: string) => {
-    const lines = batchNumbers.split("\n").map(l => l.trim()).filter(Boolean);
-    const firstIndex = lines.indexOf(num);
-    const filtered = lines.filter((l, idx) => l !== num || idx === firstIndex);
-    setBatchNumbers(filtered.join("\n"));
-    setDuplicates(duplicates.filter(d => d !== num));
-  };
-
-  const lookupNumbers = (nums: string[]) => {
-    if (!allUsers) return;
-    const results = nums.map(num => {
-      const u = allUsers.find(u => u.guest_id === num);
-      return { guestId: num, keyCount: u?.key_count || 0, balance: u?.balance || 0 };
-    });
-    setLookupResults(results);
-  };
-
-  const submitNumbersMutation = useMutation({
-    mutationFn: async (numbers: string[]) => {
-      await addSubmittedNumbers(numbers, adminName, paymentNumber || undefined, paymentNumber ? paymentMethod : undefined);
-    },
-    onSuccess: () => {
-      setBatchNumbers("");
-      setPaymentNumber("");
-      setServerDuplicates([]);
-      toast({ title: "সফলভাবে সাবমিট করা হয়েছে" });
-    },
-    onError: () => {
-      toast({ title: "সাবমিট ব্যর্থ হয়েছে", variant: "destructive" });
-    },
   });
 
   const createUserRequestMutation = useMutation({
@@ -181,17 +101,6 @@ export default function Dashboard() {
   const minRequestVerified = publicSettings?.minRequestVerified || 10;
   const userVerifiedCount = user?.key_count || 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
-
-  const getBatchInfo = () => {
-    const lines = batchNumbers.split("\n").map(l => l.trim()).filter(Boolean);
-    let totalVerified = 0;
-    const details = lines.map(num => {
-      const u = lookupResults?.find((u: any) => u.guestId === num);
-      totalVerified += u?.keyCount || 0;
-      return { num, count: u?.keyCount || 0 };
-    });
-    return { totalVerified, details };
-  };
 
   const copyId = () => {
     if (user?.guest_id) {
@@ -426,89 +335,6 @@ export default function Dashboard() {
               )}
             </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
-
-        {/* Telegram Admin Section */}
-        <section className="glass-card p-6 rounded-3xl border-2 border-primary/30">
-          <button onClick={() => setShowTelegramAdmin(!showTelegramAdmin)} className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3 text-primary">
-              <Send className="w-6 h-6" />
-              <h2 className="text-xl font-bold">Payment Request Only Telegram Admin</h2>
-            </div>
-          </button>
-
-          <AnimatePresence>
-            {showTelegramAdmin && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mt-6 space-y-4">
-                {!isPasswordVerified ? (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">পাসওয়ার্ড দিন:</p>
-                    <input type="password" placeholder="পাসওয়ার্ড..." className="input-field" value={adminPassword}
-                      onChange={(e) => { setAdminPassword(e.target.value); if (e.target.value === "anamul984516") setIsPasswordVerified(true); }} />
-                  </div>
-                ) : !isNameSet ? (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">আপনার নাম লিখুন:</p>
-                    <input type="text" placeholder="আপনার নাম..." className="input-field" value={adminName} onChange={(e) => setAdminName(e.target.value)} />
-                    <button onClick={() => { if (adminName.trim()) setIsNameSet(true); }} className="btn-primary py-3 font-black" disabled={!adminName.trim()}>এগিয়ে যান</button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-secondary/50 p-4 rounded-xl border border-border">
-                      <p className="text-sm font-bold mb-2">Total Verified: <span className="text-primary">{getBatchInfo().totalVerified}</span></p>
-                      <div className="max-h-40 overflow-y-auto space-y-1">
-                        {getBatchInfo().details.map((d, i) => (
-                          <p key={i} className="text-xs flex justify-between"><span>{d.num}</span><span className="text-primary font-bold">{d.count} টা</span></p>
-                        ))}
-                      </div>
-                    </div>
-                    <textarea placeholder="ইউজার নম্বরগুলো দিন (প্রতি লাইনে একটি)..." className={`input-field min-h-[120px] font-mono text-sm ${duplicates.length > 0 ? "border-destructive" : ""}`}
-                      value={batchNumbers} onChange={(e) => handleBatchNumbersChange(e.target.value)} />
-                    {duplicates.length > 0 && (
-                      <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 space-y-2">
-                        <p className="text-xs text-destructive font-bold flex items-center gap-1"><XCircle className="w-3 h-3" /> ডুপ্লিকেট নম্বর পাওয়া গেছে:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {duplicates.map(num => (
-                            <div key={num} className="bg-destructive/20 text-destructive text-[10px] px-2 py-1 rounded-md flex items-center gap-1">
-                              {num}<button onClick={() => removeDuplicate(num)} className="hover:text-foreground"><XCircle className="w-3 h-3" /></button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {serverDuplicates.length > 0 && (
-                      <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 space-y-2">
-                        <p className="text-xs text-accent font-bold flex items-center gap-1"><XCircle className="w-3 h-3" /> আগেই সাবমিট করা হয়েছে:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {serverDuplicates.map(num => (<div key={num} className="bg-accent/20 text-accent text-[10px] px-2 py-1 rounded-md font-mono font-bold">{num}</div>))}
-                        </div>
-                      </div>
-                    )}
-                    <div className="bg-secondary/50 p-4 rounded-xl border border-border space-y-3">
-                      <p className="text-sm font-bold text-muted-foreground">পেমেন্ট নম্বর (bKash/Nagad)</p>
-                      <div className="flex gap-2">
-                        <div className="flex items-center gap-1 bg-secondary p-1 rounded-xl border border-border">
-                          <button onClick={() => setPaymentMethod("bkash")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${paymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
-                          <button onClick={() => setPaymentMethod("nagad")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${paymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
-                        </div>
-                        <input type="text" placeholder="01XXXXXXXXX" value={paymentNumber} onChange={(e) => setPaymentNumber(e.target.value)} className="input-field flex-1" />
-                      </div>
-                    </div>
-                    {(duplicates.length > 0 || serverDuplicates.length > 0) ? (
-                      <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 text-center">
-                        <p className="text-sm text-destructive font-bold">ডুপ্লিকেট নম্বর সরান, তারপর সাবমিট করুন</p>
-                      </div>
-                    ) : (
-                      <button onClick={() => submitNumbersMutation.mutate(batchNumbers.split("\n").map(l => l.trim()).filter(Boolean))}
-                        className="btn-primary py-4 font-black" disabled={submitNumbersMutation.isPending || !batchNumbers.trim()}>
-                        {submitNumbersMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-5 h-5" /> Submit Request</>}
-                      </button>
-                    )}
-                  </div>
-                )}
               </motion.div>
             )}
           </AnimatePresence>
