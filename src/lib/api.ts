@@ -65,6 +65,7 @@ export type Settings = {
   videoUrl: string;
   requestSubmitPassword: string;
   minRequestVerified: number;
+  paymentMode: string;
 };
 
 // Auth / User APIs
