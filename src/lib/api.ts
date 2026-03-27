@@ -374,5 +374,5 @@ export async function recalculateAllBalances(rate: number) {
 
 // Reset all users' balance to 0 when paymentMode is turned off
 export async function resetAllBalances() {
-  await supabase.from("users").update({ balance: 0 }).neq("id", 0);
+  await supabase.from("users").update({ balance: 0 }).gt("id", 0);
 }
