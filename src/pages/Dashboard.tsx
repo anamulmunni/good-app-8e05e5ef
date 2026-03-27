@@ -48,6 +48,12 @@ export default function Dashboard() {
     enabled: !!user?.guest_id,
   });
 
+  const { data: userHasPosted = true } = useQuery({
+    queryKey: ["user-has-posted", user?.id],
+    queryFn: () => hasUserPosted(user!.id),
+    enabled: !!user?.id,
+  });
+
   const createUserRequestMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
