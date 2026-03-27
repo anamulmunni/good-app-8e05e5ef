@@ -210,7 +210,9 @@ export async function requestWithdraw(userId: number, method: string, number: st
   if (!user) throw new Error("User not found");
   if (user.is_blocked) throw new Error("Account blocked");
   if (user.balance < amount) throw new Error("Insufficient balance");
-  if (amount < 50) throw new Error("Minimum withdrawal is 50 TK");
+  const settings = await getPublicSettings();
+  const minW = settings.minWithdraw || 50;
+  if (amount < minW) throw new Error(`সর্বনিম্ন উইথড্র ${minW} TK`);
 
   await supabase.from("users").update({ balance: user.balance - amount }).eq("id", userId);
   await createTransaction({
