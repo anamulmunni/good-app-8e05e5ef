@@ -15,6 +15,12 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const normalizePhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    const local = digits.startsWith("88") ? digits.slice(2) : digits;
+    return /^01\d{9}$/.test(local) ? local : null;
+  };
+
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       navigate("/dashboard");
@@ -23,11 +29,22 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim() || !password) return;
+
+    const rawPhone = phone.trim();
+    const normalizedPhone = normalizePhone(rawPhone);
+    if (!rawPhone || !password) return;
+    if (!normalizedPhone) {
+      toast({
+        title: "লগইন ব্যর্থ",
+        description: "সঠিক ফোন নম্বর দিন (01XXXXXXXXX)",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const fakeEmail = `${phone.trim()}@goodapp.local`;
+      const fakeEmail = `${normalizedPhone}@goodapp.local`;
 
       let { error } = await supabase.auth.signInWithPassword({
         email: fakeEmail,
@@ -35,10 +52,10 @@ export default function Login() {
       });
 
       if (error && error.message === "Invalid login credentials") {
-        const { data: userData } = await supabase
+          const { data: userData } = await supabase
           .from("users")
           .select("email")
-          .eq("guest_id", phone.trim())
+            .eq("guest_id", normalizedPhone)
           .single();
 
         if (userData?.email && userData.email !== fakeEmail) {
@@ -72,7 +89,7 @@ export default function Login() {
   const handleGoogleSignIn = async () => {
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/~c`,
         extraParams: {
           prompt: "select_account",
         },
