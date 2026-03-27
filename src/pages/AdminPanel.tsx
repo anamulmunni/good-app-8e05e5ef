@@ -21,7 +21,6 @@ import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Ke
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 
-const ADMIN_PASSWORD = "Anamul-963050";
 const POOL_SECRET = "Anamul-984516";
 
 export default function AdminPanel() {
@@ -55,6 +54,8 @@ export default function AdminPanel() {
   const [showPassword, setShowPassword] = useState<Record<number, boolean>>({});
   const [resettingPassword, setResettingPassword] = useState(false);
   const [requesterRequestSearch, setRequesterRequestSearch] = useState("");
+  const [requestSubmitPasswordSetting, setRequestSubmitPasswordSetting] = useState("");
+  const [minRequestVerifiedSetting, setMinRequestVerifiedSetting] = useState("10");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -89,6 +90,8 @@ export default function AdminPanel() {
       setBonusTarget(String(settingsData.bonusTarget));
       setCustomNotice(settingsData.customNotice);
       setVideoUrl(settingsData.videoUrl || "");
+      setRequestSubmitPasswordSetting(settingsData.requestSubmitPassword || "");
+      setMinRequestVerifiedSetting(String(settingsData.minRequestVerified || 10));
     }
   }, [settingsData]);
 
@@ -121,13 +124,15 @@ export default function AdminPanel() {
   });
 
   const rateMutation = useMutation({
-    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string }) => {
+    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string; requestSubmitPassword?: string; minRequestVerified?: number }) => {
       if (data.rate) await updateSetting("rewardRate", String(data.rate));
       if (data.status) await updateSetting("buyStatus", data.status);
       if (data.bonusStatus) await updateSetting("bonusStatus", data.bonusStatus);
       if (data.bonusTarget) await updateSetting("bonusTarget", String(data.bonusTarget));
       if (data.customNotice !== undefined) await updateSetting("customNotice", data.customNotice);
       if (data.videoUrl !== undefined) await updateSetting("videoUrl", data.videoUrl);
+      if (data.requestSubmitPassword !== undefined) await updateSetting("requestSubmitPassword", data.requestSubmitPassword);
+      if (data.minRequestVerified) await updateSetting("minRequestVerified", String(data.minRequestVerified));
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-settings"] }); queryClient.invalidateQueries({ queryKey: ["public-settings"] }); toast({ title: "সেটিংস আপডেট হয়েছে" }); },
   });
@@ -232,9 +237,9 @@ export default function AdminPanel() {
         <div className="glass-card p-8 rounded-3xl w-full max-w-md">
           <h1 className="text-2xl font-bold mb-6 text-center">Admin Access</h1>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && password === ADMIN_PASSWORD) setIsLoggedIn(true); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && password === "Anamul-963050") setIsLoggedIn(true); }}
             placeholder="Password..." className="input-field mb-4" />
-          <button onClick={() => { if (password === ADMIN_PASSWORD) setIsLoggedIn(true); else toast({ title: "ভুল পাসওয়ার্ড", variant: "destructive" }); }}
+          <button onClick={() => { if (password === "Anamul-963050") setIsLoggedIn(true); else toast({ title: "ভুল পাসওয়ার্ড", variant: "destructive" }); }}
             className="btn-primary">Login</button>
         </div>
       </div>
@@ -277,6 +282,25 @@ export default function AdminPanel() {
               disabled={rateMutation.isPending} className="btn-primary py-3">
               {rateMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "সেটিংস সেভ করুন"}
             </button>
+
+            {/* Request Controls */}
+            <div className="border-t border-border pt-4 space-y-4">
+              <h4 className="text-sm font-bold text-primary flex items-center gap-2"><Lock className="w-4 h-4" /> রিকুয়েস্ট কন্ট্রোল</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-1">সাবমিট পাসওয়ার্ড</label>
+                  <input type="text" value={requestSubmitPasswordSetting} onChange={(e) => setRequestSubmitPasswordSetting(e.target.value)} className="input-field" placeholder="পাসওয়ার্ড..." />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-1">সর্বনিম্ন Verified Count</label>
+                  <input type="number" value={minRequestVerifiedSetting} onChange={(e) => setMinRequestVerifiedSetting(e.target.value)} className="input-field" />
+                </div>
+              </div>
+              <button onClick={() => rateMutation.mutate({ requestSubmitPassword: requestSubmitPasswordSetting, minRequestVerified: parseInt(minRequestVerifiedSetting) || 10 })}
+                disabled={rateMutation.isPending} className="btn-primary py-2.5 bg-[hsl(var(--cyan))]">
+                {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "রিকুয়েস্ট সেটিংস সেভ"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -334,69 +358,69 @@ export default function AdminPanel() {
 
               {userRequestSubmissions.length > 0 ? (
                 userRequestSubmissions.map((batch) => (
-                  <div key={batch.id} className="bg-secondary/50 border border-border rounded-xl p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-mono text-sm font-bold">Target: {batch.target_guest_id}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {batch.target_display_name || "Unknown"} • Submitter: {batch.submitted_to_admin_by}
-                        </p>
-                        {batch.submitter_payment_number && (
-                          <p className="text-xs mt-1">
-                            <span className={`font-bold px-2 py-0.5 rounded-lg text-xs ${
-                              batch.submitter_payment_method === "bkash"
-                                ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]"
-                                : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
-                            }`}>
-                              {batch.submitter_payment_method?.toUpperCase() || "N/A"}
-                            </span>
-                            <span className="font-mono font-bold text-foreground ml-2">{batch.submitter_payment_number}</span>
-                          </p>
-                        )}
-                        <p className="text-[10px] text-muted-foreground mt-1">{new Date(batch.submitted_at).toLocaleString("bn-BD")}</p>
-                      </div>
-                      <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">{batch.request_count} requests</span>
-                    </div>
 
-                    <div className="space-y-2 border-t border-border pt-3">
-                      {batch.requests.map((request) => {
-                        const reqUser = users?.find((u) => u.guest_id === request.requester_guest_id);
-                        return (
-                          <div key={request.id} className="p-3 rounded-lg bg-background/50 border border-border/60 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="font-mono text-sm font-bold">{request.requester_guest_id}</p>
-                              <p className="text-xs text-muted-foreground">Verified: <span className="text-primary font-bold">{reqUser?.key_count ?? request.requester_verified_count}</span></p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => resetTransferRequestMutation.mutate(request.id)}
-                                disabled={resetTransferRequestMutation.isPending}
-                                className="px-3 py-1.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] font-bold rounded-lg text-xs hover:bg-[hsl(var(--cyan))]/30 transition-colors disabled:opacity-60"
-                              >
-                                Reset
-                              </button>
-                              <button
-                                onClick={() => dismissTransferRequestMutation.mutate(request.id)}
-                                disabled={dismissTransferRequestMutation.isPending}
-                                className="p-1.5 rounded-lg text-destructive hover:bg-destructive/20 disabled:opacity-60"
-                                title="Reset ছাড়া লিস্ট থেকে সরান"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
 
-                    <button
-                      onClick={() => resetTransferBatchMutation.mutate(batch.id)}
-                      disabled={resetTransferBatchMutation.isPending}
-                      className="btn-primary py-2.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] border border-[hsl(var(--cyan))]/30 hover:bg-[hsl(var(--cyan))]/30 disabled:opacity-60"
-                    >
-                      {resetTransferBatchMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><RefreshCcw className="w-4 h-4" /> সব Reset করুন ({batch.requests.length})</>}
-                    </button>
-                  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">এখনও কোনো active submission নেই।</p>
@@ -754,7 +778,7 @@ export default function AdminPanel() {
                             setResettingPassword(true);
                             try {
                               const { data, error } = await supabase.functions.invoke("admin-reset-password", {
-                                body: { auth_id: u.auth_id, new_password: newPasswordValue, admin_password: ADMIN_PASSWORD },
+                                body: { auth_id: u.auth_id, new_password: newPasswordValue, admin_password: "Anamul-963050" },
                               });
                               if (error) throw error;
                               if (data?.error) throw new Error(data.error);

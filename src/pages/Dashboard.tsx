@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, XCircle } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [serverDuplicates, setServerDuplicates] = useState<string[]>([]);
   const [lookupResults, setLookupResults] = useState<any[]>([]);
+  const [showRequestSection, setShowRequestSection] = useState(false);
 
   const lookupTimerRef = useRef<any>(null);
   const dupCheckTimerRef = useRef<any>(null);
@@ -177,6 +178,9 @@ export default function Dashboard() {
   const bonusEnabled = publicSettings?.bonusStatus === "on";
   const targetAmount = publicSettings?.bonusTarget || 10;
   const customNoticeText = publicSettings?.customNotice;
+  const minRequestVerified = publicSettings?.minRequestVerified || 10;
+  const userVerifiedCount = user?.key_count || 0;
+  const canSendRequest = userVerifiedCount >= minRequestVerified;
 
   const getBatchInfo = () => {
     const lines = batchNumbers.split("\n").map(l => l.trim()).filter(Boolean);
@@ -268,54 +272,69 @@ export default function Dashboard() {
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-6 relative z-10">
         {/* User to User Request */}
-        <section className="glass-card p-6 rounded-3xl border-2 border-primary/30 space-y-5">
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold">User Request পাঠান</h2>
-            <p className="text-xs text-muted-foreground">যে নম্বরে পাঠাবেন + আপনার bKash/Nagad নম্বর দিন।</p>
-          </div>
-
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={requestTargetNumber}
-              onChange={(e) => setRequestTargetNumber(e.target.value)}
-              placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)"
-              className="input-field"
-            />
-
-            <div className="bg-secondary/50 p-5 rounded-xl border border-border space-y-4">
-              <p className="text-base font-bold text-foreground">আপনার পেমেন্ট নম্বর</p>
-              <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-border">
-                <button
-                  onClick={() => setRequestPaymentMethod("bkash")}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}
-                >
-                  bKash
-                </button>
-                <button
-                  onClick={() => setRequestPaymentMethod("nagad")}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}
-                >
-                  Nagad
-                </button>
+        <section className="glass-card rounded-3xl border-2 border-primary/30 overflow-hidden">
+          <button
+            onClick={() => setShowRequestSection(!showRequestSection)}
+            className="w-full p-6 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Send className="w-6 h-6 text-primary" />
+              <div className="text-left">
+                <h2 className="text-xl font-bold">User Request পাঠান</h2>
+                <p className="text-xs text-muted-foreground">ট্যাপ করে খুলুন</p>
               </div>
-              <input
-                type="text"
-                placeholder="01XXXXXXXXX"
-                value={requestPaymentNumber}
-                onChange={(e) => setRequestPaymentNumber(e.target.value)}
-                className="input-field text-base py-3"
-              />
             </div>
+            {showRequestSection ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
 
-            <button
-              onClick={() => createUserRequestMutation.mutate()}
-              className="btn-primary py-4 font-black"
-              disabled={createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}
-            >
-              {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-5 h-5" /> Request পাঠান</>}
-            </button>
-          </div>
+          <AnimatePresence>
+            {showRequestSection && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <div className="px-6 pb-6 space-y-4">
+                  {/* Minimum request notice */}
+                  <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/30 rounded-xl p-4 space-y-2">
+                    <p className="text-sm font-bold text-[hsl(var(--amber))]">📢 গুরুত্বপূর্ণ নোটিশ</p>
+                    <p className="text-xs text-foreground/80 leading-relaxed">
+                      রিকুয়েস্ট পাঠাতে হলে আপনার অ্যাকাউন্টে সর্বনিম্ন <span className="text-[hsl(var(--amber))] font-black text-sm">{minRequestVerified}</span> টি ভেরিফাইড কাউন্ট থাকতে হবে।
+                    </p>
+                    <p className="text-xs text-foreground/80 leading-relaxed">
+                      একসাথে <span className="text-primary font-bold">২০ টি</span> করতে পারলে <span className="text-primary font-bold">১০% বোনাস</span> এবং <span className="text-primary font-bold">৫০ টি</span> করতে পারলে <span className="text-primary font-bold">২০% বোনাস</span> পাবেন!
+                    </p>
+                  </div>
+
+                  {!canSendRequest ? (
+                    <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 text-center">
+                      <p className="text-sm text-destructive font-bold">
+                        আপনার ভেরিফাইড কাউন্ট: <span className="text-lg">{userVerifiedCount}</span> / {minRequestVerified}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">সর্বনিম্ন {minRequestVerified} টি ভেরিফাইড হলেই রিকুয়েস্ট পাঠাতে পারবেন।</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={requestTargetNumber}
+                        onChange={(e) => setRequestTargetNumber(e.target.value)}
+                        placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)"
+                        className="input-field"
+                      />
+                      <div className="bg-secondary/50 p-5 rounded-xl border border-border space-y-4">
+                        <p className="text-base font-bold text-foreground">আপনার পেমেন্ট নম্বর</p>
+                        <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-border">
+                          <button onClick={() => setRequestPaymentMethod("bkash")}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
+                          <button onClick={() => setRequestPaymentMethod("nagad")}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
+                        </div>
+                        <input type="text" placeholder="01XXXXXXXXX" value={requestPaymentNumber}
+                          onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field text-base py-3" />
+                      </div>
+                      <button onClick={() => createUserRequestMutation.mutate()} className="btn-primary py-4 font-black"
+                        disabled={createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
+                        {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-5 h-5" /> Request পাঠান</>}
+                      </button>
+                    </div>
+                  )}
 
           <div className="border-t border-border pt-4 space-y-3">
             <h3 className="font-bold text-sm">আপনার নম্বরে আসা Request List ({incomingRequests.length})</h3>
@@ -403,9 +422,13 @@ export default function Dashboard() {
                     Full List Submit
                   </button>
                 )}
-              </>
+                </>
+              )}
+            </div>
+                </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
         </section>
 
         {/* Telegram Admin Section */}
@@ -503,37 +526,39 @@ export default function Dashboard() {
 
         {/* Bonus Section */}
         {bonusEnabled && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
               className="bg-gradient-to-r from-accent/20 to-[hsl(var(--amber))]/20 border-2 border-accent/50 rounded-2xl p-6 text-center shadow-lg shadow-accent/10">
               <p className="text-xl font-black text-accent mb-2">🔥 ধামাকা বোনাস অফার! 🔥</p>
               <p className="text-sm font-bold leading-relaxed">
-                ১ দিনে {targetAmount}টি অ্যাকাউন্ট ভেরিফাই করতে পারলে বর্তমান দামের সাথে আরও <span className="text-accent text-lg">২০% বোনাস</span> দেওয়া হবে!
+                {targetAmount}টি ভেরিফাই করলে <span className="text-accent text-lg">বোনাস</span> পাবেন!
               </p>
             </motion.div>
 
-            <div className="glass-card p-5 rounded-3xl border border-border">
-              <div className="flex justify-between items-center mb-4">
+            <div className="glass-card p-5 rounded-3xl border border-border space-y-3">
+              <div className="flex justify-between items-center">
                 <p className="text-sm font-bold">আজকের টার্গেট (Bonus)</p>
                 <p className="text-xs font-mono bg-primary/20 text-primary px-2 py-1 rounded-lg">{user.key_count}/{targetAmount}</p>
               </div>
-              <div className="grid grid-cols-5 gap-2">
-                {Array.from({ length: targetAmount }, (_, i) => {
-                  const done = i < user.key_count;
-                  return (
-                    <motion.div key={i} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: i * 0.05 }}
-                      className={`aspect-square rounded-xl flex items-center justify-center border-2 transition-all ${done ? "bg-primary/20 border-primary shadow-lg shadow-primary/20" : "bg-secondary border-border"}`}>
-                      {done ? <Check className="w-5 h-5 text-primary" /> : <span className="text-xs text-muted-foreground font-bold">{i + 1}</span>}
-                    </motion.div>
-                  );
-                })}
+              <div className="w-full h-4 bg-secondary rounded-full overflow-hidden border border-border">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((user.key_count / targetAmount) * 100, 100)}%` }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="h-full bg-gradient-to-r from-primary to-[hsl(var(--emerald))] rounded-full"
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>0</span>
+                <span className="text-primary font-bold">{user.key_count} সম্পন্ন</span>
+                <span>{targetAmount}</span>
               </div>
               {user.key_count >= targetAmount ? (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-3 bg-primary/20 border border-primary/40 rounded-xl text-center">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-primary/20 border border-primary/40 rounded-xl text-center">
                   <p className="text-primary font-bold text-sm">🎉 আপনি বোনাসের জন্য এলিজিবল হয়েছেন!</p>
                 </motion.div>
               ) : (
-                <p className="text-[10px] text-muted-foreground mt-3 text-center">{targetAmount}টি টার্গেট পূর্ণ হলে বোনাস আনলক হবে</p>
+                <p className="text-[10px] text-muted-foreground text-center">টার্গেট পূর্ণ হলে বোনাস আনলক হবে</p>
               )}
             </div>
           </div>
