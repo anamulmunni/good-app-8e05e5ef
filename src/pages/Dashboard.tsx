@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [showRequestSection, setShowRequestSection] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
