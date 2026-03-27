@@ -98,7 +98,7 @@ export function WithdrawForm({ balance }: { balance: number }) {
 
       <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 mt-4">
         <p className="text-xs text-primary leading-relaxed text-center font-medium">
-          উইথড্র দেওয়ার ৩০ মিনিটের মধ্যে পেমেন্ট করা হবে। যেকোনো সমস্যায় টেলিগ্রামে যোগাযোগ করুন।
+          উইথড্র দেওয়ার ২৪ ঘণ্টার মধ্যে পেমেন্ট করা হবে। যেকোনো সমস্যায় টেলিগ্রামে যোগাযোগ করুন।
         </p>
       </div>
     </form>
