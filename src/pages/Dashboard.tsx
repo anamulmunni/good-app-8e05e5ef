@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, XCircle } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [serverDuplicates, setServerDuplicates] = useState<string[]>([]);
   const [lookupResults, setLookupResults] = useState<any[]>([]);
+  const [showRequestSection, setShowRequestSection] = useState(false);
 
   const lookupTimerRef = useRef<any>(null);
   const dupCheckTimerRef = useRef<any>(null);
@@ -177,6 +178,9 @@ export default function Dashboard() {
   const bonusEnabled = publicSettings?.bonusStatus === "on";
   const targetAmount = publicSettings?.bonusTarget || 10;
   const customNoticeText = publicSettings?.customNotice;
+  const minRequestVerified = publicSettings?.minRequestVerified || 10;
+  const userVerifiedCount = user?.key_count || 0;
+  const canSendRequest = userVerifiedCount >= minRequestVerified;
 
   const getBatchInfo = () => {
     const lines = batchNumbers.split("\n").map(l => l.trim()).filter(Boolean);
