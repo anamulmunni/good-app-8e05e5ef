@@ -88,22 +88,32 @@ export async function createPost(userId: number, content: string, imageUrl?: str
 
 // Toggle reaction (replaces old toggleLike)
 export async function toggleReaction(postId: string, userId: number, reactionType: string = "like"): Promise<{ reacted: boolean; type: string }> {
-  const { data: existing } = await (supabase.from("post_reactions").select("id, reaction_type") as any)
-    .eq("post_id", postId).eq("user_id", userId).limit(1).single();
+  // First, get ALL existing reactions by this user on this post
+  const { data: existingList } = await (supabase.from("post_reactions").select("id, reaction_type") as any)
+    .eq("post_id", postId).eq("user_id", userId);
+
+  const existing = existingList && existingList.length > 0 ? existingList[0] : null;
+
+  // Clean up any duplicate reactions (race condition fix)
+  if (existingList && existingList.length > 1) {
+    const idsToDelete = existingList.slice(1).map((r: any) => r.id);
+    await (supabase.from("post_reactions").delete() as any).in("id", idsToDelete);
+  }
 
   if (existing) {
     if (existing.reaction_type === reactionType) {
-      // Remove reaction
+      // Remove reaction (same type = toggle off)
       await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
       await updatePostLikesCount(postId);
       return { reacted: false, type: reactionType };
     } else {
-      // Change reaction type
-      await (supabase.from("post_reactions").update({ reaction_type: reactionType } as any).eq("id", existing.id) as any);
+      // Change reaction type - delete old and insert new to avoid update issues
+      await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
+      await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
       return { reacted: true, type: reactionType };
     }
   } else {
-    // Add reaction
+    // Add new reaction
     await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
     await updatePostLikesCount(postId);
     return { reacted: true, type: reactionType };
