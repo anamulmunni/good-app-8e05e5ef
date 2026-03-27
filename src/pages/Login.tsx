@@ -16,6 +16,12 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: getPublicSettings,
+  });
+  const videoUrl = publicSettings?.videoUrl;
+
   const normalizePhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
     const local = digits.startsWith("88") ? digits.slice(2) : digits;
