@@ -549,6 +549,18 @@ export default function Dashboard() {
 
       {/* Floating Action Buttons */}
       <div className="fixed bottom-6 right-5 z-50 flex flex-col gap-3">
+        {/* Install Button */}
+        {!window.matchMedia("(display-mode: standalone)").matches && (
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate("/install")}
+            className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--emerald))] to-[hsl(var(--cyan))] shadow-lg shadow-[hsl(var(--emerald))]/30 flex items-center justify-center"
+          >
+            <Download className="w-6 h-6 text-foreground" />
+          </motion.button>
+        )}
+
         {/* Feed Button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -559,7 +571,7 @@ export default function Dashboard() {
           <Newspaper className="w-6 h-6 text-foreground" />
         </motion.button>
 
-        {/* Chat Button - glowing, animated */}
+        {/* Chat Button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
