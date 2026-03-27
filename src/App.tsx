@@ -40,6 +40,7 @@ const App = () => (
           <Route path="/feed" element={<Feed />} />
           <Route path="/user/:userId" element={<UserProfile />} />
           <Route path="/call/:userId" element={<CallPage />} />
+          <Route path="/install" element={<Install />} />
           <Route path="/~oauth" element={<Login />} />
           <Route path="/~c" element={<Login />} />
           <Route path="*" element={<NotFound />} />
