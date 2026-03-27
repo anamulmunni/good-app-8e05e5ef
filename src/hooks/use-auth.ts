@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User as AppUser } from "@/lib/api";
 
@@ -6,9 +6,9 @@ export function useAuth() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const fetchedRef = useRef(false);
 
   const fetchOrCreateAppUser = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
-    // Check if user exists by auth_id using raw filter
     const { data: existing } = await (supabase
       .from("users")
       .select("*") as any)
@@ -20,7 +20,6 @@ export function useAuth() {
       return existing;
     }
 
-    // Create new user entry
     const meta = authUser.user_metadata || {};
     const displayName = meta.display_name || "User";
     const phone = meta.phone || "";
@@ -45,21 +44,26 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Get session first, then listen for changes
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        setTimeout(() => {
-          fetchOrCreateAppUser(session.user).finally(() => setIsLoading(false));
-        }, 0);
+        fetchOrCreateAppUser(session.user).finally(() => setIsLoading(false));
+        fetchedRef.current = true;
       } else {
-        setUser(null);
         setIsLoading(false);
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
+        // Skip if we already fetched on mount
+        if (fetchedRef.current) {
+          fetchedRef.current = false;
+          return;
+        }
         fetchOrCreateAppUser(session.user).finally(() => setIsLoading(false));
       } else {
+        setUser(null);
         setIsLoading(false);
       }
     });
