@@ -7,7 +7,7 @@ import {
   toggleBlockUser, updateUserBalance, resetUserKeyCount,
   updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
-  addResetHistory,
+  addResetHistory, recalculateAllBalances, resetAllBalances,
 } from "@/lib/api";
 import {
   getUserRequestSubmissions,
