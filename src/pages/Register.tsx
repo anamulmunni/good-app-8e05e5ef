@@ -5,6 +5,24 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
+const DEVICE_ACCOUNTS_KEY = "goodapp_device_accounts";
+
+function getDeviceAccounts(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(DEVICE_ACCOUNTS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function addDeviceAccount(guestId: string) {
+  const accounts = getDeviceAccounts();
+  if (!accounts.includes(guestId)) {
+    accounts.push(guestId);
+    localStorage.setItem(DEVICE_ACCOUNTS_KEY, JSON.stringify(accounts));
+  }
+}
+
 export default function Register() {
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState("");
@@ -34,18 +52,29 @@ export default function Register() {
         throw new Error("সঠিক ফোন নম্বর দিন (01XXXXXXXXX)");
       }
 
-      const { data: existingUser, error: existingUserError } = await supabase
+      // Check if this phone already has an account
+      const { data: existingUser } = await supabase
         .from("users")
         .select("id")
         .eq("guest_id", normalizedPhone)
         .maybeSingle();
 
-      if (existingUserError) throw existingUserError;
       if (existingUser) {
         throw new Error("এই ফোন নম্বর দিয়ে আগেই অ্যাকাউন্ট তৈরি হয়েছে");
       }
 
-      // Use normalized phone number as fake email for auth
+      // Check if this device already has an account - if so, block the existing one
+      const deviceAccounts = getDeviceAccounts();
+      if (deviceAccounts.length > 0) {
+        // Auto-block all previous accounts from this device
+        for (const oldGuestId of deviceAccounts) {
+          await supabase
+            .from("users")
+            .update({ is_blocked: true })
+            .eq("guest_id", oldGuestId);
+        }
+      }
+
       const fakeEmail = `${normalizedPhone}@goodapp.local`;
 
       const { error } = await supabase.auth.signUp({
@@ -66,10 +95,22 @@ export default function Register() {
         throw error;
       }
 
-      toast({
-        title: "রেজিস্ট্রেশন সফল!",
-        description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।",
-      });
+      // Track this device account
+      addDeviceAccount(normalizedPhone);
+
+      if (deviceAccounts.length > 0) {
+        toast({
+          title: "⚠️ সতর্কতা!",
+          description: "এই ডিভাইসে আগের অ্যাকাউন্ট ব্লক করা হয়েছে। একটি ডিভাইসে একটিই অ্যাকাউন্ট অনুমোদিত।",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "রেজিস্ট্রেশন সফল!",
+          description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।",
+        });
+      }
+
       navigate("/dashboard");
     } catch (err: any) {
       toast({
@@ -116,7 +157,6 @@ export default function Register() {
           <p className="text-muted-foreground">ধাপ {step}/3 — {stepLabels[step - 1]}</p>
         </div>
 
-        {/* Progress bar */}
         <div className="flex gap-2 mb-6">
           {[1, 2, 3].map(s => (
             <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${s <= step ? "bg-primary" : "bg-secondary"}`} />

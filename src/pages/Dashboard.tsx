@@ -1,15 +1,22 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
-import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, XCircle, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0, scale: 1,
+    transition: { delay: i * 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
 
 export default function Dashboard() {
   const { user, logout, isLoading, refreshUser } = useAuth();
@@ -63,8 +70,8 @@ export default function Dashboard() {
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
       return submitIncomingTransferRequests(
-        user.guest_id, 
-        user.display_name || user.guest_id, 
+        user.guest_id,
+        user.display_name || user.guest_id,
         requestSubmitPassword,
         submitterPaymentNumber.trim() || undefined,
         submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined
@@ -114,7 +121,14 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm animate-pulse">লোড হচ্ছে...</p>
+        </motion.div>
       </div>
     );
   }
@@ -126,10 +140,26 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
+      {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px]" />
+        <motion.div
+          animate={{ scale: [1, 1.2, 1], opacity: [0.08, 0.15, 0.08] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary rounded-full blur-[150px]"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], opacity: [0.05, 0.1, 0.05] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-[hsl(var(--purple))] rounded-full blur-[150px]"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], opacity: [0.03, 0.08, 0.03] }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+          className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-[hsl(var(--cyan))] rounded-full blur-[150px]"
+        />
       </div>
 
+      {/* Payment confirmation overlay */}
       <AnimatePresence>
         {user.payment_status === "pending" && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-6">
@@ -150,285 +180,327 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
-      <header className="sticky top-0 z-50 glass-card border-b-0 rounded-none bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/60 backdrop-blur-2xl">
+        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/profile")} className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center border border-border overflow-hidden hover:border-primary transition-colors">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/profile")}
+              className="w-11 h-11 bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 rounded-2xl flex items-center justify-center border border-primary/20 overflow-hidden"
+            >
               {user.avatar_url ? (
                 <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <User className="w-5 h-5 text-muted-foreground" />
+                <User className="w-5 h-5 text-primary" />
               )}
-            </button>
+            </motion.button>
             <div>
-              <p className="text-xs text-muted-foreground">স্বাগতম,</p>
-              <div className="flex flex-col">
-                <p className="font-bold text-sm truncate max-w-[120px]">{user.display_name || user.guest_id}</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-muted-foreground font-mono">ID: {user.guest_id}</p>
-                  <button onClick={copyId} className="p-1 hover:bg-secondary rounded transition-colors">
-                    {copied ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
-                  </button>
-                </div>
+              <p className="font-bold text-sm truncate max-w-[140px]">{user.display_name || user.guest_id}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] text-muted-foreground font-mono">ID: {user.guest_id}</p>
+                <button onClick={copyId} className="p-0.5 hover:bg-secondary rounded transition-colors">
+                  {copied ? <Check className="w-2.5 h-2.5 text-primary" /> : <Copy className="w-2.5 h-2.5 text-muted-foreground" />}
+                </button>
               </div>
             </div>
           </div>
-          <button onClick={() => { logout(); navigate("/"); }} className="p-2 hover:bg-secondary rounded-full text-muted-foreground hover:text-destructive transition-colors">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => { logout(); navigate("/"); }}
+            className="p-2.5 hover:bg-destructive/10 rounded-xl text-muted-foreground hover:text-destructive transition-all"
+          >
             <LogOut className="w-5 h-5" />
-          </button>
+          </motion.button>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-4 pt-6 space-y-6 relative z-10">
-        {/* User to User Request */}
-        <section className="glass-card rounded-3xl border-2 border-primary/30 overflow-hidden">
-          <button
-            onClick={() => setShowRequestSection(!showRequestSection)}
-            className="w-full p-6 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+      <main className="max-w-md mx-auto px-4 pt-6 space-y-5 relative z-10">
+        {/* Stats Cards Row */}
+        <div className="grid grid-cols-2 gap-3">
+          <motion.div
+            custom={0}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="glass-card rounded-2xl p-4 border border-primary/20 relative overflow-hidden group"
           >
-            <div className="flex items-center gap-3">
-              <Send className="w-6 h-6 text-primary" />
-              <div className="text-left">
-                <h2 className="text-xl font-bold">User Request পাঠান</h2>
-                <p className="text-xs text-muted-foreground">ট্যাপ করে খুলুন</p>
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-primary" />
+                </div>
+                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ভেরিফাইড</p>
               </div>
+              <p className="text-3xl font-black text-foreground">{user.key_count || 0}</p>
             </div>
-            {showRequestSection ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-          </button>
+          </motion.div>
 
-          <AnimatePresence>
-            {showRequestSection && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                <div className="px-6 pb-6 space-y-4">
-                  {/* Minimum request notice */}
-                  <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/30 rounded-xl p-4 space-y-2">
-                    <p className="text-sm font-bold text-[hsl(var(--amber))]">📢 গুরুত্বপূর্ণ নোটিশ</p>
-                    <p className="text-xs text-foreground/80 leading-relaxed">
-                      রিকুয়েস্ট পাঠাতে হলে আপনার অ্যাকাউন্টে সর্বনিম্ন <span className="text-[hsl(var(--amber))] font-black text-sm">{minRequestVerified}</span> টি ভেরিফাইড কাউন্ট থাকতে হবে।
-                    </p>
-                    <p className="text-xs text-foreground/80 leading-relaxed">
-                      একসাথে <span className="text-primary font-bold">২০ টি</span> করতে পারলে <span className="text-primary font-bold">১০% বোনাস</span> এবং <span className="text-primary font-bold">৫০ টি</span> করতে পারলে <span className="text-primary font-bold">২০% বোনাস</span> পাবেন!
-                    </p>
-                  </div>
-
-                  {!canSendRequest ? (
-                    <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 text-center">
-                      <p className="text-sm text-destructive font-bold">
-                        আপনার ভেরিফাইড কাউন্ট: <span className="text-lg">{userVerifiedCount}</span> / {minRequestVerified}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">সর্বনিম্ন {minRequestVerified} টি ভেরিফাইড হলেই রিকুয়েস্ট পাঠাতে পারবেন।</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        value={requestTargetNumber}
-                        onChange={(e) => setRequestTargetNumber(e.target.value)}
-                        placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)"
-                        className="input-field"
-                      />
-                      <div className="bg-secondary/50 p-5 rounded-xl border border-border space-y-4">
-                        <p className="text-base font-bold text-foreground">আপনার পেমেন্ট নম্বর</p>
-                        <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-border">
-                          <button onClick={() => setRequestPaymentMethod("bkash")}
-                            className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
-                          <button onClick={() => setRequestPaymentMethod("nagad")}
-                            className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
-                        </div>
-                        <input type="text" placeholder="01XXXXXXXXX" value={requestPaymentNumber}
-                          onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field text-base py-3" />
-                      </div>
-                      <button onClick={() => createUserRequestMutation.mutate()} className="btn-primary py-4 font-black"
-                        disabled={createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
-                        {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-5 h-5" /> Request পাঠান</>}
-                      </button>
-                    </div>
-                  )}
-
-          <div className="border-t border-border pt-4 space-y-3">
-            <h3 className="font-bold text-sm">আপনার নম্বরে আসা Request List ({incomingRequests.length})</h3>
-            {incomingRequests.length === 0 ? (
-              <p className="text-xs text-muted-foreground">এখনও কোনো request আসেনি।</p>
-            ) : (
-              <>
-                <div className="space-y-3 max-h-80 overflow-y-auto">
-                  {incomingRequests.map((item) => (
-                    <div key={item.id} className="bg-secondary/40 border border-border rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-foreground font-mono">{item.requester_guest_id}</p>
-                        <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">
-                          {item.requester_verified_count} verified
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-                          item.requester_payment_method === "bkash" 
-                            ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]" 
-                            : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
-                        }`}>
-                          {item.requester_payment_method?.toUpperCase() || "N/A"}
-                        </span>
-                        <span className="text-sm font-mono font-bold text-foreground">{item.requester_payment_number}</span>
-                      </div>
-                    </div>
-                  ))}
+          <motion.div
+            custom={1}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="glass-card rounded-2xl p-4 border border-[hsl(var(--cyan))]/20 relative overflow-hidden group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-[hsl(var(--cyan))]/20 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-[hsl(var(--cyan))]" />
                 </div>
-
-                {showRequestSubmitPassword ? (
-                  <div className="space-y-3 bg-secondary/30 p-4 rounded-xl border border-border">
-                    <input
-                      type="password"
-                      value={requestSubmitPassword}
-                      onChange={(e) => setRequestSubmitPassword(e.target.value)}
-                      placeholder="পাসওয়ার্ড দিন"
-                      className="input-field"
-                    />
-                    
-                    <div className="bg-secondary/50 p-4 rounded-xl border border-border space-y-3">
-                      <p className="text-sm font-bold text-foreground">আপনার bKash/Nagad নম্বর (Admin এ যাবে)</p>
-                      <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-border">
-                        <button
-                          onClick={() => setSubmitterPaymentMethod("bkash")}
-                          className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${submitterPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}
-                        >
-                          bKash
-                        </button>
-                        <button
-                          onClick={() => setSubmitterPaymentMethod("nagad")}
-                          className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${submitterPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}
-                        >
-                          Nagad
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="01XXXXXXXXX"
-                        value={submitterPaymentNumber}
-                        onChange={(e) => setSubmitterPaymentNumber(e.target.value)}
-                        className="input-field text-base py-3"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => submitIncomingRequestsMutation.mutate()}
-                        className="btn-primary py-3"
-                        disabled={submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}
-                      >
-                        {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin" /> : "Admin এ পাঠান"}
-                      </button>
-                      <button
-                        onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
-                        className="px-4 py-3 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-colors font-bold"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button onClick={() => setShowRequestSubmitPassword(true)} className="btn-primary py-3">
-                    Full List Submit
-                  </button>
-                )}
-                </>
-              )}
+                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ব্যালেন্স</p>
+              </div>
+              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">৳</span></p>
             </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
+          </motion.div>
+        </div>
 
         {/* Custom Notice */}
         <AnimatePresence>
           {customNoticeText && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="bg-primary/20 border-2 border-primary/40 rounded-2xl p-6 flex items-start gap-4 shadow-xl shadow-primary/10">
-              <Bell className="w-10 h-10 text-primary shrink-0" />
-              <p className="text-xl font-black leading-tight whitespace-pre-wrap">{customNoticeText}</p>
+            <motion.div
+              custom={2}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="relative overflow-hidden rounded-2xl border border-[hsl(var(--amber))]/30"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--amber))]/10 to-[hsl(var(--orange))]/5" />
+              <div className="relative p-5 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--amber))]/20 flex items-center justify-center shrink-0">
+                  <Bell className="w-5 h-5 text-[hsl(var(--amber))]" />
+                </div>
+                <p className="text-sm font-bold leading-relaxed whitespace-pre-wrap">{customNoticeText}</p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Bonus Section */}
         {bonusEnabled && (
-          <div className="space-y-3">
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-              className="bg-gradient-to-r from-accent/20 to-[hsl(var(--amber))]/20 border-2 border-accent/50 rounded-2xl p-6 text-center shadow-lg shadow-accent/10">
-              <p className="text-xl font-black text-accent mb-2">🔥 ধামাকা বোনাস অফার! 🔥</p>
-              <p className="text-sm font-bold leading-relaxed">
-                {targetAmount}টি ভেরিফাই করলে <span className="text-accent text-lg">বোনাস</span> পাবেন!
-              </p>
-            </motion.div>
-
-            <div className="glass-card p-5 rounded-3xl border border-border space-y-3">
-              <div className="flex justify-between items-center">
-                <p className="text-sm font-bold">আজকের টার্গেট (Bonus)</p>
-                <p className="text-xs font-mono bg-primary/20 text-primary px-2 py-1 rounded-lg">{user.key_count}/{targetAmount}</p>
+          <motion.div
+            custom={3}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-3"
+          >
+            <div className="relative overflow-hidden rounded-2xl border border-accent/30">
+              <div className="absolute inset-0 bg-gradient-to-r from-accent/15 via-[hsl(var(--amber))]/10 to-[hsl(var(--orange))]/15" />
+              <motion.div
+                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-accent/10 to-transparent"
+              />
+              <div className="relative p-5 text-center">
+                <p className="text-lg font-black text-accent mb-1">🔥 ধামাকা বোনাস অফার! 🔥</p>
+                <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                  {targetAmount}টি ভেরিফাই করলে <span className="text-accent">বোনাস</span> পাবেন!
+                </p>
               </div>
-              <div className="w-full h-4 bg-secondary rounded-full overflow-hidden border border-border">
+            </div>
+
+            <div className="glass-card p-5 rounded-2xl border border-border/50 space-y-3">
+              <div className="flex justify-between items-center">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">বোনাস প্রগ্রেস</p>
+                <p className="text-xs font-mono bg-primary/20 text-primary px-2.5 py-1 rounded-lg font-bold">{user.key_count}/{targetAmount}</p>
+              </div>
+              <div className="w-full h-3 bg-secondary/80 rounded-full overflow-hidden border border-border/50">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min((user.key_count / targetAmount) * 100, 100)}%` }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                  className="h-full bg-gradient-to-r from-primary to-[hsl(var(--emerald))] rounded-full"
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>0</span>
-                <span className="text-primary font-bold">{user.key_count} সম্পন্ন</span>
-                <span>{targetAmount}</span>
+                  transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+                  className="h-full bg-gradient-to-r from-primary via-[hsl(var(--emerald))] to-[hsl(var(--cyan))] rounded-full relative"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent to-foreground/10 rounded-full" />
+                </motion.div>
               </div>
               {user.key_count >= targetAmount ? (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-primary/20 border border-primary/40 rounded-xl text-center">
-                  <p className="text-primary font-bold text-sm">🎉 আপনি বোনাসের জন্য এলিজিবল হয়েছেন!</p>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="p-3 bg-primary/15 border border-primary/30 rounded-xl text-center"
+                >
+                  <p className="text-primary font-bold text-sm">🎉 বোনাসের জন্য এলিজিবল!</p>
                 </motion.div>
               ) : (
                 <p className="text-[10px] text-muted-foreground text-center">টার্গেট পূর্ণ হলে বোনাস আনলক হবে</p>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Balance Card */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-primary to-[hsl(var(--emerald))] rounded-3xl p-8 shadow-2xl shadow-primary/20 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-foreground/10 rounded-full blur-2xl transform translate-x-10 -translate-y-10" />
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div>
-              <p className="text-primary-foreground/80 font-medium mb-1">মোট ভেরিফাইড কি</p>
-              <h1 className="text-5xl font-bold tracking-tight text-primary-foreground">{user.key_count || 0}</h1>
+        {/* User Request Section */}
+        <motion.section
+          custom={4}
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          className="glass-card rounded-2xl border border-primary/20 overflow-hidden"
+        >
+          <button
+            onClick={() => setShowRequestSection(!showRequestSection)}
+            className="w-full p-5 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 flex items-center justify-center">
+                <Send className="w-5 h-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <h2 className="text-base font-bold">User Request পাঠান</h2>
+                <p className="text-[10px] text-muted-foreground">ট্যাপ করে খুলুন</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-primary-foreground/60 text-sm relative z-10">
-            <span className="w-2 h-2 bg-primary-foreground rounded-full animate-pulse" />লাইভ আপডেট সক্রিয়
-          </div>
+            <motion.div animate={{ rotate: showRequestSection ? 180 : 0 }} transition={{ duration: 0.3 }}>
+              <ChevronDown className="w-5 h-5 text-muted-foreground" />
+            </motion.div>
+          </button>
+
+          <AnimatePresence>
+            {showRequestSection && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
+                <div className="px-5 pb-5 space-y-4">
+                  {/* Minimum request notice */}
+                  <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-xl p-4 space-y-2">
+                    <p className="text-xs text-foreground/80 leading-relaxed">
+                      রিকুয়েস্ট পাঠাতে সর্বনিম্ন <span className="text-[hsl(var(--amber))] font-black">{minRequestVerified}</span> টি ভেরিফাইড কাউন্ট দরকার।
+                    </p>
+                    <p className="text-xs text-foreground/80 leading-relaxed">
+                      <span className="text-primary font-bold">২০ টি</span> = <span className="text-primary font-bold">১০% বোনাস</span> | <span className="text-primary font-bold">৫০ টি</span> = <span className="text-primary font-bold">২০% বোনাস</span>
+                    </p>
+                  </div>
+
+                  {!canSendRequest ? (
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-center">
+                      <p className="text-sm text-destructive font-bold">
+                        {userVerifiedCount} / {minRequestVerified} ভেরিফাইড
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-1">সর্বনিম্ন {minRequestVerified} টি হলেই পাঠাতে পারবেন</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <input type="text" value={requestTargetNumber} onChange={(e) => setRequestTargetNumber(e.target.value)}
+                        placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)" className="input-field" />
+                      <div className="bg-secondary/30 p-4 rounded-xl border border-border/50 space-y-3">
+                        <p className="text-sm font-bold">আপনার পেমেন্ট নম্বর</p>
+                        <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
+                          <button onClick={() => setRequestPaymentMethod("bkash")}
+                            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
+                          <button onClick={() => setRequestPaymentMethod("nagad")}
+                            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
+                        </div>
+                        <input type="text" placeholder="01XXXXXXXXX" value={requestPaymentNumber}
+                          onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field" />
+                      </div>
+                      <button onClick={() => createUserRequestMutation.mutate()} className="btn-primary py-3.5 font-black"
+                        disabled={createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
+                        {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-4 h-4" /> Request পাঠান</>}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="border-t border-border/50 pt-4 space-y-3">
+                    <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">আসা Request ({incomingRequests.length})</h3>
+                    {incomingRequests.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-3">কোনো request আসেনি</p>
+                    ) : (
+                      <>
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                          {incomingRequests.map((item) => (
+                            <motion.div
+                              key={item.id}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="bg-secondary/30 border border-border/50 rounded-xl p-3.5 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-bold font-mono">{item.requester_guest_id}</p>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-primary/20 text-primary">
+                                  {item.requester_verified_count} ✓
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+                                  item.requester_payment_method === "bkash"
+                                    ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]"
+                                    : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
+                                }`}>
+                                  {item.requester_payment_method?.toUpperCase() || "N/A"}
+                                </span>
+                                <span className="text-xs font-mono font-bold">{item.requester_payment_number}</span>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+
+                        {showRequestSubmitPassword ? (
+                          <div className="space-y-3 bg-secondary/20 p-4 rounded-xl border border-border/50">
+                            <input type="password" value={requestSubmitPassword} onChange={(e) => setRequestSubmitPassword(e.target.value)}
+                              placeholder="পাসওয়ার্ড দিন" className="input-field" />
+                            <div className="bg-secondary/30 p-3 rounded-xl border border-border/50 space-y-3">
+                              <p className="text-xs font-bold">আপনার bKash/Nagad নম্বর</p>
+                              <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
+                                <button onClick={() => setSubmitterPaymentMethod("bkash")}
+                                  className={`px-3 py-2 rounded-lg text-xs font-black transition-all ${submitterPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
+                                <button onClick={() => setSubmitterPaymentMethod("nagad")}
+                                  className={`px-3 py-2 rounded-lg text-xs font-black transition-all ${submitterPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
+                              </div>
+                              <input type="text" placeholder="01XXXXXXXXX" value={submitterPaymentNumber}
+                                onChange={(e) => setSubmitterPaymentNumber(e.target.value)} className="input-field" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button onClick={() => submitIncomingRequestsMutation.mutate()} className="btn-primary py-3"
+                                disabled={submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}>
+                                {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin" /> : "Admin এ পাঠান"}
+                              </button>
+                              <button onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
+                                className="px-4 py-3 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-colors font-bold text-sm">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowRequestSubmitPassword(true)} className="btn-primary py-3">
+                            Full List Submit
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.section>
+
+        {/* Key Submitter */}
+        <motion.div custom={5} variants={cardVariants} initial="hidden" animate="visible">
+          <KeySubmitter />
         </motion.div>
 
-        {/* Important Notice */}
-        <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 text-accent">
-          <p className="text-sm font-bold mb-1">গুরুত্বপূর্ণ নোটিশ:</p>
-          <div className="space-y-2 text-xs leading-relaxed">
-            <p>সবাইকে জানানো যাচ্ছে যে, একটি প্রাইভেট কি শুধুমাত্র একবারই সাবমিট করা যাবে।</p>
-            <p className="font-bold border-t border-accent/20 pt-2">Account verified করে স্থানীয় অ্যাডমিনের কাছ থেকে নির্ধারিত পরিমাণ টাকা বুঝে নিন।</p>
+        {/* Transaction History */}
+        <motion.div custom={6} variants={cardVariants} initial="hidden" animate="visible" className="pt-2">
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Recent History</h3>
           </div>
-        </div>
-
-        <KeySubmitter />
-
-        <div className="pt-4">
-          <h3 className="text-lg font-bold mb-4 px-2">Recent History</h3>
           <TransactionList />
-        </div>
+        </motion.div>
       </main>
 
       {/* Floating Chat Button */}
-      <button
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
         onClick={() => navigate("/chat")}
-        className="fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground w-14 h-14 rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 transition-transform"
+        className="fixed bottom-6 right-6 z-50 bg-gradient-to-br from-primary to-[hsl(var(--emerald))] text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/30 flex items-center justify-center"
       >
         <MessageCircle className="w-6 h-6" />
-      </button>
+      </motion.button>
     </div>
   );
 }
