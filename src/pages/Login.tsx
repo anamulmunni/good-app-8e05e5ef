@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowRight, Lock, Phone } from "lucide-react";
+import { Loader2, ArrowRight, Lock, Phone, PlayCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { getPublicSettings } from "@/lib/api";
 
 export default function Login() {
   const [phone, setPhone] = useState("");
