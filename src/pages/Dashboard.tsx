@@ -110,7 +110,7 @@ export default function Dashboard() {
   const paymentMode = publicSettings?.paymentMode === "on";
   const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
-  const displayBalance = paymentMode ? (userVerifiedCount * currentRate - (userVerifiedCount * currentRate - (user?.balance || 0))) : 0;
+  const displayBalance = paymentMode ? (user?.balance || 0) : 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
 
   const copyId = () => {
