@@ -260,6 +260,78 @@ export default function AdminPanel() {
           </div>
         </header>
 
+        {/* Payment Mode Switch */}
+        <div className="glass-card p-6 rounded-3xl border-2 border-[hsl(var(--emerald))]/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Coins className="w-6 h-6 text-[hsl(var(--emerald))]" />
+              <div>
+                <h3 className="text-xl font-bold">পেমেন্ট মোড</h3>
+                <p className="text-xs text-muted-foreground">ON করলে প্রতি ভেরিফাই এ টাকা যোগ হবে, উইথড্র সিস্টেম চালু হবে</p>
+              </div>
+            </div>
+            <button
+              disabled={paymentModeLoading}
+              onClick={async () => {
+                const newMode = paymentModeSetting === "on" ? "off" : "on";
+                setPaymentModeLoading(true);
+                try {
+                  await updateSetting("paymentMode", newMode);
+                  if (newMode === "on") {
+                    // Recalculate all balances retroactively
+                    const rate = parseInt(rewardRate) || 40;
+                    await recalculateAllBalances(rate);
+                    toast({ title: `পেমেন্ট মোড ON — সব ইউজারের ব্যালেন্স ${rate} TK/key হিসেবে আপডেট হয়েছে` });
+                  } else {
+                    await resetAllBalances();
+                    toast({ title: "পেমেন্ট মোড OFF — সব ব্যালেন্স রিসেট হয়েছে" });
+                  }
+                  setPaymentModeSetting(newMode);
+                  queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
+                  queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                  queryClient.invalidateQueries({ queryKey: ["public-settings"] });
+                } catch (err) {
+                  toast({ title: "ব্যর্থ", variant: "destructive" });
+                } finally {
+                  setPaymentModeLoading(false);
+                }
+              }}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm transition-all ${
+                paymentModeSetting === "on" 
+                  ? "bg-[hsl(var(--emerald))] text-foreground shadow-lg shadow-[hsl(var(--emerald))]/30" 
+                  : "bg-secondary text-muted-foreground border border-border"
+              }`}
+            >
+              {paymentModeLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : paymentModeSetting === "on" ? (
+                <><ToggleRight className="w-5 h-5" /> ON</>
+              ) : (
+                <><ToggleLeft className="w-5 h-5" /> OFF</>
+              )}
+            </button>
+          </div>
+          {paymentModeSetting === "on" && (
+            <div className="mt-4 pt-4 border-t border-border space-y-3">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">প্রতি ভেরিফাই এর রেট (TK)</label>
+                <div className="flex gap-2">
+                  <input type="number" value={rewardRate} onChange={(e) => setRewardRate(e.target.value)} className="input-field" />
+                  <button onClick={async () => {
+                    const rate = parseInt(rewardRate);
+                    await rateMutation.mutateAsync({ rate });
+                    await recalculateAllBalances(rate);
+                    queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                    toast({ title: `রেট ${rate} TK আপডেট হয়েছে এবং সব ব্যালেন্স রিক্যালকুলেট হয়েছে` });
+                  }} className="btn-primary w-auto" disabled={rateMutation.isPending}>
+                    {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "আপডেট ও রিক্যালকুলেট"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Notice & Bonus Settings */}
         <div className="glass-card p-6 rounded-3xl">
           <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><Bell className="w-5 h-5 text-primary" /> নোটিশ এবং বোনাস সেটিংস</h3>
