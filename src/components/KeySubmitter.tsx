@@ -122,10 +122,10 @@ export function KeySubmitter() {
   });
 
   const steps = [
-    { num: "১", text: "নিচের বাটনে ক্লিক করুন — অটোমেটিক একটি প্রাইভেট কী তৈরি হবে।", icon: Zap },
-    { num: "২", text: "\"Face Verification খুলুন\" বাটনে ক্লিক করলে ক্যামেরা পেজ ওপেন হবে।", icon: Camera },
-    { num: "৩", text: "ক্যামেরা Permission Allow করে মুখ দেখিয়ে ভেরিফিকেশন সম্পন্ন করুন।", icon: CheckCircle },
-    { num: "৪", text: "ভেরিফিকেশন শেষে এই অ্যাপে ফিরে \"ভেরিফিকেশন সম্পূর্ণ করুন\" বাটনে ক্লিক করুন।", icon: ArrowRight },
+    { num: "১", text: "নিচে \"ফেস ভেরিফিকেশন শুরু করুন\" বাটনে ক্লিক করুন।", icon: Zap },
+    { num: "২", text: "\"Face Verification খুলুন\" বাটনে ক্লিক করুন — ক্যামেরা পেজ ওপেন হবে।", icon: Camera },
+    { num: "৩", text: "ক্যামেরা Permission Allow করে মুখ দেখিয়ে ফেস ভেরিফিকেশন সম্পন্ন করুন।", icon: CheckCircle },
+    { num: "৪", text: "ভেরিফিকেশন শেষে এই অ্যাপে (Good-App) ফিরে এসে \"ভেরিফিকেশন সম্পূর্ণ করুন\" বাটনে ক্লিক করুন।", icon: ArrowRight },
     { num: "৫", text: "সবশেষে \"সাবমিট এবং ইনকাম করুন\" বাটনে ক্লিক করলেই কাজ শেষ! 🎉", icon: Sparkles },
   ];
 
