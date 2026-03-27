@@ -66,6 +66,7 @@ export type Settings = {
   requestSubmitPassword: string;
   minRequestVerified: number;
   paymentMode: string;
+  minWithdraw: number;
 };
 
 // Auth / User APIs
