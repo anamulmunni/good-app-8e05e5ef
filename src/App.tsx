@@ -13,6 +13,8 @@ import AddKeys from "./pages/AddKeys";
 import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
 import UserProfile from "./pages/UserProfile";
+import CallPage from "./pages/CallPage";
+import IncomingCallHandler from "./components/IncomingCallHandler";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +25,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <IncomingCallHandler />
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/index" element={<Login />} />
@@ -35,6 +38,7 @@ const App = () => (
           <Route path="/chat" element={<Chat />} />
           <Route path="/feed" element={<Feed />} />
           <Route path="/user/:userId" element={<UserProfile />} />
+          <Route path="/call/:userId" element={<CallPage />} />
           <Route path="/~oauth" element={<Login />} />
           <Route path="/~c" element={<Login />} />
           <Route path="*" element={<NotFound />} />
