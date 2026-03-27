@@ -251,7 +251,7 @@ export default function Dashboard() {
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="glass-card rounded-2xl border border-[hsl(var(--cyan))]/20 relative overflow-hidden group"
+              className="glass-card rounded-2xl border border-[hsl(var(--cyan))]/20 relative group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/5 via-[hsl(var(--emerald))]/5 to-[hsl(var(--purple))]/5" />
               <motion.div
