@@ -14,6 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversations: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_message: string | null
+          last_message_at: string | null
+          participant_1: number
+          participant_2: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_message?: string | null
+          last_message_at?: string | null
+          participant_1: number
+          participant_2: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_message?: string | null
+          last_message_at?: string | null
+          participant_1?: number
+          participant_2?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_participant_1_fkey"
+            columns: ["participant_1"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_participant_2_fkey"
+            columns: ["participant_2"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string | null
+          conversation_id: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          media_url: string | null
+          message_type: string
+          sender_id: number
+        }
+        Insert: {
+          content?: string | null
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          media_url?: string | null
+          message_type?: string
+          sender_id: number
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          media_url?: string | null
+          message_type?: string
+          sender_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reset_history: {
         Row: {
           id: number

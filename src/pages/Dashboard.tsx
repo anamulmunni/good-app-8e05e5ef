@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, XCircle, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -595,6 +595,14 @@ export default function Dashboard() {
           <TransactionList />
         </div>
       </main>
+
+      {/* Floating Chat Button */}
+      <button
+        onClick={() => navigate("/chat")}
+        className="fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground w-14 h-14 rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 transition-transform"
+      >
+        <MessageCircle className="w-6 h-6" />
+      </button>
     </div>
   );
 }
