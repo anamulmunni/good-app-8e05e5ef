@@ -430,6 +430,7 @@ export type Database = {
         Args: { p_admin_name?: string; p_request_id: number }
         Returns: boolean
       }
+      recalculate_all_balances: { Args: { p_rate: number }; Returns: undefined }
       submit_user_request_batch: {
         Args: {
           p_password: string
