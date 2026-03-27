@@ -897,21 +897,35 @@ export default function AdminPanel() {
         </section>
 
         {/* Withdrawals */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold">পেন্ডিং উইথড্র</h2>
+        <section className="glass-card p-6 rounded-2xl border-2 border-[hsl(var(--orange))]/30 space-y-4">
+          <h2 className="text-xl font-bold flex items-center gap-2"><Coins className="w-6 h-6 text-[hsl(var(--orange))]" /> পেন্ডিং উইথড্র ({withdrawals.filter(w => w.status === "pending").length})</h2>
           <div className="grid gap-4">
-            {withdrawals.filter(w => w.status === "pending").map(w => (
-              <div key={w.id} className="glass-card p-4 rounded-xl space-y-3">
-                <div className="flex justify-between">
-                  <p className="font-bold text-lg">৳{w.amount}</p>
-                  <p className="text-sm text-muted-foreground">{w.details}</p>
+            {withdrawals.filter(w => w.status === "pending").map(w => {
+              const wxUser = users?.find(u => u.id === w.user_id);
+              return (
+                <div key={w.id} className="bg-secondary/50 border border-border rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-black text-2xl text-[hsl(var(--orange))]">{w.amount} TK</p>
+                      <p className="text-sm text-muted-foreground">{w.details}</p>
+                      {wxUser && <p className="text-xs text-muted-foreground mt-1">User: <span className="font-mono font-bold text-foreground">{wxUser.guest_id}</span> ({wxUser.display_name})</p>}
+                      <p className="text-[10px] text-muted-foreground">{new Date(w.created_at || "").toLocaleString("bn-BD")}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => statusMutation.mutate({ id: w.id, status: "completed" })} className="flex-1 btn-primary py-2.5 bg-[hsl(var(--emerald))]">
+                      <CheckCircle className="w-4 h-4" /> Approve
+                    </button>
+                    <button onClick={() => statusMutation.mutate({ id: w.id, status: "rejected" })} className="flex-1 btn-primary py-2.5 bg-destructive">
+                      <XCircle className="w-4 h-4" /> Reject
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => statusMutation.mutate({ id: w.id, status: "completed" })} className="flex-1 btn-primary py-2 bg-[hsl(var(--emerald))]">Approve</button>
-                  <button onClick={() => statusMutation.mutate({ id: w.id, status: "rejected" })} className="flex-1 btn-primary py-2 bg-destructive">Reject</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
+            {withdrawals.filter(w => w.status === "pending").length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">কোনো পেন্ডিং উইথড্র নেই</p>
+            )}
           </div>
         </section>
       </div>
