@@ -391,7 +391,7 @@ export default function AdminPanel() {
                               )}
                             </div>
                             <div className="flex gap-1">
-                              <button onClick={() => resetRequestMutation.mutate(req.id)} disabled={resetRequestMutation.isPending} className="p-1.5 rounded bg-primary/20 hover:bg-primary/40" title="Reset">
+                              <button onClick={() => resetTransferRequestMutation.mutate(req.id)} disabled={resetTransferRequestMutation.isPending} className="p-1.5 rounded bg-primary/20 hover:bg-primary/40" title="Reset">
                                 <RefreshCcw className="w-3.5 h-3.5 text-primary" />
                               </button>
                               <button onClick={() => dismissRequestMutation.mutate(req.id)} disabled={dismissRequestMutation.isPending} className="p-1.5 rounded bg-destructive/20 hover:bg-destructive/40" title="Dismiss">
