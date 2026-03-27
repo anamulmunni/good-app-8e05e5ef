@@ -778,7 +778,7 @@ export default function AdminPanel() {
                             setResettingPassword(true);
                             try {
                               const { data, error } = await supabase.functions.invoke("admin-reset-password", {
-                                body: { auth_id: u.auth_id, new_password: newPasswordValue, admin_password: ADMIN_PASSWORD },
+                                body: { auth_id: u.auth_id, new_password: newPasswordValue, admin_password: "Anamul-963050" },
                               });
                               if (error) throw error;
                               if (data?.error) throw new Error(data.error);
