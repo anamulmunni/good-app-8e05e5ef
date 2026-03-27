@@ -259,7 +259,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ব্যালেন্স</p>
               </div>
-              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">TK</span></p>
+              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">৳</span></p>
             </div>
           </motion.div>
           )}
