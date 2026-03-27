@@ -12,6 +12,7 @@ import AdminPanel from "./pages/AdminPanel";
 import AddKeys from "./pages/AddKeys";
 import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
+import UserProfile from "./pages/UserProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

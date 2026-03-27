@@ -9,8 +9,8 @@ import {
   type Post, type PostComment
 } from "@/lib/feed-api";
 import {
-  Heart, MessageCircle, Send, Image, Video, X, ArrowLeft,
-  Plus, User, MoreHorizontal, ChevronDown
+  Heart, MessageCircle, Send, Image, X, ArrowLeft,
+  Plus, User
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -42,14 +42,12 @@ export default function Feed() {
     enabled: !!user,
   });
 
-  // Load user likes
   useEffect(() => {
     if (user && posts.length > 0) {
       getUserLikes(user.id, posts.map(p => p.id)).then(setLikedPosts);
     }
   }, [user, posts]);
 
-  // Realtime for new posts
   useEffect(() => {
     const channel = supabase
       .channel("feed-realtime")
@@ -80,30 +78,78 @@ export default function Feed() {
     onError: (e: Error) => toast({ title: "পোস্ট করা যায়নি", description: e.message, variant: "destructive" }),
   });
 
+  // Optimistic like
   const likeMutation = useMutation({
     mutationFn: async (postId: string) => {
       if (!user) throw new Error("Login");
       return { postId, liked: await toggleLike(postId, user.id) };
     },
-    onSuccess: ({ postId, liked }) => {
-      setLikedPosts(prev => {
-        const next = new Set(prev);
-        liked ? next.add(postId) : next.delete(postId);
+    onMutate: async (postId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["feed-posts"] });
+      const prev = queryClient.getQueryData<Post[]>(["feed-posts"]);
+      const wasLiked = likedPosts.has(postId);
+
+      // Optimistic update
+      setLikedPosts(p => {
+        const next = new Set(p);
+        wasLiked ? next.delete(postId) : next.add(postId);
         return next;
       });
+      queryClient.setQueryData<Post[]>(["feed-posts"], old =>
+        (old || []).map(p => p.id === postId
+          ? { ...p, likes_count: p.likes_count + (wasLiked ? -1 : 1) }
+          : p
+        )
+      );
+      return { prev, wasLiked };
+    },
+    onError: (_err, postId, context) => {
+      if (context?.prev) queryClient.setQueryData(["feed-posts"], context.prev);
+      setLikedPosts(p => {
+        const next = new Set(p);
+        context?.wasLiked ? next.add(postId) : next.delete(postId);
+        return next;
+      });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
     },
   });
 
+  // Optimistic comment
   const commentMutation = useMutation({
     mutationFn: async () => {
       if (!user || !commentingPostId) throw new Error("Error");
       return addComment(commentingPostId, user.id, commentText.trim());
     },
-    onSuccess: () => {
+    onMutate: async () => {
+      if (!user || !commentingPostId) return;
+      const optimisticComment: PostComment = {
+        id: `temp-${Date.now()}`,
+        post_id: commentingPostId,
+        user_id: user.id,
+        content: commentText.trim(),
+        created_at: new Date().toISOString(),
+        user: { display_name: user.display_name, avatar_url: user.avatar_url, guest_id: user.guest_id },
+      };
+      setComments(prev => [...prev, optimisticComment]);
+      // Optimistic count update
+      queryClient.setQueryData<Post[]>(["feed-posts"], old =>
+        (old || []).map(p => p.id === commentingPostId
+          ? { ...p, comments_count: p.comments_count + 1 }
+          : p
+        )
+      );
+      const savedText = commentText;
       setCommentText("");
+      return { savedText };
+    },
+    onSuccess: () => {
       if (commentingPostId) loadComments(commentingPostId);
       queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.savedText) setCommentText(context.savedText);
     },
   });
 
@@ -268,7 +314,10 @@ export default function Feed() {
               >
                 {/* Post header */}
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 flex items-center justify-center border border-primary/20 overflow-hidden">
+                  <button
+                    onClick={() => navigate(`/user/${post.user_id}`)}
+                    className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 flex items-center justify-center border border-primary/20 overflow-hidden"
+                  >
                     {post.user?.avatar_url ? (
                       <img src={post.user.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -276,9 +325,11 @@ export default function Feed() {
                         {post.user?.display_name?.[0]?.toUpperCase() || "?"}
                       </span>
                     )}
-                  </div>
+                  </button>
                   <div className="flex-1">
-                    <p className="font-bold text-sm text-foreground">{post.user?.display_name || "User"}</p>
+                    <button onClick={() => navigate(`/user/${post.user_id}`)} className="font-bold text-sm text-foreground hover:underline text-left">
+                      {post.user?.display_name || "User"}
+                    </button>
                     <p className="text-[10px] text-muted-foreground">{timeAgo(post.created_at)}</p>
                   </div>
                   {post.user_id !== user.id && (
