@@ -272,54 +272,69 @@ export default function Dashboard() {
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-6 relative z-10">
         {/* User to User Request */}
-        <section className="glass-card p-6 rounded-3xl border-2 border-primary/30 space-y-5">
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold">User Request পাঠান</h2>
-            <p className="text-xs text-muted-foreground">যে নম্বরে পাঠাবেন + আপনার bKash/Nagad নম্বর দিন।</p>
-          </div>
-
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={requestTargetNumber}
-              onChange={(e) => setRequestTargetNumber(e.target.value)}
-              placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)"
-              className="input-field"
-            />
-
-            <div className="bg-secondary/50 p-5 rounded-xl border border-border space-y-4">
-              <p className="text-base font-bold text-foreground">আপনার পেমেন্ট নম্বর</p>
-              <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-border">
-                <button
-                  onClick={() => setRequestPaymentMethod("bkash")}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}
-                >
-                  bKash
-                </button>
-                <button
-                  onClick={() => setRequestPaymentMethod("nagad")}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}
-                >
-                  Nagad
-                </button>
+        <section className="glass-card rounded-3xl border-2 border-primary/30 overflow-hidden">
+          <button
+            onClick={() => setShowRequestSection(!showRequestSection)}
+            className="w-full p-6 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Send className="w-6 h-6 text-primary" />
+              <div className="text-left">
+                <h2 className="text-xl font-bold">User Request পাঠান</h2>
+                <p className="text-xs text-muted-foreground">ট্যাপ করে খুলুন</p>
               </div>
-              <input
-                type="text"
-                placeholder="01XXXXXXXXX"
-                value={requestPaymentNumber}
-                onChange={(e) => setRequestPaymentNumber(e.target.value)}
-                className="input-field text-base py-3"
-              />
             </div>
+            {showRequestSection ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
 
-            <button
-              onClick={() => createUserRequestMutation.mutate()}
-              className="btn-primary py-4 font-black"
-              disabled={createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}
-            >
-              {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-5 h-5" /> Request পাঠান</>}
-            </button>
-          </div>
+          <AnimatePresence>
+            {showRequestSection && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <div className="px-6 pb-6 space-y-4">
+                  {/* Minimum request notice */}
+                  <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/30 rounded-xl p-4 space-y-2">
+                    <p className="text-sm font-bold text-[hsl(var(--amber))]">📢 গুরুত্বপূর্ণ নোটিশ</p>
+                    <p className="text-xs text-foreground/80 leading-relaxed">
+                      রিকুয়েস্ট পাঠাতে হলে আপনার অ্যাকাউন্টে সর্বনিম্ন <span className="text-[hsl(var(--amber))] font-black text-sm">{minRequestVerified}</span> টি ভেরিফাইড কাউন্ট থাকতে হবে।
+                    </p>
+                    <p className="text-xs text-foreground/80 leading-relaxed">
+                      একসাথে <span className="text-primary font-bold">২০ টি</span> করতে পারলে <span className="text-primary font-bold">১০% বোনাস</span> এবং <span className="text-primary font-bold">৫০ টি</span> করতে পারলে <span className="text-primary font-bold">২০% বোনাস</span> পাবেন!
+                    </p>
+                  </div>
+
+                  {!canSendRequest ? (
+                    <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 text-center">
+                      <p className="text-sm text-destructive font-bold">
+                        আপনার ভেরিফাইড কাউন্ট: <span className="text-lg">{userVerifiedCount}</span> / {minRequestVerified}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">সর্বনিম্ন {minRequestVerified} টি ভেরিফাইড হলেই রিকুয়েস্ট পাঠাতে পারবেন।</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={requestTargetNumber}
+                        onChange={(e) => setRequestTargetNumber(e.target.value)}
+                        placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)"
+                        className="input-field"
+                      />
+                      <div className="bg-secondary/50 p-5 rounded-xl border border-border space-y-4">
+                        <p className="text-base font-bold text-foreground">আপনার পেমেন্ট নম্বর</p>
+                        <div className="grid grid-cols-2 gap-2 bg-secondary p-1.5 rounded-xl border border-border">
+                          <button onClick={() => setRequestPaymentMethod("bkash")}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
+                          <button onClick={() => setRequestPaymentMethod("nagad")}
+                            className={`px-4 py-2.5 rounded-lg text-sm font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
+                        </div>
+                        <input type="text" placeholder="01XXXXXXXXX" value={requestPaymentNumber}
+                          onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field text-base py-3" />
+                      </div>
+                      <button onClick={() => createUserRequestMutation.mutate()} className="btn-primary py-4 font-black"
+                        disabled={createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
+                        {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-5 h-5" /> Request পাঠান</>}
+                      </button>
+                    </div>
+                  )}
 
           <div className="border-t border-border pt-4 space-y-3">
             <h3 className="font-bold text-sm">আপনার নম্বরে আসা Request List ({incomingRequests.length})</h3>
@@ -407,9 +422,13 @@ export default function Dashboard() {
                     Full List Submit
                   </button>
                 )}
-              </>
+                </>
+              )}
+            </div>
+                </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
         </section>
 
         {/* Telegram Admin Section */}
