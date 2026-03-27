@@ -55,7 +55,7 @@ export function playRingtone(): { stop: () => void } {
         const gain2 = audioCtx.createGain();
         osc2.connect(gain2);
         gain2.connect(audioCtx.destination);
-        osc2.frequency.value = 554);
+        osc2.frequency.value = 554;
         osc2.type = "sine";
         gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
