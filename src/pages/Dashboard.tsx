@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp, DollarSign, Newspaper, Download } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp, DollarSign, Newspaper, Download, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
+import { hasUserPosted } from "@/lib/feed-api";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
