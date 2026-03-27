@@ -185,7 +185,7 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/60 backdrop-blur-2xl">
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95">
         <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <motion.button
