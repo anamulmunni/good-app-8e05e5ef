@@ -32,6 +32,7 @@ const App = () => (
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/add-keys" element={<AddKeys />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/feed" element={<Feed />} />
           <Route path="/~oauth" element={<Login />} />
           <Route path="/~c" element={<Login />} />
           <Route path="*" element={<NotFound />} />
