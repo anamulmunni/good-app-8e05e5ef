@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
 
 const cardVariants = {
