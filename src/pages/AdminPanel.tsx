@@ -358,69 +358,69 @@ export default function AdminPanel() {
 
               {userRequestSubmissions.length > 0 ? (
                 userRequestSubmissions.map((batch) => (
-                  <div key={batch.id} className="bg-secondary/50 border border-border rounded-xl p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-mono text-sm font-bold">Target: {batch.target_guest_id}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {batch.target_display_name || "Unknown"} • Submitter: {batch.submitted_to_admin_by}
-                        </p>
-                        {batch.submitter_payment_number && (
-                          <p className="text-xs mt-1">
-                            <span className={`font-bold px-2 py-0.5 rounded-lg text-xs ${
-                              batch.submitter_payment_method === "bkash"
-                                ? "bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]"
-                                : "bg-[hsl(var(--orange))]/20 text-[hsl(var(--orange))]"
-                            }`}>
-                              {batch.submitter_payment_method?.toUpperCase() || "N/A"}
-                            </span>
-                            <span className="font-mono font-bold text-foreground ml-2">{batch.submitter_payment_number}</span>
-                          </p>
-                        )}
-                        <p className="text-[10px] text-muted-foreground mt-1">{new Date(batch.submitted_at).toLocaleString("bn-BD")}</p>
-                      </div>
-                      <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">{batch.request_count} requests</span>
-                    </div>
 
-                    <div className="space-y-2 border-t border-border pt-3">
-                      {batch.requests.map((request) => {
-                        const reqUser = users?.find((u) => u.guest_id === request.requester_guest_id);
-                        return (
-                          <div key={request.id} className="p-3 rounded-lg bg-background/50 border border-border/60 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="font-mono text-sm font-bold">{request.requester_guest_id}</p>
-                              <p className="text-xs text-muted-foreground">Verified: <span className="text-primary font-bold">{reqUser?.key_count ?? request.requester_verified_count}</span></p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => resetTransferRequestMutation.mutate(request.id)}
-                                disabled={resetTransferRequestMutation.isPending}
-                                className="px-3 py-1.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] font-bold rounded-lg text-xs hover:bg-[hsl(var(--cyan))]/30 transition-colors disabled:opacity-60"
-                              >
-                                Reset
-                              </button>
-                              <button
-                                onClick={() => dismissTransferRequestMutation.mutate(request.id)}
-                                disabled={dismissTransferRequestMutation.isPending}
-                                className="p-1.5 rounded-lg text-destructive hover:bg-destructive/20 disabled:opacity-60"
-                                title="Reset ছাড়া লিস্ট থেকে সরান"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
 
-                    <button
-                      onClick={() => resetTransferBatchMutation.mutate(batch.id)}
-                      disabled={resetTransferBatchMutation.isPending}
-                      className="btn-primary py-2.5 bg-[hsl(var(--cyan))]/20 text-[hsl(var(--cyan))] border border-[hsl(var(--cyan))]/30 hover:bg-[hsl(var(--cyan))]/30 disabled:opacity-60"
-                    >
-                      {resetTransferBatchMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><RefreshCcw className="w-4 h-4" /> সব Reset করুন ({batch.requests.length})</>}
-                    </button>
-                  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">এখনও কোনো active submission নেই।</p>
