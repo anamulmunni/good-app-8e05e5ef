@@ -14,6 +14,12 @@ export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const normalizePhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    const local = digits.startsWith("88") ? digits.slice(2) : digits;
+    return /^01\d{9}$/.test(local) ? local : null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step < 3) {
@@ -23,8 +29,24 @@ export default function Register() {
 
     setIsSubmitting(true);
     try {
-      // Use phone number as fake email for Supabase auth
-      const fakeEmail = `${phone.trim()}@goodapp.local`;
+      const normalizedPhone = normalizePhone(phone.trim());
+      if (!normalizedPhone) {
+        throw new Error("সঠিক ফোন নম্বর দিন (01XXXXXXXXX)");
+      }
+
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("guest_id", normalizedPhone)
+        .maybeSingle();
+
+      if (existingUserError) throw existingUserError;
+      if (existingUser) {
+        throw new Error("এই ফোন নম্বর দিয়ে আগেই অ্যাকাউন্ট তৈরি হয়েছে");
+      }
+
+      // Use normalized phone number as fake email for auth
+      const fakeEmail = `${normalizedPhone}@goodapp.local`;
 
       const { error } = await supabase.auth.signUp({
         email: fakeEmail,
@@ -32,7 +54,7 @@ export default function Register() {
         options: {
           data: {
             display_name: displayName.trim(),
-            phone: phone.trim(),
+            phone: normalizedPhone,
           },
         },
       });
