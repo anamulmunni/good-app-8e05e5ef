@@ -116,6 +116,7 @@ export async function getPublicSettings(): Promise<Settings> {
     requestSubmitPassword: "Anamul-341321",
     minRequestVerified: 10,
     paymentMode: "off",
+    minWithdraw: 50,
   };
   data?.forEach((s) => {
     if (s.key === "rewardRate") settings.rewardRate = parseInt(s.value);
