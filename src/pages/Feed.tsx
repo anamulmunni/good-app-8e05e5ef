@@ -292,8 +292,27 @@ export default function Feed() {
                   </div>
                 )}
 
-                {/* Suggested users when no search */}
-                {!searchQuery && suggestedUsers.length > 0 && (
+                {/* Online users when no search */}
+                {!searchQuery && onlineUsers.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1.5 px-1">🟢 অনলাইন</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {onlineUsers.map((u: any) => (
+                        <button key={u.id} onClick={() => navigate(`/user/${u.id}`)}
+                          className="flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-xl hover:bg-secondary/80 transition-colors">
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm overflow-hidden">
+                              {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.display_name?.[0]?.toUpperCase() || "?"}
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[hsl(var(--emerald))] rounded-full border-2 border-background" />
+                          </div>
+                          <p className="text-[10px] text-foreground font-bold truncate max-w-[60px]">{u.display_name || "User"}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {!searchQuery && onlineUsers.length === 0 && suggestedUsers.length > 0 && (
                   <div className="mt-2">
                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1.5 px-1">সাজেস্টেড</p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
