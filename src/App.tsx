@@ -15,6 +15,7 @@ import Feed from "./pages/Feed";
 import UserProfile from "./pages/UserProfile";
 import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/feed" element={<Feed />} />
           <Route path="/user/:userId" element={<UserProfile />} />
           <Route path="/call/:userId" element={<CallPage />} />
+          <Route path="/install" element={<Install />} />
           <Route path="/~oauth" element={<Login />} />
           <Route path="/~c" element={<Login />} />
           <Route path="*" element={<NotFound />} />
