@@ -575,6 +575,7 @@ export type Database = {
           id: number
           is_blocked: boolean
           key_count: number
+          online_at: string | null
           payment_scheduled_at: string | null
           payment_status: string
           watched_video_url: string | null
@@ -590,6 +591,7 @@ export type Database = {
           id?: number
           is_blocked?: boolean
           key_count?: number
+          online_at?: string | null
           payment_scheduled_at?: string | null
           payment_status?: string
           watched_video_url?: string | null
@@ -605,6 +607,7 @@ export type Database = {
           id?: number
           is_blocked?: boolean
           key_count?: number
+          online_at?: string | null
           payment_scheduled_at?: string | null
           payment_status?: string
           watched_video_url?: string | null

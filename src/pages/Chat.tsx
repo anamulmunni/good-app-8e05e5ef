@@ -9,6 +9,7 @@ import {
   type Conversation, type Message
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
+import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Video } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +63,13 @@ export default function Chat() {
     queryKey: ["user-search", searchQuery],
     queryFn: () => searchUsers(searchQuery),
     enabled: searchQuery.length >= 2,
+  });
+
+  const { data: onlineUsers = [] } = useQuery({
+    queryKey: ["online-users-chat"],
+    queryFn: () => getOnlineUsers(user!.id),
+    enabled: !!user,
+    refetchInterval: 30000,
   });
 
   // Realtime
@@ -376,8 +384,29 @@ export default function Chat() {
         )}
       </AnimatePresence>
 
+      {/* Online Users Section */}
+      {onlineUsers.length > 0 && !showSearch && (
+        <div className="border-b border-border bg-card/50 px-4 py-3">
+          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-2">🟢 অনলাইন ({onlineUsers.length})</p>
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            {onlineUsers.map((u: any) => (
+              <button key={u.id} onClick={() => startConversationWith(u)}
+                className="flex flex-col items-center gap-1 min-w-[56px]">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm overflow-hidden">
+                    {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.display_name?.[0]?.toUpperCase() || "?"}
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[hsl(var(--emerald))] rounded-full border-2 border-background" />
+                </div>
+                <p className="text-[10px] text-foreground font-medium truncate max-w-[56px]">{u.display_name || "User"}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="divide-y divide-border">
-        {conversations.length === 0 && !showSearch && (
+        {conversations.length === 0 && !showSearch && onlineUsers.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <MessageCircle size={48} className="mb-3 opacity-40" />
             <p className="text-sm">কোনো কথোপকথন নেই</p>
@@ -387,11 +416,15 @@ export default function Chat() {
         {conversations.map((convo) => {
           const otherId = getOtherUserId(convo);
           const other = userCache[otherId];
+          const otherOnline = isUserOnline(other?.online_at);
           return (
             <button key={convo.id} onClick={() => openConversation(convo)}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors text-left">
-              <div className="w-11 h-11 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden">
-                {other?.avatar_url ? <img src={other.avatar_url} alt="" className="w-full h-full object-cover" /> : other?.display_name?.[0]?.toUpperCase() || "?"}
+              <div className="relative">
+                <div className="w-11 h-11 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden">
+                  {other?.avatar_url ? <img src={other.avatar_url} alt="" className="w-full h-full object-cover" /> : other?.display_name?.[0]?.toUpperCase() || "?"}
+                </div>
+                {otherOnline && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[hsl(var(--emerald))] rounded-full border-2 border-background" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center">
