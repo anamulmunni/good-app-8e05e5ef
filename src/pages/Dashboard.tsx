@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp, DollarSign, Newspaper, Download, Sparkles } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, TrendingUp, Newspaper, Download, Sparkles, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +35,7 @@ export default function Dashboard() {
   const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [showRequestSection, setShowRequestSection] = useState(false);
-  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showWalletDrawer, setShowWalletDrawer] = useState(false);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
@@ -112,7 +112,6 @@ export default function Dashboard() {
     },
   });
 
-  // Realtime: auto-refresh settings & user data when admin changes them
   useEffect(() => {
     const settingsChannel = supabase
       .channel('dashboard-settings')
@@ -150,7 +149,6 @@ export default function Dashboard() {
   const paymentMode = publicSettings?.paymentMode === "on";
   const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
-  const displayBalance = paymentMode ? (user?.balance || 0) : 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
 
   const copyId = () => {
@@ -165,11 +163,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-muted-foreground text-sm animate-pulse">লোড হচ্ছে...</p>
         </motion.div>
@@ -191,7 +185,7 @@ export default function Dashboard() {
         <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-[hsl(var(--cyan))] opacity-[0.05] rounded-full blur-[150px]" />
       </div>
 
-      {/* Feed onboarding overlay */}
+      {/* Feed onboarding overlay - ALL users must post */}
       <AnimatePresence>
         {!userHasPosted && (
           <motion.div
@@ -214,9 +208,9 @@ export default function Dashboard() {
                 <Newspaper className="w-12 h-12 text-background" />
               </motion.div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-black">নিউজ ফিডে স্বাগতম! 🎉</h2>
+                <h2 className="text-2xl font-black">নিউজ ফিডে পোস্ট করুন! 🎉</h2>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  অ্যাপ ব্যবহার শুরু করতে প্রথমে নিউজ ফিডে গিয়ে একটি পোস্ট করুন। এটি সবার জন্য দেখা যাবে।
+                  অ্যাপ ব্যবহার করতে প্রথমে নিউজ ফিডে গিয়ে একটি পোস্ট করুন। এটি সবার জন্য প্রযোজ্য।
                 </p>
               </div>
               <motion.button
@@ -267,6 +261,62 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
+      {/* Wallet Drawer Overlay */}
+      <AnimatePresence>
+        {showWalletDrawer && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowWalletDrawer(false)}
+              className="fixed inset-0 z-[150] bg-background/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-[151] max-h-[85vh] overflow-y-auto"
+            >
+              <div className="max-w-md mx-auto bg-background border-t border-x border-border/50 rounded-t-3xl shadow-2xl">
+                {/* Drawer handle */}
+                <div className="flex justify-center pt-3 pb-1">
+                  <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+                </div>
+                <div className="p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[hsl(var(--cyan))]/30 to-[hsl(var(--emerald))]/20 flex items-center justify-center">
+                        <Wallet className="w-5 h-5 text-[hsl(var(--cyan))]" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-black">ওয়ালেট</h2>
+                        <p className="text-[10px] text-muted-foreground">💰 {currentRate} TK/ভেরিফাই</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setShowWalletDrawer(false)} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+                      <X className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                  </div>
+                  
+                  {/* Balance */}
+                  <div className="text-center py-4 bg-gradient-to-br from-[hsl(var(--cyan))]/5 to-[hsl(var(--emerald))]/5 rounded-2xl border border-[hsl(var(--cyan))]/15">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">মোট ব্যালেন্স</p>
+                    <p className="text-5xl font-black bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--emerald))] to-primary bg-clip-text text-transparent">
+                      {user.balance || 0}<span className="text-lg ml-1">৳</span>
+                    </p>
+                  </div>
+
+                  {/* Withdraw Form */}
+                  <WithdrawForm balance={user.balance || 0} />
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95">
         <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
@@ -305,7 +355,7 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-5 relative z-10">
-        {/* Stats Cards Row */}
+        {/* Stats Card - Verified Key or Balance */}
         <div className="grid grid-cols-1 gap-3">
           {paymentMode ? (
             <motion.div
@@ -316,11 +366,6 @@ export default function Dashboard() {
               className="glass-card rounded-2xl border border-[hsl(var(--cyan))]/20 relative group"
             >
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/5 via-[hsl(var(--emerald))]/5 to-[hsl(var(--purple))]/5" />
-              <motion.div
-                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-                className="pointer-events-none absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-[hsl(var(--cyan))]/5 to-transparent"
-              />
               <div className="relative z-10 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -339,34 +384,7 @@ export default function Dashboard() {
                     {user.balance || 0}<span className="text-lg ml-1">৳</span>
                   </p>
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowWithdraw(!showWithdraw)}
-                  className="w-full mt-4 py-3.5 rounded-xl bg-gradient-to-r from-[hsl(var(--cyan))] to-[hsl(var(--emerald))] text-background font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[hsl(var(--emerald))]/20"
-                >
-                  <Wallet className="w-4 h-4" />
-                  উইথড্র করুন
-                  <motion.div animate={{ rotate: showWithdraw ? 180 : 0 }} transition={{ duration: 0.3 }}>
-                    <ChevronDown className="w-4 h-4" />
-                  </motion.div>
-                </motion.button>
               </div>
-              <AnimatePresence>
-                {showWithdraw && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="relative z-10 overflow-hidden border-t border-[hsl(var(--cyan))]/10"
-                  >
-                    <div className="p-5">
-                      <WithdrawForm balance={user.balance || 0} />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
           ) : (
             <motion.div
@@ -424,10 +442,15 @@ export default function Dashboard() {
           )}
         </AnimatePresence>
 
+        {/* Key Submitter - MOVED TO TOP */}
+        <motion.div custom={3} variants={cardVariants} initial="hidden" animate="visible">
+          <KeySubmitter />
+        </motion.div>
+
         {/* Bonus Section */}
         {bonusEnabled && (
           <motion.div
-            custom={3}
+            custom={4}
             variants={cardVariants}
             initial="hidden"
             animate="visible"
@@ -478,10 +501,9 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-
         {/* User Request Section - hidden when payment mode is ON */}
         {!paymentMode && <motion.section
-          custom={4}
+          custom={5}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
@@ -509,7 +531,6 @@ export default function Dashboard() {
             {showRequestSection && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
                 <div className="px-5 pb-5 space-y-4">
-                  {/* Minimum request notice */}
                   <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-xl p-4 space-y-2">
                     <p className="text-xs text-foreground/80 leading-relaxed">
                       রিকুয়েস্ট পাঠাতে সর্বনিম্ন <span className="text-[hsl(var(--amber))] font-black">{minRequestVerified}</span> টি ভেরিফাইড কাউন্ট দরকার।
@@ -624,11 +645,6 @@ export default function Dashboard() {
           </AnimatePresence>
         </motion.section>}
 
-        {/* Key Submitter */}
-        <motion.div custom={5} variants={cardVariants} initial="hidden" animate="visible">
-          <KeySubmitter />
-        </motion.div>
-
         {/* Transaction History */}
         <motion.div custom={6} variants={cardVariants} initial="hidden" animate="visible" className="pt-2">
           <div className="flex items-center gap-2 mb-4 px-1">
@@ -650,6 +666,23 @@ export default function Dashboard() {
             className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--emerald))] to-[hsl(var(--cyan))] shadow-lg shadow-[hsl(var(--emerald))]/30 flex items-center justify-center"
           >
             <Download className="w-6 h-6 text-foreground" />
+          </motion.button>
+        )}
+
+        {/* Wallet Button - opens wallet drawer */}
+        {paymentMode && (
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowWalletDrawer(true)}
+            className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--emerald))] shadow-lg shadow-[hsl(var(--cyan))]/40 flex items-center justify-center"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--emerald))] opacity-40"
+            />
+            <Wallet className="w-6 h-6 text-foreground relative z-10" />
           </motion.button>
         )}
 
