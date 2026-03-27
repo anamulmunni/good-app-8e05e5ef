@@ -114,6 +114,7 @@ export async function getPublicSettings(): Promise<Settings> {
     videoUrl: "",
     requestSubmitPassword: "Anamul-341321",
     minRequestVerified: 10,
+    paymentMode: "off",
   };
   data?.forEach((s) => {
     if (s.key === "rewardRate") settings.rewardRate = parseInt(s.value);
@@ -124,6 +125,7 @@ export async function getPublicSettings(): Promise<Settings> {
     if (s.key === "videoUrl") settings.videoUrl = s.value;
     if (s.key === "requestSubmitPassword") settings.requestSubmitPassword = s.value;
     if (s.key === "minRequestVerified") settings.minRequestVerified = parseInt(s.value) || 10;
+    if (s.key === "paymentMode") settings.paymentMode = s.value;
   });
   return settings;
 }
