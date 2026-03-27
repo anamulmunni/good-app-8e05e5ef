@@ -346,7 +346,8 @@ export async function updateUserWatchedVideo(userId: number, videoUrl: string) {
 
 // Recalculate all users' balance based on key_count * rate (uses DB function for speed)
 export async function recalculateAllBalances(rate: number) {
-  await supabase.rpc("recalculate_all_balances", { p_rate: rate });
+  const { error } = await supabase.rpc("recalculate_all_balances", { p_rate: rate });
+  if (error) throw error;
 }
 
 // Reset all users' balance to 0 when paymentMode is turned off

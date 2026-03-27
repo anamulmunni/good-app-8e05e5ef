@@ -289,8 +289,9 @@ export default function AdminPanel() {
                   queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
                   queryClient.invalidateQueries({ queryKey: ["admin-users"] });
                   queryClient.invalidateQueries({ queryKey: ["public-settings"] });
-                } catch (err) {
-                  toast({ title: "ব্যর্থ", variant: "destructive" });
+                } catch (err: any) {
+                  console.error("Payment mode toggle error:", err);
+                  toast({ title: "ব্যর্থ", description: err?.message || "কিছু ভুল হয়েছে", variant: "destructive" });
                 } finally {
                   setPaymentModeLoading(false);
                 }
