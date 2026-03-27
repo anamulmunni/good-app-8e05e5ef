@@ -4,7 +4,7 @@ import { submitKey, getPublicSettings, addPoolKey, updateUserWatchedVideo } from
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Key, ShieldCheck, Loader2, ExternalLink, CheckCircle, Video, AlertCircle, Lock } from "lucide-react";
+import { Key, ShieldCheck, Loader2, ExternalLink, CheckCircle, Video, AlertCircle, Lock, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ethers } from "ethers";
 import { compressToEncodedURIComponent } from "lz-string";
@@ -208,21 +208,58 @@ export function KeySubmitter() {
               </div>
             )}
 
-            <button
+            <motion.button
               onClick={() => generateKeyMutation.mutate()}
               disabled={generateKeyMutation.isPending || isOff || !hasWatchedVideo}
-              className={`btn-primary py-4 rounded-2xl font-black text-base relative overflow-hidden transition-all duration-300 ${isOff || !hasWatchedVideo ? "opacity-50 grayscale cursor-not-allowed" : "hover:scale-[1.01] hover:shadow-xl hover:shadow-primary/20"}`}
+              whileHover={!(isOff || !hasWatchedVideo) ? { scale: 1.03, y: -2 } : {}}
+              whileTap={!(isOff || !hasWatchedVideo) ? { scale: 0.97 } : {}}
+              className={`w-full relative py-5 rounded-2xl font-black text-base overflow-hidden transition-all duration-500 ${
+                isOff || !hasWatchedVideo
+                  ? "bg-secondary/60 text-muted-foreground cursor-not-allowed border border-border/50"
+                  : "text-primary-foreground"
+              }`}
             >
-              <span className="relative z-10 flex items-center justify-center gap-2">
+              {!(isOff || !hasWatchedVideo) && (
+                <>
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-[hsl(var(--cyan))] to-[hsl(var(--blue))]"
+                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    style={{ backgroundSize: "200% 100%" }}
+                  />
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    animate={{ x: ["-100%", "200%"] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 1, ease: "easeInOut" }}
+                  />
+                  <div className="absolute inset-0 rounded-2xl border-2 border-white/20" />
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3/4 h-6 bg-[hsl(var(--cyan))] blur-xl opacity-40" />
+                </>
+              )}
+              <span className="relative z-10 flex items-center justify-center gap-3">
                 {generateKeyMutation.isPending ? (
-                  <Loader2 className="animate-spin" />
+                  <Loader2 className="animate-spin w-6 h-6" />
                 ) : !hasWatchedVideo ? (
                   <><Lock className="w-5 h-5" /> আগে ভিডিও দেখুন</>
                 ) : (
-                  <><Key className="w-5 h-5" /> ফেস ভেরিফিকেশন শুরু করুন</>
+                  <>
+                    <motion.div
+                      animate={{ rotate: [0, 15, -15, 0] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                    >
+                      <Zap className="w-6 h-6 fill-current" />
+                    </motion.div>
+                    <span className="text-lg tracking-wide">ফেস ভেরিফিকেশন শুরু করুন</span>
+                    <motion.div
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <span className="text-xl">→</span>
+                    </motion.div>
+                  </>
                 )}
               </span>
-            </button>
+            </motion.button>
           </motion.div>
         ) : (
           <motion.div
@@ -232,37 +269,79 @@ export function KeySubmitter() {
             exit={{ opacity: 0, scale: 0.95 }}
             className="space-y-4"
           >
-            <a
+            <motion.a
               href={activeKey.verifyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-[hsl(var(--cyan))] text-primary-foreground font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-primary/30 animate-fade-in"
+              whileHover={{ scale: 1.02, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              className="relative w-full py-4 rounded-2xl text-primary-foreground font-black text-base flex items-center justify-center gap-3 overflow-hidden block"
             >
-              <ExternalLink className="w-5 h-5" /> Face Verification খুলুন
-            </a>
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--blue))] via-[hsl(var(--cyan))] to-[hsl(var(--emerald))]"
+                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                style={{ backgroundSize: "200% 100%" }}
+              />
+              <div className="absolute inset-0 rounded-2xl border border-white/15" />
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2/3 h-4 bg-[hsl(var(--cyan))] blur-lg opacity-30" />
+              <span className="relative z-10 flex items-center gap-2">
+                <ExternalLink className="w-5 h-5" /> Face Verification খুলুন
+              </span>
+            </motion.a>
 
-            <button
+            <motion.button
               onClick={() => checkVerificationMutation.mutate()}
               disabled={checkVerificationMutation.isPending || isVerified}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-[hsl(var(--emerald))] to-[hsl(var(--cyan))] text-primary-foreground font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-[hsl(var(--emerald))]/25 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-[hsl(var(--emerald))]/30 animate-enter disabled:opacity-60"
+              whileHover={!isVerified ? { scale: 1.02, y: -1 } : {}}
+              whileTap={!isVerified ? { scale: 0.98 } : {}}
+              className="relative w-full py-4 rounded-2xl text-primary-foreground font-black text-base flex items-center justify-center gap-3 overflow-hidden disabled:opacity-70"
             >
-              {checkVerificationMutation.isPending ? (
-                <Loader2 className="animate-spin w-5 h-5" />
-              ) : isVerified ? (
-                <><CheckCircle className="w-5 h-5" /> ভেরিফিকেশন সফল</>
-              ) : (
-                <><CheckCircle className="w-5 h-5" /> Verification সম্পুর্ন করুন</>
-              )}
-            </button>
+              <motion.div
+                className={`absolute inset-0 ${isVerified ? "bg-[hsl(var(--emerald))]" : "bg-gradient-to-r from-[hsl(var(--emerald))] via-[hsl(var(--cyan))] to-[hsl(var(--emerald))]"}`}
+                animate={!isVerified ? { backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] } : {}}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                style={{ backgroundSize: "200% 100%" }}
+              />
+              <div className="absolute inset-0 rounded-2xl border border-white/15" />
+              <span className="relative z-10 flex items-center gap-2">
+                {checkVerificationMutation.isPending ? (
+                  <Loader2 className="animate-spin w-5 h-5" />
+                ) : isVerified ? (
+                  <><CheckCircle className="w-5 h-5" /> ভেরিফিকেশন সফল ✅</>
+                ) : (
+                  <><CheckCircle className="w-5 h-5" /> Verification সম্পুর্ন করুন</>
+                )}
+              </span>
+            </motion.button>
 
             {isVerified && (
-              <button
+              <motion.button
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 onClick={() => submitMutation.mutate()}
                 disabled={submitMutation.isPending}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-[hsl(var(--amber))] text-primary-foreground font-black text-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/30 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-primary/40 animate-pulse"
+                whileHover={{ scale: 1.03, y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                className="relative w-full py-5 rounded-2xl text-primary-foreground font-black text-lg flex items-center justify-center gap-3 overflow-hidden"
               >
-                {submitMutation.isPending ? <Loader2 className="animate-spin mx-auto" /> : "সাবমিট এবং ইনকাম করুন"}
-              </button>
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--amber))] via-[hsl(var(--orange))] to-[hsl(var(--pink))]"
+                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  style={{ backgroundSize: "200% 100%" }}
+                />
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  animate={{ x: ["-100%", "200%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.5 }}
+                />
+                <div className="absolute inset-0 rounded-2xl border-2 border-white/20" />
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3/4 h-6 bg-[hsl(var(--amber))] blur-xl opacity-40" />
+                <span className="relative z-10">
+                  {submitMutation.isPending ? <Loader2 className="animate-spin mx-auto" /> : "🎉 সাবমিট এবং ইনকাম করুন"}
+                </span>
+              </motion.button>
             )}
 
             <button

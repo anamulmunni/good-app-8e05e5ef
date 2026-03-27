@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp, DollarSign, Newspaper, Download } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp, DollarSign, Newspaper, Download, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
+import { hasUserPosted } from "@/lib/feed-api";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
@@ -45,6 +46,12 @@ export default function Dashboard() {
     queryKey: ["incoming-user-transfer-requests", user?.guest_id],
     queryFn: () => getIncomingTransferRequests(user?.guest_id || ""),
     enabled: !!user?.guest_id,
+  });
+
+  const { data: userHasPosted = true } = useQuery({
+    queryKey: ["user-has-posted", user?.id],
+    queryFn: () => hasUserPosted(user!.id),
+    enabled: !!user?.id,
   });
 
   const createUserRequestMutation = useMutation({
@@ -183,6 +190,61 @@ export default function Dashboard() {
         <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-[hsl(var(--purple))] opacity-[0.07] rounded-full blur-[150px]" />
         <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-[hsl(var(--cyan))] opacity-[0.05] rounded-full blur-[150px]" />
       </div>
+
+      {/* Feed onboarding overlay */}
+      <AnimatePresence>
+        {!userHasPosted && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-background/95 backdrop-blur-md flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: "spring", damping: 20 }}
+              className="w-full max-w-sm text-center space-y-6"
+            >
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-[hsl(var(--amber))] to-[hsl(var(--orange))] flex items-center justify-center shadow-2xl shadow-[hsl(var(--amber))]/30"
+              >
+                <Newspaper className="w-12 h-12 text-background" />
+              </motion.div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black">নিউজ ফিডে স্বাগতম! 🎉</h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  অ্যাপ ব্যবহার শুরু করতে প্রথমে নিউজ ফিডে গিয়ে একটি পোস্ট করুন। এটি সবার জন্য দেখা যাবে।
+                </p>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate("/feed")}
+                className="w-full relative py-4 rounded-2xl font-black text-lg text-primary-foreground overflow-hidden"
+              >
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--amber))] via-[hsl(var(--orange))] to-[hsl(var(--pink))]"
+                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  style={{ backgroundSize: "200% 100%" }}
+                />
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  animate={{ x: ["-100%", "200%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                />
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <Sparkles className="w-5 h-5" /> নিউজ ফিডে যান ও পোস্ট করুন
+                </span>
+              </motion.button>
+              <p className="text-[10px] text-muted-foreground">পোস্ট করার পর সব ফিচার আনলক হবে</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Payment confirmation overlay */}
       <AnimatePresence>

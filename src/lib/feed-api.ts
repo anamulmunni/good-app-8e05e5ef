@@ -47,6 +47,15 @@ export const REACTION_EMOJIS: Record<string, string> = {
   angry: "😡",
 };
 
+// Check if user has posted at least once
+export async function hasUserPosted(userId: number): Promise<boolean> {
+  const { count } = await supabase
+    .from("posts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+  return (count || 0) > 0;
+}
+
 // Get feed posts with user info
 export async function getFeedPosts(limit = 30, searchQuery?: string): Promise<Post[]> {
   let query = (supabase.from("posts").select("*") as any)
