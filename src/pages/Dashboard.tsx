@@ -104,6 +104,37 @@ export default function Dashboard() {
     },
   });
 
+  // Realtime: auto-refresh settings & user data when admin changes them
+  useEffect(() => {
+    const settingsChannel = supabase
+      .channel('dashboard-settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["public-settings"] });
+      })
+      .subscribe();
+
+    const usersChannel = supabase
+      .channel('dashboard-user')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: user ? `id=eq.${user.id}` : undefined }, () => {
+        refreshUser();
+      })
+      .subscribe();
+
+    const txChannel = supabase
+      .channel('dashboard-transactions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: user ? `user_id=eq.${user.id}` : undefined }, () => {
+        queryClient.invalidateQueries({ queryKey: ["user-transactions"] });
+        refreshUser();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(settingsChannel);
+      supabase.removeChannel(usersChannel);
+      supabase.removeChannel(txChannel);
+    };
+  }, [user?.id, queryClient, refreshUser]);
+
   const bonusEnabled = publicSettings?.bonusStatus === "on";
   const targetAmount = publicSettings?.bonusTarget || 10;
   const customNoticeText = publicSettings?.customNotice;
