@@ -355,71 +355,139 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-5 relative z-10">
-        {/* Stats Card - Verified Key or Balance */}
-        <div className="grid grid-cols-1 gap-3">
-          {paymentMode ? (
-            <motion.div
-              custom={0}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              className="glass-card rounded-2xl border border-[hsl(var(--cyan))]/20 relative group"
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/5 via-[hsl(var(--emerald))]/5 to-[hsl(var(--purple))]/5" />
-              <div className="relative z-10 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[hsl(var(--cyan))]/30 to-[hsl(var(--emerald))]/20 flex items-center justify-center">
-                      <Wallet className="w-5 h-5 text-[hsl(var(--cyan))]" />
-                    </div>
-                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">আমার ওয়ালেট</p>
-                  </div>
-                  <div className="px-3 py-1.5 rounded-xl bg-[hsl(var(--emerald))]/15 border border-[hsl(var(--emerald))]/25">
-                    <p className="text-sm font-black text-[hsl(var(--emerald))]">💰 {currentRate} TK/ভেরিফাই</p>
-                  </div>
-                </div>
-                <div className="text-center py-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">মোট ব্যালেন্স</p>
-                  <p className="text-5xl font-black bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--emerald))] to-primary bg-clip-text text-transparent">
-                    {user.balance || 0}<span className="text-lg ml-1">৳</span>
-                  </p>
-                </div>
+        {/* Premium Balance & Wallet Section */}
+        <motion.div
+          custom={0}
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          className="glass-card rounded-3xl border border-[hsl(var(--cyan))]/25 relative overflow-hidden group"
+        >
+          {/* Animated background glow */}
+          <motion.div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/8 via-[hsl(var(--emerald))]/5 to-[hsl(var(--purple))]/8"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 4, repeat: Infinity }}
+          />
+          <motion.div
+            className="pointer-events-none absolute -top-20 -right-20 w-40 h-40 bg-[hsl(var(--cyan))] rounded-full blur-[80px] opacity-15"
+            animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.2, 0.1] }}
+            transition={{ duration: 5, repeat: Infinity }}
+          />
+          <motion.div
+            className="pointer-events-none absolute -bottom-20 -left-20 w-40 h-40 bg-[hsl(var(--emerald))] rounded-full blur-[80px] opacity-15"
+            animate={{ scale: [1.3, 1, 1.3], opacity: [0.15, 0.08, 0.15] }}
+            transition={{ duration: 5, repeat: Infinity }}
+          />
+
+          <div className="relative z-10 p-6">
+            {/* Header with wallet icon and rate */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <motion.div
+                  animate={{ rotate: [0, 5, -5, 0] }}
+                  transition={{ duration: 4, repeat: Infinity }}
+                  className="w-10 h-10 rounded-xl bg-gradient-to-br from-[hsl(var(--cyan))]/30 to-[hsl(var(--emerald))]/25 flex items-center justify-center border border-[hsl(var(--cyan))]/30"
+                >
+                  <Wallet className="w-5 h-5 text-[hsl(var(--cyan))]" />
+                </motion.div>
+                <p className="text-sm text-muted-foreground font-bold">আমার ওয়ালেট</p>
               </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              custom={0}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              className="glass-card rounded-2xl border border-primary/25 relative overflow-hidden group"
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-[hsl(var(--cyan))]/10" />
               <motion.div
-                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                className="pointer-events-none absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-primary/10 to-transparent"
-              />
-              <div className="relative z-10 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-primary" />
-                    </div>
-                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">ভেরিফাইড কী</p>
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="px-4 py-2 rounded-2xl bg-gradient-to-r from-[hsl(var(--emerald))]/20 to-[hsl(var(--cyan))]/15 border border-[hsl(var(--emerald))]/30"
+              >
+                <p className="text-base font-black text-[hsl(var(--emerald))]">💰 {currentRate} TK/ভেরিফাই</p>
+              </motion.div>
+            </div>
+
+            {/* Main Balance - Premium */}
+            <div className="text-center py-5">
+              <p className="text-xs text-muted-foreground uppercase tracking-[0.2em] mb-2 font-semibold">মোট ব্যালেন্স</p>
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", damping: 15 }}
+              >
+                <motion.p
+                  key={user.balance}
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className="text-7xl font-black leading-none"
+                >
+                  <span className="bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--emerald))] to-primary bg-clip-text text-transparent drop-shadow-[0_0_40px_hsl(var(--emerald)/0.3)]">
+                    {user.balance || 0}
+                  </span>
+                  <motion.span
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="text-2xl ml-2 text-[hsl(var(--emerald))]"
+                  >
+                    ৳
+                  </motion.span>
+                </motion.p>
+              </motion.div>
+            </div>
+
+            {/* Withdraw Button - Premium */}
+            {paymentMode && (
+              <motion.button
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowWalletDrawer(true)}
+                className="w-full relative py-4 rounded-2xl font-black text-base overflow-hidden mt-2"
+              >
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--emerald))] to-[hsl(var(--cyan))]"
+                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                  style={{ backgroundSize: "200% 100%" }}
+                />
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  animate={{ x: ["-100%", "200%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                />
+                <div className="absolute inset-0 rounded-2xl border border-white/20" />
+                <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+                  <Wallet className="w-5 h-5" />
+                  উইথড্র করুন
+                </span>
+              </motion.button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Verified Key Count (non-payment mode) */}
+        {!paymentMode && (
+          <motion.div
+            custom={0}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="glass-card rounded-2xl border border-primary/25 relative overflow-hidden group"
+          >
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-[hsl(var(--cyan))]/10" />
+            <div className="relative z-10 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-primary" />
                   </div>
-                  <span className="text-[10px] px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/20 text-primary font-black">LIVE COUNT</span>
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">ভেরিফাইড কী</p>
                 </div>
-                <div className="text-center py-1">
-                  <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wider">মোট ভেরিফিকেশন</p>
-                  <p className="text-6xl sm:text-7xl font-black leading-none text-foreground drop-shadow-[0_10px_24px_hsl(var(--primary)/0.28)]">
-                    {user.key_count || 0}
-                  </p>
-                </div>
+                <span className="text-[10px] px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/20 text-primary font-black">LIVE COUNT</span>
               </div>
-            </motion.div>
-          )}
-        </div>
+              <div className="text-center py-1">
+                <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wider">মোট ভেরিফিকেশন</p>
+                <p className="text-6xl sm:text-7xl font-black leading-none text-foreground drop-shadow-[0_10px_24px_hsl(var(--primary)/0.28)]">
+                  {user.key_count || 0}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Custom Notice */}
         <AnimatePresence>
