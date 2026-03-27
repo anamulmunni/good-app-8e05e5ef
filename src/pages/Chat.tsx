@@ -65,6 +65,13 @@ export default function Chat() {
     enabled: searchQuery.length >= 2,
   });
 
+  const { data: onlineUsers = [] } = useQuery({
+    queryKey: ["online-users-chat"],
+    queryFn: () => getOnlineUsers(user!.id),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
   // Realtime
   useEffect(() => {
     if (!activeConversation) return;
