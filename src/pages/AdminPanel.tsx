@@ -94,6 +94,7 @@ export default function AdminPanel() {
       setVideoUrl(settingsData.videoUrl || "");
       setRequestSubmitPasswordSetting(settingsData.requestSubmitPassword || "");
       setMinRequestVerifiedSetting(String(settingsData.minRequestVerified || 10));
+      setPaymentModeSetting(settingsData.paymentMode || "off");
     }
   }, [settingsData]);
 
