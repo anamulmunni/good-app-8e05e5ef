@@ -98,10 +98,10 @@ export function WithdrawForm({ balance }: { balance: number }) {
         </div>
 
         <div>
-          <label className="block text-sm text-muted-foreground mb-2">পরিমাণ (কমপক্ষে ৫০ টাকা)</label>
+          <label className="block text-sm text-muted-foreground mb-2">পরিমাণ (কমপক্ষে {minWithdraw} টাকা)</label>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">৳</span>
-            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" min="50" max={balance} className="input-field pl-8" required />
+            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" min={minWithdraw} max={balance} className="input-field pl-8" required />
           </div>
         </div>
 
