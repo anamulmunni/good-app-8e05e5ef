@@ -56,6 +56,8 @@ export default function AdminPanel() {
   const [requesterRequestSearch, setRequesterRequestSearch] = useState("");
   const [requestSubmitPasswordSetting, setRequestSubmitPasswordSetting] = useState("");
   const [minRequestVerifiedSetting, setMinRequestVerifiedSetting] = useState("10");
+  const [paymentModeSetting, setPaymentModeSetting] = useState("off");
+  const [paymentModeLoading, setPaymentModeLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
