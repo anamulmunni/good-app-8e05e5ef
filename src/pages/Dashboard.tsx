@@ -526,37 +526,39 @@ export default function Dashboard() {
 
         {/* Bonus Section */}
         {bonusEnabled && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
               className="bg-gradient-to-r from-accent/20 to-[hsl(var(--amber))]/20 border-2 border-accent/50 rounded-2xl p-6 text-center shadow-lg shadow-accent/10">
               <p className="text-xl font-black text-accent mb-2">🔥 ধামাকা বোনাস অফার! 🔥</p>
               <p className="text-sm font-bold leading-relaxed">
-                ১ দিনে {targetAmount}টি অ্যাকাউন্ট ভেরিফাই করতে পারলে বর্তমান দামের সাথে আরও <span className="text-accent text-lg">২০% বোনাস</span> দেওয়া হবে!
+                {targetAmount}টি ভেরিফাই করলে <span className="text-accent text-lg">বোনাস</span> পাবেন!
               </p>
             </motion.div>
 
-            <div className="glass-card p-5 rounded-3xl border border-border">
-              <div className="flex justify-between items-center mb-4">
+            <div className="glass-card p-5 rounded-3xl border border-border space-y-3">
+              <div className="flex justify-between items-center">
                 <p className="text-sm font-bold">আজকের টার্গেট (Bonus)</p>
                 <p className="text-xs font-mono bg-primary/20 text-primary px-2 py-1 rounded-lg">{user.key_count}/{targetAmount}</p>
               </div>
-              <div className="grid grid-cols-5 gap-2">
-                {Array.from({ length: targetAmount }, (_, i) => {
-                  const done = i < user.key_count;
-                  return (
-                    <motion.div key={i} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: i * 0.05 }}
-                      className={`aspect-square rounded-xl flex items-center justify-center border-2 transition-all ${done ? "bg-primary/20 border-primary shadow-lg shadow-primary/20" : "bg-secondary border-border"}`}>
-                      {done ? <Check className="w-5 h-5 text-primary" /> : <span className="text-xs text-muted-foreground font-bold">{i + 1}</span>}
-                    </motion.div>
-                  );
-                })}
+              <div className="w-full h-4 bg-secondary rounded-full overflow-hidden border border-border">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((user.key_count / targetAmount) * 100, 100)}%` }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="h-full bg-gradient-to-r from-primary to-[hsl(var(--emerald))] rounded-full"
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>0</span>
+                <span className="text-primary font-bold">{user.key_count} সম্পন্ন</span>
+                <span>{targetAmount}</span>
               </div>
               {user.key_count >= targetAmount ? (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-3 bg-primary/20 border border-primary/40 rounded-xl text-center">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-primary/20 border border-primary/40 rounded-xl text-center">
                   <p className="text-primary font-bold text-sm">🎉 আপনি বোনাসের জন্য এলিজিবল হয়েছেন!</p>
                 </motion.div>
               ) : (
-                <p className="text-[10px] text-muted-foreground mt-3 text-center">{targetAmount}টি টার্গেট পূর্ণ হলে বোনাস আনলক হবে</p>
+                <p className="text-[10px] text-muted-foreground text-center">টার্গেট পূর্ণ হলে বোনাস আনলক হবে</p>
               )}
             </div>
           </div>
