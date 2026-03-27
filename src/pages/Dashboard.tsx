@@ -390,9 +390,11 @@ export default function Dashboard() {
                     <p className="text-xs text-foreground/80 leading-relaxed">
                       রিকুয়েস্ট পাঠাতে সর্বনিম্ন <span className="text-[hsl(var(--amber))] font-black">{minRequestVerified}</span> টি ভেরিফাইড কাউন্ট দরকার।
                     </p>
-                    <p className="text-xs text-foreground/80 leading-relaxed">
-                      <span className="text-primary font-bold">২০ টি</span> = <span className="text-primary font-bold">১০% বোনাস</span> | <span className="text-primary font-bold">৫০ টি</span> = <span className="text-primary font-bold">২০% বোনাস</span>
-                    </p>
+                    {bonusEnabled && (
+                      <p className="text-xs text-foreground/80 leading-relaxed">
+                        <span className="text-primary font-bold">৫০ টি</span> = <span className="text-primary font-bold">২০% বোনাস</span>
+                      </p>
+                    )}
                   </div>
 
                   {!canSendRequest ? (
