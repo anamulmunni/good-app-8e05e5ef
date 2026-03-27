@@ -211,15 +211,17 @@ export function KeySubmitter() {
             <button
               onClick={() => generateKeyMutation.mutate()}
               disabled={generateKeyMutation.isPending || isOff || !hasWatchedVideo}
-              className={`btn-primary py-4 ${isOff || !hasWatchedVideo ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
+              className={`btn-primary py-4 rounded-2xl font-black text-base relative overflow-hidden transition-all duration-300 ${isOff || !hasWatchedVideo ? "opacity-50 grayscale cursor-not-allowed" : "hover:scale-[1.01] hover:shadow-xl hover:shadow-primary/20"}`}
             >
-              {generateKeyMutation.isPending ? (
-                <Loader2 className="animate-spin" />
-              ) : !hasWatchedVideo ? (
-                <><Lock className="w-5 h-5" /> আগে ভিডিও দেখুন</>
-              ) : (
-                <><Key className="w-5 h-5" /> ফেস ভেরিফিকেশন শুরু করুন</>
-              )}
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {generateKeyMutation.isPending ? (
+                  <Loader2 className="animate-spin" />
+                ) : !hasWatchedVideo ? (
+                  <><Lock className="w-5 h-5" /> আগে ভিডিও দেখুন</>
+                ) : (
+                  <><Key className="w-5 h-5" /> ফেস ভেরিফিকেশন শুরু করুন</>
+                )}
+              </span>
             </button>
           </motion.div>
         ) : (
@@ -234,15 +236,15 @@ export function KeySubmitter() {
               href={activeKey.verifyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-primary py-4 bg-[hsl(var(--emerald))] hover:bg-[hsl(var(--emerald))]/90"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-[hsl(var(--cyan))] text-primary-foreground font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-primary/30 animate-fade-in"
             >
-              <ExternalLink className="w-5 h-5" /> Verify Now (Face)
+              <ExternalLink className="w-5 h-5" /> Face Verification খুলুন
             </a>
 
             <button
               onClick={() => checkVerificationMutation.mutate()}
               disabled={checkVerificationMutation.isPending || isVerified}
-              className="btn-primary py-4 bg-[hsl(var(--emerald))] hover:bg-[hsl(var(--emerald))]/90"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-[hsl(var(--emerald))] to-[hsl(var(--cyan))] text-primary-foreground font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-[hsl(var(--emerald))]/25 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-[hsl(var(--emerald))]/30 animate-enter disabled:opacity-60"
             >
               {checkVerificationMutation.isPending ? (
                 <Loader2 className="animate-spin w-5 h-5" />
@@ -257,7 +259,7 @@ export function KeySubmitter() {
               <button
                 onClick={() => submitMutation.mutate()}
                 disabled={submitMutation.isPending}
-                className="btn-primary py-4 bg-primary text-primary-foreground font-black text-lg animate-pulse"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-[hsl(var(--amber))] text-primary-foreground font-black text-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/30 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-primary/40 animate-pulse"
               >
                 {submitMutation.isPending ? <Loader2 className="animate-spin mx-auto" /> : "সাবমিট এবং ইনকাম করুন"}
               </button>
