@@ -358,69 +358,51 @@ export default function AdminPanel() {
 
               {userRequestSubmissions.length > 0 ? (
                 userRequestSubmissions.map((batch) => (
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                  <div key={batch.id} className="glass-card border border-border rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-sm">Target: <span className="font-mono text-primary">{batch.target_guest_id}</span></p>
+                        <p className="text-xs text-muted-foreground">
+                          {batch.target_display_name || "Unknown"} • Verified: {batch.target_verified_count} • Requests: {batch.request_count}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Submitted by: {batch.submitted_to_admin_by}</p>
+                        {batch.submitter_payment_method && (
+                          <p className="text-xs font-semibold text-accent-foreground mt-1">
+                            💳 Submitter: {batch.submitter_payment_method} — {batch.submitter_payment_number}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => resetBatchMutation.mutate(batch.id)} disabled={resetBatchMutation.isPending} className="p-2 rounded-lg bg-primary/20 hover:bg-primary/40 transition" title="Reset Batch">
+                          <RefreshCcw className="w-4 h-4 text-primary" />
+                        </button>
+                      </div>
+                    </div>
+                    {batch.requests && batch.requests.length > 0 && (
+                      <div className="space-y-2 border-t border-border pt-2">
+                        <p className="text-xs font-bold text-muted-foreground">Requester Details:</p>
+                        {batch.requests.map((req) => (
+                          <div key={req.id} className="flex items-center justify-between bg-background/50 border border-border rounded-lg px-3 py-2">
+                            <div>
+                              <p className="text-sm font-mono font-bold">{req.requester_guest_id}</p>
+                              <p className="text-xs text-muted-foreground">Verified: {req.requester_verified_count}</p>
+                              {req.requester_payment_method && (
+                                <p className="text-xs text-accent-foreground">💳 {req.requester_payment_method} — {req.requester_payment_number}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1">
+                              <button onClick={() => resetRequestMutation.mutate(req.id)} disabled={resetRequestMutation.isPending} className="p-1.5 rounded bg-primary/20 hover:bg-primary/40" title="Reset">
+                                <RefreshCcw className="w-3.5 h-3.5 text-primary" />
+                              </button>
+                              <button onClick={() => dismissRequestMutation.mutate(req.id)} disabled={dismissRequestMutation.isPending} className="p-1.5 rounded bg-destructive/20 hover:bg-destructive/40" title="Dismiss">
+                                <XCircle className="w-3.5 h-3.5 text-destructive" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">এখনও কোনো active submission নেই।</p>
