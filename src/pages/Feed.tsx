@@ -10,6 +10,7 @@ import {
   REACTION_EMOJIS, type Post, type PostComment, type Story
 } from "@/lib/feed-api";
 import { getOrCreateConversation } from "@/lib/chat-api";
+import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import {
   Heart, MessageCircle, Send, Image, X, ArrowLeft,
   Plus, User, Search, Phone, Share2, Loader2
