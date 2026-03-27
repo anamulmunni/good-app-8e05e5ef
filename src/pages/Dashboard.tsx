@@ -40,19 +40,37 @@ export default function Dashboard() {
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
+    refetchInterval: 10000,
   });
 
   const { data: incomingRequests = [] } = useQuery({
     queryKey: ["incoming-user-transfer-requests", user?.guest_id],
     queryFn: () => getIncomingTransferRequests(user?.guest_id || ""),
     enabled: !!user?.guest_id,
+    refetchInterval: 15000,
   });
 
   const { data: userHasPosted = true } = useQuery({
     queryKey: ["user-has-posted", user?.id],
     queryFn: () => hasUserPosted(user!.id),
     enabled: !!user?.id,
+    refetchInterval: 30000,
   });
+
+  // Realtime: auto-refresh user data when admin changes settings or user record
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["public-settings"] });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` }, () => {
+        refreshUser();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient, refreshUser]);
 
   const createUserRequestMutation = useMutation({
     mutationFn: async () => {
