@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [showRequestSection, setShowRequestSection] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
@@ -250,18 +251,60 @@ export default function Dashboard() {
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="glass-card rounded-2xl p-5 border border-[hsl(var(--cyan))]/20 relative overflow-hidden group"
+              className="glass-card rounded-2xl border border-[hsl(var(--cyan))]/20 relative overflow-hidden group"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-xl bg-[hsl(var(--cyan))]/20 flex items-center justify-center">
-                    <Zap className="w-4 h-4 text-[hsl(var(--cyan))]" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/5 via-[hsl(var(--emerald))]/5 to-[hsl(var(--purple))]/5" />
+              <motion.div
+                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-[hsl(var(--cyan))]/5 to-transparent"
+              />
+              <div className="relative z-10 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[hsl(var(--cyan))]/30 to-[hsl(var(--emerald))]/20 flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-[hsl(var(--cyan))]" />
+                    </div>
+                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">আমার ওয়ালেট</p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ব্যালেন্স</p>
+                  <div className="px-2.5 py-1 rounded-lg bg-[hsl(var(--emerald))]/15 border border-[hsl(var(--emerald))]/20">
+                    <p className="text-[10px] font-bold text-[hsl(var(--emerald))]">{currentRate} TK/ভেরি</p>
+                  </div>
                 </div>
-                <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">৳</span></p>
+                <div className="text-center py-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">মোট ব্যালেন্স</p>
+                  <p className="text-5xl font-black bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--emerald))] to-primary bg-clip-text text-transparent">
+                    {user.balance || 0}<span className="text-lg ml-1">৳</span>
+                  </p>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowWithdraw(!showWithdraw)}
+                  className="w-full mt-4 py-3.5 rounded-xl bg-gradient-to-r from-[hsl(var(--cyan))] to-[hsl(var(--emerald))] text-background font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[hsl(var(--emerald))]/20"
+                >
+                  <Wallet className="w-4 h-4" />
+                  উইথড্র করুন
+                  <motion.div animate={{ rotate: showWithdraw ? 180 : 0 }} transition={{ duration: 0.3 }}>
+                    <ChevronDown className="w-4 h-4" />
+                  </motion.div>
+                </motion.button>
               </div>
+              <AnimatePresence>
+                {showWithdraw && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden border-t border-[hsl(var(--cyan))]/10"
+                  >
+                    <div className="p-5">
+                      <WithdrawForm balance={user.balance || 0} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           ) : (
             <motion.div
@@ -360,32 +403,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* Current Rate & Withdraw Section */}
-        {paymentMode && (
-          <>
-            <motion.div
-              custom={3.5}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              className="glass-card rounded-2xl p-4 border border-[hsl(var(--emerald))]/20 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--emerald))]/20 flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-[hsl(var(--emerald))]" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">বর্তমান রেট</p>
-                  <p className="text-xl font-black text-[hsl(var(--emerald))]">{currentRate} TK <span className="text-xs text-muted-foreground font-medium">/ প্রতি ভেরিফাই</span></p>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div custom={3.7} variants={cardVariants} initial="hidden" animate="visible">
-              <WithdrawForm balance={user.balance || 0} />
-            </motion.div>
-          </>
-        )}
 
         {/* User Request Section */}
         <motion.section
