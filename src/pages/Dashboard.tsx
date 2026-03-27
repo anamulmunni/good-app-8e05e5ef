@@ -595,6 +595,14 @@ export default function Dashboard() {
           <TransactionList />
         </div>
       </main>
+
+      {/* Floating Chat Button */}
+      <button
+        onClick={() => navigate("/chat")}
+        className="fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground w-14 h-14 rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 transition-transform"
+      >
+        <MessageCircle className="w-6 h-6" />
+      </button>
     </div>
   );
 }
