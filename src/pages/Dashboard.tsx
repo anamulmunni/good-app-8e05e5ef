@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
+import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Shield, Zap, TrendingUp, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -106,7 +107,10 @@ export default function Dashboard() {
   const targetAmount = publicSettings?.bonusTarget || 10;
   const customNoticeText = publicSettings?.customNotice;
   const minRequestVerified = publicSettings?.minRequestVerified || 10;
+  const paymentMode = publicSettings?.paymentMode === "on";
+  const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
+  const displayBalance = paymentMode ? (userVerifiedCount * currentRate - (userVerifiedCount * currentRate - (user?.balance || 0))) : 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
 
   const copyId = () => {
@@ -219,7 +223,7 @@ export default function Dashboard() {
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-5 relative z-10">
         {/* Stats Cards Row */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${paymentMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <motion.div
             custom={0}
             variants={cardVariants}
@@ -239,6 +243,7 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
+          {paymentMode && (
           <motion.div
             custom={1}
             variants={cardVariants}
@@ -254,9 +259,10 @@ export default function Dashboard() {
                 </div>
                 <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">ব্যালেন্স</p>
               </div>
-              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">৳</span></p>
+              <p className="text-3xl font-black text-foreground">{user.balance || 0}<span className="text-sm text-muted-foreground ml-1">TK</span></p>
             </div>
           </motion.div>
+          )}
         </div>
 
         {/* Custom Notice */}
@@ -332,6 +338,33 @@ export default function Dashboard() {
               )}
             </div>
           </motion.div>
+        )}
+
+        {/* Current Rate & Withdraw Section */}
+        {paymentMode && (
+          <>
+            <motion.div
+              custom={3.5}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="glass-card rounded-2xl p-4 border border-[hsl(var(--emerald))]/20 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--emerald))]/20 flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-[hsl(var(--emerald))]" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">বর্তমান রেট</p>
+                  <p className="text-xl font-black text-[hsl(var(--emerald))]">{currentRate} TK <span className="text-xs text-muted-foreground font-medium">/ প্রতি ভেরিফাই</span></p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div custom={3.7} variants={cardVariants} initial="hidden" animate="visible">
+              <WithdrawForm balance={user.balance || 0} />
+            </motion.div>
+          </>
         )}
 
         {/* User Request Section */}

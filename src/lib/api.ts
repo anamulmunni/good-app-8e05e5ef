@@ -65,6 +65,7 @@ export type Settings = {
   videoUrl: string;
   requestSubmitPassword: string;
   minRequestVerified: number;
+  paymentMode: string;
 };
 
 // Auth / User APIs
@@ -113,6 +114,7 @@ export async function getPublicSettings(): Promise<Settings> {
     videoUrl: "",
     requestSubmitPassword: "Anamul-341321",
     minRequestVerified: 10,
+    paymentMode: "off",
   };
   data?.forEach((s) => {
     if (s.key === "rewardRate") settings.rewardRate = parseInt(s.value);
@@ -123,6 +125,7 @@ export async function getPublicSettings(): Promise<Settings> {
     if (s.key === "videoUrl") settings.videoUrl = s.value;
     if (s.key === "requestSubmitPassword") settings.requestSubmitPassword = s.value;
     if (s.key === "minRequestVerified") settings.minRequestVerified = parseInt(s.value) || 10;
+    if (s.key === "paymentMode") settings.paymentMode = s.value;
   });
   return settings;
 }
@@ -175,22 +178,27 @@ export async function submitKey(userId: number, privateKey: string): Promise<{ n
   if (!user) throw new Error("User not found");
   if (user.is_blocked) throw new Error("Account blocked");
 
-  // Increment key count only (no balance added)
+  // Increment key count and add balance if paymentMode is on
   const newKeyCount = user.key_count + 1;
+  const isPaymentOn = settings.paymentMode === "on";
+  const earnedAmount = isPaymentOn ? rewardRate : 0;
+  const newBalance = user.balance + earnedAmount;
+  
   await supabase.from("users").update({
     key_count: newKeyCount,
+    balance: newBalance,
   }).eq("id", userId);
 
   // Create transaction record
   await createTransaction({
     user_id: userId,
     type: "earning",
-    amount: 0,
+    amount: earnedAmount,
     details: `Key: ${privateKey.substring(0, 10)}...`,
     status: "completed",
   });
 
-  return { newBalance: user.balance, message: `Verified! Total count: ${newKeyCount}` };
+  return { newBalance, message: isPaymentOn ? `Verified! +${rewardRate} TK` : `Verified! Total count: ${newKeyCount}` };
 }
 
 // Withdraw
@@ -334,4 +342,36 @@ export async function getPaymentUsers(status: string): Promise<User[]> {
 // Update user watched video URL
 export async function updateUserWatchedVideo(userId: number, videoUrl: string) {
   await supabase.from("users").update({ watched_video_url: videoUrl }).eq("id", userId);
+}
+
+// Recalculate all users' balance based on key_count * rate
+export async function recalculateAllBalances(rate: number) {
+  const { data: allUsers } = await supabase.from("users").select("id, key_count, balance");
+  if (!allUsers) return;
+  
+  // Calculate total withdrawn per user
+  const { data: withdrawals } = await supabase
+    .from("transactions")
+    .select("user_id, amount")
+    .eq("type", "withdrawal")
+    .in("status", ["pending", "completed"]);
+  
+  const withdrawnMap: Record<number, number> = {};
+  withdrawals?.forEach(w => {
+    withdrawnMap[w.user_id] = (withdrawnMap[w.user_id] || 0) + w.amount;
+  });
+  
+  for (const u of allUsers) {
+    const totalEarned = u.key_count * rate;
+    const totalWithdrawn = withdrawnMap[u.id] || 0;
+    const newBalance = Math.max(0, totalEarned - totalWithdrawn);
+    if (newBalance !== u.balance) {
+      await supabase.from("users").update({ balance: newBalance }).eq("id", u.id);
+    }
+  }
+}
+
+// Reset all users' balance to 0 when paymentMode is turned off
+export async function resetAllBalances() {
+  await supabase.from("users").update({ balance: 0 }).neq("id", 0);
 }

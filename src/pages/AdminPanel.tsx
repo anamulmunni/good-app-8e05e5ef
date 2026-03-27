@@ -7,7 +7,7 @@ import {
   toggleBlockUser, updateUserBalance, resetUserKeyCount,
   updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
-  addResetHistory,
+  addResetHistory, recalculateAllBalances, resetAllBalances,
 } from "@/lib/api";
 import {
   getUserRequestSubmissions,
@@ -17,7 +17,7 @@ import {
   adminResetTransferBatch,
   adminDismissTransferRequest,
 } from "@/lib/user-requests";
-import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff } from "lucide-react";
+import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff, ToggleLeft, ToggleRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -56,6 +56,8 @@ export default function AdminPanel() {
   const [requesterRequestSearch, setRequesterRequestSearch] = useState("");
   const [requestSubmitPasswordSetting, setRequestSubmitPasswordSetting] = useState("");
   const [minRequestVerifiedSetting, setMinRequestVerifiedSetting] = useState("10");
+  const [paymentModeSetting, setPaymentModeSetting] = useState("off");
+  const [paymentModeLoading, setPaymentModeLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -92,6 +94,7 @@ export default function AdminPanel() {
       setVideoUrl(settingsData.videoUrl || "");
       setRequestSubmitPasswordSetting(settingsData.requestSubmitPassword || "");
       setMinRequestVerifiedSetting(String(settingsData.minRequestVerified || 10));
+      setPaymentModeSetting(settingsData.paymentMode || "off");
     }
   }, [settingsData]);
 
@@ -256,6 +259,78 @@ export default function AdminPanel() {
             <p className="text-sm text-muted-foreground">মোট ইউজার: <span className="text-primary font-bold">{users?.length || 0}</span> জন</p>
           </div>
         </header>
+
+        {/* Payment Mode Switch */}
+        <div className="glass-card p-6 rounded-3xl border-2 border-[hsl(var(--emerald))]/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Coins className="w-6 h-6 text-[hsl(var(--emerald))]" />
+              <div>
+                <h3 className="text-xl font-bold">পেমেন্ট মোড</h3>
+                <p className="text-xs text-muted-foreground">ON করলে প্রতি ভেরিফাই এ টাকা যোগ হবে, উইথড্র সিস্টেম চালু হবে</p>
+              </div>
+            </div>
+            <button
+              disabled={paymentModeLoading}
+              onClick={async () => {
+                const newMode = paymentModeSetting === "on" ? "off" : "on";
+                setPaymentModeLoading(true);
+                try {
+                  await updateSetting("paymentMode", newMode);
+                  if (newMode === "on") {
+                    // Recalculate all balances retroactively
+                    const rate = parseInt(rewardRate) || 40;
+                    await recalculateAllBalances(rate);
+                    toast({ title: `পেমেন্ট মোড ON — সব ইউজারের ব্যালেন্স ${rate} TK/key হিসেবে আপডেট হয়েছে` });
+                  } else {
+                    await resetAllBalances();
+                    toast({ title: "পেমেন্ট মোড OFF — সব ব্যালেন্স রিসেট হয়েছে" });
+                  }
+                  setPaymentModeSetting(newMode);
+                  queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
+                  queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                  queryClient.invalidateQueries({ queryKey: ["public-settings"] });
+                } catch (err) {
+                  toast({ title: "ব্যর্থ", variant: "destructive" });
+                } finally {
+                  setPaymentModeLoading(false);
+                }
+              }}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm transition-all ${
+                paymentModeSetting === "on" 
+                  ? "bg-[hsl(var(--emerald))] text-foreground shadow-lg shadow-[hsl(var(--emerald))]/30" 
+                  : "bg-secondary text-muted-foreground border border-border"
+              }`}
+            >
+              {paymentModeLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : paymentModeSetting === "on" ? (
+                <><ToggleRight className="w-5 h-5" /> ON</>
+              ) : (
+                <><ToggleLeft className="w-5 h-5" /> OFF</>
+              )}
+            </button>
+          </div>
+          {paymentModeSetting === "on" && (
+            <div className="mt-4 pt-4 border-t border-border space-y-3">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">প্রতি ভেরিফাই এর রেট (TK)</label>
+                <div className="flex gap-2">
+                  <input type="number" value={rewardRate} onChange={(e) => setRewardRate(e.target.value)} className="input-field" />
+                  <button onClick={async () => {
+                    const rate = parseInt(rewardRate);
+                    await rateMutation.mutateAsync({ rate });
+                    await recalculateAllBalances(rate);
+                    queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                    toast({ title: `রেট ${rate} TK আপডেট হয়েছে এবং সব ব্যালেন্স রিক্যালকুলেট হয়েছে` });
+                  }} className="btn-primary w-auto" disabled={rateMutation.isPending}>
+                    {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "আপডেট ও রিক্যালকুলেট"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Notice & Bonus Settings */}
         <div className="glass-card p-6 rounded-3xl">
@@ -822,21 +897,35 @@ export default function AdminPanel() {
         </section>
 
         {/* Withdrawals */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold">পেন্ডিং উইথড্র</h2>
+        <section className="glass-card p-6 rounded-2xl border-2 border-[hsl(var(--orange))]/30 space-y-4">
+          <h2 className="text-xl font-bold flex items-center gap-2"><Coins className="w-6 h-6 text-[hsl(var(--orange))]" /> পেন্ডিং উইথড্র ({withdrawals.filter(w => w.status === "pending").length})</h2>
           <div className="grid gap-4">
-            {withdrawals.filter(w => w.status === "pending").map(w => (
-              <div key={w.id} className="glass-card p-4 rounded-xl space-y-3">
-                <div className="flex justify-between">
-                  <p className="font-bold text-lg">৳{w.amount}</p>
-                  <p className="text-sm text-muted-foreground">{w.details}</p>
+            {withdrawals.filter(w => w.status === "pending").map(w => {
+              const wxUser = users?.find(u => u.id === w.user_id);
+              return (
+                <div key={w.id} className="bg-secondary/50 border border-border rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-black text-2xl text-[hsl(var(--orange))]">{w.amount} TK</p>
+                      <p className="text-sm text-muted-foreground">{w.details}</p>
+                      {wxUser && <p className="text-xs text-muted-foreground mt-1">User: <span className="font-mono font-bold text-foreground">{wxUser.guest_id}</span> ({wxUser.display_name})</p>}
+                      <p className="text-[10px] text-muted-foreground">{new Date(w.created_at || "").toLocaleString("bn-BD")}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => statusMutation.mutate({ id: w.id, status: "completed" })} className="flex-1 btn-primary py-2.5 bg-[hsl(var(--emerald))]">
+                      <CheckCircle className="w-4 h-4" /> Approve
+                    </button>
+                    <button onClick={() => statusMutation.mutate({ id: w.id, status: "rejected" })} className="flex-1 btn-primary py-2.5 bg-destructive">
+                      <XCircle className="w-4 h-4" /> Reject
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => statusMutation.mutate({ id: w.id, status: "completed" })} className="flex-1 btn-primary py-2 bg-[hsl(var(--emerald))]">Approve</button>
-                  <button onClick={() => statusMutation.mutate({ id: w.id, status: "rejected" })} className="flex-1 btn-primary py-2 bg-destructive">Reject</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
+            {withdrawals.filter(w => w.status === "pending").length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">কোনো পেন্ডিং উইথড্র নেই</p>
+            )}
           </div>
         </section>
       </div>
