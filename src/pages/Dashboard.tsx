@@ -547,15 +547,29 @@ export default function Dashboard() {
         </motion.div>
       </main>
 
-      {/* Floating Chat Button */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => navigate("/chat")}
-        className="fixed bottom-6 right-6 z-50 bg-gradient-to-br from-primary to-[hsl(var(--emerald))] text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/30 flex items-center justify-center"
-      >
-        <MessageCircle className="w-6 h-6" />
-      </motion.button>
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-6 right-5 z-50 flex flex-col gap-3">
+        {/* Feed Button */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate("/feed")}
+          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--amber))] to-[hsl(var(--orange))] shadow-lg shadow-[hsl(var(--amber))]/30 flex items-center justify-center"
+        >
+          <Newspaper className="w-6 h-6 text-foreground" />
+        </motion.button>
+
+        {/* Chat Button - glowing, animated */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate("/chat")}
+          className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] shadow-lg shadow-[hsl(var(--cyan))]/40 flex items-center justify-center"
+        >
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] animate-pulse opacity-40" />
+          <MessageCircle className="w-6 h-6 text-foreground relative z-10 fill-foreground/20" />
+        </motion.button>
+      </div>
     </div>
   );
 }
