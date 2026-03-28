@@ -652,12 +652,12 @@ export default function Feed() {
                               {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
                                 <span className="text-[10px] text-blue-600 font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
                             </button>
-                            <div className="bg-gray-100 dark:bg-secondary rounded-2xl px-3 py-2 flex-1">
-                              <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-xs font-bold text-gray-900 dark:text-foreground hover:underline block">
+                            <div className="bg-gray-100 dark:bg-secondary rounded-2xl px-3 py-2.5 flex-1 min-w-0">
+                              <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-[13px] font-bold text-gray-900 dark:text-foreground hover:underline block">
                                 {c.user?.display_name || "User"}
                               </button>
-                              <p className="text-[13px] text-gray-800 dark:text-foreground/90 mt-0.5 break-words">{c.content}</p>
-                              <p className="text-[10px] text-gray-500 dark:text-muted-foreground mt-1">{timeAgo(c.created_at)}</p>
+                              <p className="text-[15px] leading-5 text-gray-900 dark:text-foreground mt-0.5 break-words whitespace-pre-wrap">{c.content}</p>
+                              <p className="text-[11px] text-gray-500 dark:text-muted-foreground mt-1">{timeAgo(c.created_at)}</p>
                             </div>
                           </div>
                         ))}
