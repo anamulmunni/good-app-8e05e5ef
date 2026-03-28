@@ -1,50 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Type, Music, Check, Search, Loader2, Palette, AlignCenter, Pause, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-// Free royalty-free audio samples for preview/playback
-const AUDIO_SAMPLES: Record<string, string> = {
-  Bollywood: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  Pop: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  Romance: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  English: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-  EDM: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-  Bangla: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-};
-
-const MUSIC_LIBRARY = [
-  { id: "1", title: "Tum Hi Ho", artist: "Arijit Singh", genre: "Bollywood" },
-  { id: "2", title: "Kesariya", artist: "Arijit Singh", genre: "Bollywood" },
-  { id: "3", title: "Raataan Lambiyan", artist: "Jubin Nautiyal", genre: "Bollywood" },
-  { id: "4", title: "Pasoori", artist: "Ali Sethi", genre: "Pop" },
-  { id: "5", title: "Apna Bana Le", artist: "Arijit Singh", genre: "Bollywood" },
-  { id: "6", title: "Maan Meri Jaan", artist: "King", genre: "Pop" },
-  { id: "7", title: "Chaleya", artist: "Arijit Singh", genre: "Bollywood" },
-  { id: "8", title: "Tera Ban Jaunga", artist: "Akhil Sachdeva", genre: "Bollywood" },
-  { id: "9", title: "Shayad", artist: "Arijit Singh", genre: "Romance" },
-  { id: "10", title: "Kahani Suno", artist: "Kaifi Khalil", genre: "Pop" },
-  { id: "11", title: "O Maahi", artist: "Arijit Singh", genre: "Bollywood" },
-  { id: "12", title: "Heeriye", artist: "Jasleen Royal", genre: "Pop" },
-  { id: "13", title: "Dil Ko Karaar Aaya", artist: "Yasser Desai", genre: "Romance" },
-  { id: "14", title: "Aaj Ki Raat", artist: "Arijit Singh", genre: "Bollywood" },
-  { id: "15", title: "Perfect", artist: "Ed Sheeran", genre: "English" },
-  { id: "16", title: "Shape of You", artist: "Ed Sheeran", genre: "English" },
-  { id: "17", title: "Believer", artist: "Imagine Dragons", genre: "English" },
-  { id: "18", title: "Faded", artist: "Alan Walker", genre: "EDM" },
-  { id: "19", title: "Let Me Love You", artist: "DJ Snake", genre: "EDM" },
-  { id: "20", title: "On My Way", artist: "Alan Walker", genre: "EDM" },
-  { id: "21", title: "বাংলা গান ১", artist: "অজানা শিল্পী", genre: "Bangla" },
-  { id: "22", title: "Mon Majhi Re", artist: "Arijit Singh", genre: "Bangla" },
-  { id: "23", title: "Tomake Chai", artist: "Arijit Singh", genre: "Bangla" },
-  { id: "24", title: "Tumi Jake Bhalobasho", artist: "Anupam Roy", genre: "Bangla" },
-];
-
-export function getAudioUrlForMusic(musicName: string | null | undefined): string | null {
-  if (!musicName) return null;
-  const song = MUSIC_LIBRARY.find(m => musicName.includes(m.title));
-  if (song) return AUDIO_SAMPLES[song.genre] || AUDIO_SAMPLES.Bollywood;
-  return AUDIO_SAMPLES.Bollywood;
-}
+import { STORY_MUSIC_LIBRARY, StoryMusicTrack, buildStoredMusicValue } from "@/lib/story-music";
 
 const TEXT_COLORS = [
   "#FFFFFF", "#000000", "#FF0000", "#00FF00", "#0000FF",
@@ -61,7 +18,6 @@ type Props = {
 };
 
 export default function StoryEditor({ imageFile, onClose, onPublish, isPending }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [overlayText, setOverlayText] = useState("");
   const [textColor, setTextColor] = useState("#FFFFFF");
@@ -70,7 +26,7 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
   const [showTextEditor, setShowTextEditor] = useState(false);
   const [showMusicPicker, setShowMusicPicker] = useState(false);
   const [musicQuery, setMusicQuery] = useState("");
-  const [selectedMusic, setSelectedMusic] = useState<typeof MUSIC_LIBRARY[0] | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<StoryMusicTrack | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -86,7 +42,6 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
 
-  // Cleanup audio on unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -96,23 +51,22 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
     };
   }, []);
 
-  const filteredMusic = MUSIC_LIBRARY.filter(m =>
+  const filteredMusic = STORY_MUSIC_LIBRARY.filter((m) =>
     m.title.toLowerCase().includes(musicQuery.toLowerCase()) ||
     m.artist.toLowerCase().includes(musicQuery.toLowerCase()) ||
     m.genre.toLowerCase().includes(musicQuery.toLowerCase())
   );
 
-  const playPreview = (song: typeof MUSIC_LIBRARY[0]) => {
-    // Stop current audio
+  const playPreview = (song: StoryMusicTrack) => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audioUrl = AUDIO_SAMPLES[song.genre] || AUDIO_SAMPLES.Bollywood;
-    const audio = new Audio(audioUrl);
-    audio.volume = 0.5;
+
+    const audio = new Audio(song.audioUrl);
+    audio.volume = 0.55;
     audioRef.current = audio;
-    audio.play().then(() => setIsPlaying(true)).catch(() => {});
+    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     audio.onended = () => setIsPlaying(false);
   };
 
@@ -124,7 +78,7 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
     setIsPlaying(false);
   };
 
-  const selectMusic = (song: typeof MUSIC_LIBRARY[0]) => {
+  const selectMusic = (song: StoryMusicTrack) => {
     setSelectedMusic(song);
     playPreview(song);
     setShowMusicPicker(false);
@@ -143,6 +97,7 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
   const publishStory = async () => {
     if (!imgRef.current) return;
     stopPreview();
+
     const img = imgRef.current;
     const canvas = document.createElement("canvas");
     canvas.width = img.naturalWidth;
@@ -168,8 +123,9 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
       const words = overlayText.split(" ");
       const lines: string[] = [];
       let currentLine = "";
+
       for (const word of words) {
-        const testLine = currentLine ? currentLine + " " + word : word;
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
         if (ctx.measureText(testLine).width > maxWidth && currentLine) {
           lines.push(currentLine);
           currentLine = word;
@@ -189,76 +145,89 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], "story.jpg", { type: "image/jpeg" });
-      const musicLabel = selectedMusic ? `${selectedMusic.title} - ${selectedMusic.artist}` : undefined;
-      onPublish(file, musicLabel);
+      const musicValue = selectedMusic ? buildStoredMusicValue(selectedMusic) : undefined;
+      onPublish(file, musicValue);
     }, "image/jpeg", 0.9);
   };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[300] bg-black flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-black/80">
         <button onClick={() => { stopPreview(); onClose(); }} className="p-2 text-white">
           <X className="w-6 h-6" />
         </button>
+
         <div className="flex items-center gap-2">
-          <button onClick={() => { setShowTextEditor(!showTextEditor); setShowMusicPicker(false); }}
-            className={`p-2.5 rounded-full ${showTextEditor ? "bg-white text-black" : "bg-white/20 text-white"}`}>
+          <button
+            onClick={() => { setShowTextEditor(!showTextEditor); setShowMusicPicker(false); }}
+            className={`p-2.5 rounded-full ${showTextEditor ? "bg-white text-black" : "bg-white/20 text-white"}`}
+          >
             <Type className="w-5 h-5" />
           </button>
-          <button onClick={() => { setShowMusicPicker(!showMusicPicker); setShowTextEditor(false); }}
-            className={`p-2.5 rounded-full ${showMusicPicker ? "bg-white text-black" : "bg-white/20 text-white"}`}>
+          <button
+            onClick={() => { setShowMusicPicker(!showMusicPicker); setShowTextEditor(false); }}
+            className={`p-2.5 rounded-full ${showMusicPicker ? "bg-white text-black" : "bg-white/20 text-white"}`}
+          >
             <Music className="w-5 h-5" />
           </button>
         </div>
-        <button onClick={publishStory} disabled={isPending}
-          className="px-5 py-2 bg-blue-600 text-white rounded-full text-sm font-bold disabled:opacity-50">
+
+        <button
+          onClick={publishStory}
+          disabled={isPending}
+          className="px-5 py-2 bg-blue-600 text-white rounded-full text-sm font-bold disabled:opacity-50"
+        >
           {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "শেয়ার করুন"}
         </button>
       </div>
 
-      {/* Image Preview with text overlay */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden"
+      <div
+        className="flex-1 flex items-center justify-center relative overflow-hidden"
         ref={containerRef}
         onMouseMove={handleTextDrag}
         onTouchMove={handleTextDrag}
         onMouseUp={() => setIsDragging(false)}
-        onTouchEnd={() => setIsDragging(false)}>
-        {imageUrl && (
-          <img src={imageUrl} alt="" className="max-w-full max-h-full object-contain" />
-        )}
+        onTouchEnd={() => setIsDragging(false)}
+      >
+        {imageUrl && <img src={imageUrl} alt="" className="max-w-full max-h-full object-contain" />}
+
         {overlayText && (
-          <div className="absolute cursor-move select-none"
+          <div
+            className="absolute cursor-move select-none"
             style={{
               left: `${textPosition.x * 100}%`,
               top: `${textPosition.y * 100}%`,
               transform: "translate(-50%, -50%)",
             }}
             onMouseDown={() => setIsDragging(true)}
-            onTouchStart={() => setIsDragging(true)}>
-            <p style={{
-              color: textColor,
-              fontSize: `${fontSize}px`,
-              fontWeight: "bold",
-              textShadow: "2px 2px 8px rgba(0,0,0,0.7)",
-              textAlign: "center",
-              maxWidth: "80vw",
-              wordBreak: "break-word",
-              lineHeight: 1.3,
-            }}>
+            onTouchStart={() => setIsDragging(true)}
+          >
+            <p
+              style={{
+                color: textColor,
+                fontSize: `${fontSize}px`,
+                fontWeight: "bold",
+                textShadow: "2px 2px 8px rgba(0,0,0,0.7)",
+                textAlign: "center",
+                maxWidth: "80vw",
+                wordBreak: "break-word",
+                lineHeight: 1.3,
+              }}
+            >
               {overlayText}
             </p>
           </div>
         )}
 
-        {/* Selected music indicator */}
         {selectedMusic && (
           <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 bg-black/60 rounded-full px-3 py-2">
             <Music className="w-4 h-4 text-white shrink-0" />
             <p className="text-white text-xs truncate flex-1">{selectedMusic.title} - {selectedMusic.artist}</p>
-            <button onClick={() => isPlaying ? stopPreview() : playPreview(selectedMusic)}
-              className="text-white/80 hover:text-white p-1">
+            <button
+              onClick={() => (isPlaying ? stopPreview() : playPreview(selectedMusic))}
+              className="text-white/80 hover:text-white p-1"
+            >
               {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             </button>
             <button onClick={() => { stopPreview(); setSelectedMusic(null); }} className="text-white/60 hover:text-white">
@@ -268,11 +237,9 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
         )}
       </div>
 
-      {/* Text Editor Panel */}
       <AnimatePresence>
         {showTextEditor && (
-          <motion.div initial={{ y: 200 }} animate={{ y: 0 }} exit={{ y: 200 }}
-            className="bg-gray-900 px-4 py-3 space-y-3">
+          <motion.div initial={{ y: 200 }} animate={{ y: 0 }} exit={{ y: 200 }} className="bg-gray-900 px-4 py-3 space-y-3">
             <input
               value={overlayText}
               onChange={(e) => setOverlayText(e.target.value)}
@@ -280,52 +247,66 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
               className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm border-none outline-none placeholder:text-gray-500"
               autoFocus
             />
+
             <div className="flex items-center gap-2">
               <Palette className="w-4 h-4 text-gray-400 shrink-0" />
               <div className="flex gap-2 overflow-x-auto">
-                {TEXT_COLORS.map(color => (
-                  <button key={color} onClick={() => setTextColor(color)}
+                {TEXT_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setTextColor(color)}
                     className={`w-7 h-7 rounded-full shrink-0 border-2 ${textColor === color ? "border-white scale-110" : "border-gray-600"}`}
-                    style={{ backgroundColor: color }} />
+                    style={{ backgroundColor: color }}
+                  />
                 ))}
               </div>
             </div>
+
             <div className="flex items-center gap-2">
               <AlignCenter className="w-4 h-4 text-gray-400 shrink-0" />
               <div className="flex gap-2">
-                {FONT_SIZES.map(size => (
-                  <button key={size} onClick={() => setFontSize(size)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold ${fontSize === size ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-300"}`}>
+                {FONT_SIZES.map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setFontSize(size)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold ${fontSize === size ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-300"}`}
+                  >
                     {size}
                   </button>
                 ))}
               </div>
             </div>
+
             <p className="text-gray-500 text-xs text-center">💡 টেক্সট ড্র্যাগ করে সরানো যাবে</p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Music Picker Panel */}
       <AnimatePresence>
         {showMusicPicker && (
-          <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }}
-            className="bg-gray-900 max-h-[50vh] flex flex-col">
+          <motion.div initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} className="bg-gray-900 max-h-[50vh] flex flex-col">
             <div className="px-4 py-3 border-b border-gray-800">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input value={musicQuery} onChange={(e) => setMusicQuery(e.target.value)}
+                <input
+                  value={musicQuery}
+                  onChange={(e) => setMusicQuery(e.target.value)}
                   placeholder="গান খুঁজুন..."
                   className="w-full bg-gray-800 text-white rounded-full pl-10 pr-4 py-2.5 text-sm border-none outline-none placeholder:text-gray-500"
-                  autoFocus />
+                  autoFocus
+                />
               </div>
             </div>
+
             <div className="overflow-y-auto flex-1 px-2 py-2 space-y-0.5">
-              {filteredMusic.map(song => (
-                <button key={song.id} onClick={() => selectMusic(song)}
+              {filteredMusic.map((song) => (
+                <button
+                  key={song.id}
+                  onClick={() => selectMusic(song)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
                     selectedMusic?.id === song.id ? "bg-blue-600/20" : "hover:bg-gray-800"
-                  }`}>
+                  }`}
+                >
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center shrink-0">
                     <Music className="w-5 h-5 text-white" />
                   </div>
@@ -333,14 +314,11 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
                     <p className="text-white text-sm font-medium truncate">{song.title}</p>
                     <p className="text-gray-400 text-xs truncate">{song.artist} · {song.genre}</p>
                   </div>
-                  {selectedMusic?.id === song.id && (
-                    <Check className="w-5 h-5 text-blue-500 shrink-0" />
-                  )}
+                  {selectedMusic?.id === song.id && <Check className="w-5 h-5 text-blue-500 shrink-0" />}
                 </button>
               ))}
-              {filteredMusic.length === 0 && (
-                <p className="text-gray-500 text-sm text-center py-6">কোনো গান পাওয়া যায়নি</p>
-              )}
+
+              {filteredMusic.length === 0 && <p className="text-gray-500 text-sm text-center py-6">কোনো গান পাওয়া যায়নি</p>}
             </div>
           </motion.div>
         )}

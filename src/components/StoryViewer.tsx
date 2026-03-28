@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { X, Trash2, MessageCircle, Phone, Music } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Trash2, MessageCircle, Phone, Music, Play } from "lucide-react";
 import { motion } from "framer-motion";
-import { getAudioUrlForMusic } from "./StoryEditor";
+import { resolveStoryMusic } from "@/lib/story-music";
 
 type StoryViewerProps = {
   story: any;
@@ -16,24 +16,41 @@ type StoryViewerProps = {
 
 export default function StoryViewer({ story, userId, onClose, onDelete, onMessage, onCall, onProfile, timeAgo }: StoryViewerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [needsTapToPlay, setNeedsTapToPlay] = useState(false);
+
+  const resolvedMusic = resolveStoryMusic(story.music_name);
 
   useEffect(() => {
-    const musicName = story.music_name;
-    const audioUrl = getAudioUrlForMusic(musicName);
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      audio.volume = 0.6;
-      audio.loop = true;
-      audioRef.current = audio;
-      audio.play().catch(() => {});
+    setNeedsTapToPlay(false);
+
+    if (!resolvedMusic.audioUrl) {
+      return;
     }
+
+    const audio = new Audio(resolvedMusic.audioUrl);
+    audio.volume = 0.65;
+    audio.loop = true;
+    audioRef.current = audio;
+
+    audio.play()
+      .then(() => setNeedsTapToPlay(false))
+      .catch(() => setNeedsTapToPlay(true));
+
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
     };
-  }, [story]);
+  }, [story.id, resolvedMusic.audioUrl]);
+
+  const handleManualPlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    audioRef.current.play()
+      .then(() => setNeedsTapToPlay(false))
+      .catch(() => setNeedsTapToPlay(true));
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -60,12 +77,22 @@ export default function StoryViewer({ story, userId, onClose, onDelete, onMessag
           <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="text-white/80"><X size={24} /></button>
         </div>
       </div>
+
       <div className="flex-1 flex items-center justify-center p-4 relative">
         <img src={story.image_url} alt="" className="max-w-full max-h-full object-contain rounded-xl" />
-        {story.music_name && (
+
+        {resolvedMusic.label && (
           <div className="absolute bottom-6 left-4 right-4 flex items-center gap-2 bg-black/60 rounded-full px-3 py-2">
             <Music className="w-4 h-4 text-white shrink-0 animate-pulse" />
-            <p className="text-white text-xs truncate flex-1">🎵 {story.music_name}</p>
+            <p className="text-white text-xs truncate flex-1">🎵 {resolvedMusic.label}</p>
+            {needsTapToPlay && (
+              <button
+                onClick={handleManualPlay}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-white text-[10px] font-semibold"
+              >
+                <Play className="w-3 h-3" /> Tap
+              </button>
+            )}
           </div>
         )}
       </div>
