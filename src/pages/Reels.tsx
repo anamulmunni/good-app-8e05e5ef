@@ -207,6 +207,29 @@ export default function Reels() {
     }
   };
 
+  const renderMentionText = (text: string) => {
+    const parts = text.split(/(@[\w\s]+?)(?=\s@|\s*$|[.,!?])/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("@")) {
+        const name = part.slice(1).trim();
+        return (
+          <button
+            key={i}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const { data: users } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
+              if (users && users.length > 0) navigate(`/user/${users[0].id}`);
+            }}
+            className="text-blue-500 font-bold hover:underline inline"
+          >
+            @{name}
+          </button>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   if (isLoading || !user) return null;
 
   return (
