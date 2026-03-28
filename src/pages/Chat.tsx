@@ -515,7 +515,8 @@ export default function Chat() {
               {isRecording ? (
                 <div className="flex items-center gap-2 w-full">
                   <span className="text-destructive animate-pulse text-sm font-bold">● {recordingTime}s</span>
-                  <span className="text-[12px] font-medium text-destructive/90">ধরে বলুন, ছাড়লেই পাঠাবে</span>
+                  <span className="text-[12px] font-medium text-destructive/90">রেকর্ডিং চলছে... থামাতে ক্লিক করুন</span>
+                  <button onClick={() => stopRecording(false)} className="ml-auto text-red-500 text-xs font-bold">বাতিল</button>
                 </div>
               ) : (
                 <>
