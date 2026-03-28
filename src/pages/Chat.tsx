@@ -83,6 +83,12 @@ export default function Chat() {
     refetchInterval: 3000,
   });
 
+  const orderedConversations = [...conversations].sort((a, b) => {
+    const ta = new Date(a.last_message_at || a.created_at || 0).getTime();
+    const tb = new Date(b.last_message_at || b.created_at || 0).getTime();
+    return tb - ta;
+  });
+
   // Realtime
   useEffect(() => {
     if (!activeConversation) return;
@@ -613,7 +619,7 @@ export default function Chat() {
             <p className="text-[12px] mt-1">🔍 উপরে Search করে কাউকে খুঁজুন</p>
           </div>
         )}
-        {conversations.map((convo) => {
+        {orderedConversations.map((convo) => {
           const otherId = getOtherUserId(convo);
           const other = userCache[otherId];
           const otherOnline = isUserOnline(other?.online_at);
