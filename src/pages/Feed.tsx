@@ -394,8 +394,8 @@ export default function Feed() {
     video.preload = "metadata";
     video.src = URL.createObjectURL(file);
     video.onloadedmetadata = () => {
-      if (video.duration > 60) {
-        toast({ title: "নিউজ ফিডে সর্বোচ্চ ১ মিনিটের ভিডিও আপলোড করা যাবে", variant: "destructive" });
+      if (video.duration > 120) {
+        toast({ title: "নিউজ ফিডে সর্বোচ্চ ২ মিনিটের ভিডিও আপলোড করা যাবে", variant: "destructive" });
         return;
       }
       setPostVideoFile(file);
