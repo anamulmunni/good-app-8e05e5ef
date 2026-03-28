@@ -347,6 +347,7 @@ export default function AdminPanel() {
             </button>
           </div>
           {paymentModeSetting === "on" && (
+            <>
             <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">রেট (TK/key)</label>
@@ -406,6 +407,7 @@ export default function AdminPanel() {
                 </button>
               </div>
             </div>
+            </>
           )}
         </div>
 
