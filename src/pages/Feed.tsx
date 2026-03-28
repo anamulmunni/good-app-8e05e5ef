@@ -486,6 +486,30 @@ export default function Feed() {
 
   if (isLoading || !user) return null;
 
+  // Render @mention text with blue clickable names
+  const renderMentionText = (text: string) => {
+    const parts = text.split(/(@[\w\s]+?)(?=\s@|\s*$|[.,!?])/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("@")) {
+        const name = part.slice(1).trim();
+        return (
+          <button
+            key={i}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const { data: users } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
+              if (users && users.length > 0) navigate(`/user/${users[0].id}`);
+            }}
+            className="text-blue-600 dark:text-primary font-bold hover:underline inline"
+          >
+            @{name}
+          </button>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   // Insert "People You May Know" after 3rd post
   const renderPosts = () => {
     const elements: React.ReactNode[] = [];
