@@ -79,18 +79,21 @@ export default function Reels() {
     const currentReel = reels[currentIndex];
     if (!currentReel) return;
 
+    // First pause ALL videos
     Object.entries(videoRefs.current).forEach(([id, video]) => {
       if (!video) return;
-      if (id === currentReel.id) {
-        video.currentTime = 0;
-        video.muted = muted;
-        video.play().catch(() => {});
-        setPaused(null);
-      } else {
-        video.pause();
-        video.currentTime = 0;
-      }
+      video.pause();
+      video.muted = true;
     });
+
+    // Then play only the current one
+    const currentVideo = videoRefs.current[currentReel.id];
+    if (currentVideo) {
+      currentVideo.currentTime = 0;
+      currentVideo.muted = muted;
+      currentVideo.play().catch(() => {});
+      setPaused(null);
+    }
   }, [currentIndex, reels, muted]);
 
   // Scroll snap observer
@@ -319,8 +322,8 @@ export default function Reels() {
                     </div>
                     <span className="text-white font-bold text-sm drop-shadow-lg">{reel.user?.display_name || "User"}</span>
                   </button>
-                  {reel.content && (
-                    <p className="text-white/90 text-sm line-clamp-2 drop-shadow-lg">{reel.content}</p>
+                {reel.content && (
+                    <p className="text-white/90 text-[15px] line-clamp-2 drop-shadow-lg">{renderMentionText(reel.content)}</p>
                   )}
                 </div>
 
@@ -337,7 +340,7 @@ export default function Reels() {
                         <Heart className="w-6 h-6 text-white" />
                       )}
                     </motion.div>
-                    <span className="text-white text-xs font-bold drop-shadow-lg">{reel.likes_count || ""}</span>
+                    <span className="text-white text-sm font-bold drop-shadow-lg">{reel.likes_count > 0 ? reel.likes_count : ""}</span>
                   </button>
 
                   {/* Comment */}
@@ -346,7 +349,7 @@ export default function Reels() {
                     <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
                       <MessageCircle className="w-6 h-6 text-white" />
                     </div>
-                    <span className="text-white text-xs font-bold drop-shadow-lg">{reel.comments_count || ""}</span>
+                    <span className="text-white text-sm font-bold drop-shadow-lg">{reel.comments_count > 0 ? reel.comments_count : ""}</span>
                   </button>
 
                   {/* Share */}
@@ -376,19 +379,19 @@ export default function Reels() {
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {loadingComments ? (
-                <p className="text-xs text-muted-foreground text-center py-4">লোড হচ্ছে...</p>
+                <p className="text-sm text-muted-foreground text-center py-4">লোড হচ্ছে...</p>
               ) : comments.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">কোনো মন্তব্য নেই — প্রথম মন্তব্য করুন!</p>
+                <p className="text-sm text-muted-foreground text-center py-4">কোনো মন্তব্য নেই — প্রথম মন্তব্য করুন!</p>
               ) : (
                 comments.map((c) => (
                   <div key={c.id} className="flex gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
+                    <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
                       {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
-                        <span className="text-[10px] text-primary font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                        <span className="text-xs text-primary font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
                     </div>
-                    <div className="bg-secondary/60 rounded-2xl px-3 py-2 flex-1">
-                      <p className="text-xs font-bold text-foreground">{c.user?.display_name || "User"}</p>
-                      <p className="text-xs text-foreground/80">{renderMentionText(c.content)}</p>
+                    <div className="bg-secondary/60 rounded-2xl px-3 py-2.5 flex-1">
+                      <p className="text-[13px] font-bold text-foreground">{c.user?.display_name || "User"}</p>
+                      <p className="text-[14px] text-foreground/90 mt-0.5">{renderMentionText(c.content)}</p>
                     </div>
                   </div>
                 ))
