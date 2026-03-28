@@ -321,27 +321,15 @@ export default function Chat() {
     setRecordingTime(0);
   };
 
-  const handleHoldToRecordStart = async (e: React.TouchEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
+  const handleMicToggle = async () => {
     if (messageText.trim()) return;
-    e.preventDefault();
-
-    if (holdRecordingActiveRef.current || isRecording) return;
-
-    holdRecordingActiveRef.current = true;
-    shouldSendRecordingRef.current = true;
-
-    await startRecording();
-  };
-
-  const handleHoldToRecordEnd = (e: React.TouchEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (!holdRecordingActiveRef.current && !isRecording) return;
-    stopRecording(true);
-  };
-
-  const handleHoldToRecordCancel = () => {
-    if (!holdRecordingActiveRef.current && !isRecording) return;
-    stopRecording(false);
+    if (isRecording) {
+      stopRecording(true);
+    } else {
+      holdRecordingActiveRef.current = true;
+      shouldSendRecordingRef.current = true;
+      await startRecording();
+    }
   };
 
   const removePending = (id: string) => {
