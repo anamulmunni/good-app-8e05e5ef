@@ -379,19 +379,19 @@ export default function Reels() {
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {loadingComments ? (
-                <p className="text-xs text-muted-foreground text-center py-4">লোড হচ্ছে...</p>
+                <p className="text-sm text-muted-foreground text-center py-4">লোড হচ্ছে...</p>
               ) : comments.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">কোনো মন্তব্য নেই — প্রথম মন্তব্য করুন!</p>
+                <p className="text-sm text-muted-foreground text-center py-4">কোনো মন্তব্য নেই — প্রথম মন্তব্য করুন!</p>
               ) : (
                 comments.map((c) => (
                   <div key={c.id} className="flex gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
+                    <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
                       {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
-                        <span className="text-[10px] text-primary font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                        <span className="text-xs text-primary font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
                     </div>
-                    <div className="bg-secondary/60 rounded-2xl px-3 py-2 flex-1">
-                      <p className="text-xs font-bold text-foreground">{c.user?.display_name || "User"}</p>
-                      <p className="text-xs text-foreground/80">{renderMentionText(c.content)}</p>
+                    <div className="bg-secondary/60 rounded-2xl px-3 py-2.5 flex-1">
+                      <p className="text-[13px] font-bold text-foreground">{c.user?.display_name || "User"}</p>
+                      <p className="text-[14px] text-foreground/90 mt-0.5">{renderMentionText(c.content)}</p>
                     </div>
                   </div>
                 ))
