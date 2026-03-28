@@ -1156,24 +1156,27 @@ export default function Feed() {
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-border/20">
                 {notificationsList.map((n: any) => (
-                  <button key={n.id} onClick={() => { if (n.reference_id) { setActiveTab("home"); openComments(n.reference_id); } }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-secondary/30 transition-colors ${!n.is_read ? "bg-blue-50/60 dark:bg-primary/5" : ""}`}>
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
+                  <div key={n.id} className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-secondary/30 transition-colors ${!n.is_read ? "bg-blue-50/60 dark:bg-primary/5" : ""}`}>
+                    <button onClick={() => n.from_user_id && navigate(`/user/${n.from_user_id}`)}
+                      className="w-10 h-10 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
                       {n.from_user?.avatar_url ? <img src={n.from_user.avatar_url} className="w-full h-full object-cover" /> :
                         <User className="w-5 h-5 text-gray-400" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
+                    </button>
+                    <button onClick={() => { if (n.reference_id) { setActiveTab("home"); openComments(n.reference_id); } }}
+                      className="flex-1 min-w-0 text-left">
                       <p className="text-[13px] text-gray-900 dark:text-foreground">
-                        <span className="font-bold">{n.from_user?.display_name || "কেউ"}</span>
+                        <span className="font-bold text-blue-600 dark:text-primary cursor-pointer" onClick={(e) => { e.stopPropagation(); if (n.from_user_id) navigate(`/user/${n.from_user_id}`); }}>
+                          {n.from_user?.display_name || "কেউ"}
+                        </span>
                         {n.type === "mention" && " আপনাকে মেন্টশন করেছে"}
                         {n.type === "like" && " আপনার পোস্টে লাইক দিয়েছে"}
                         {n.type === "comment" && " আপনার পোস্টে মন্তব্য করেছে"}
                       </p>
                       {n.content && <p className="text-[12px] text-gray-500 dark:text-muted-foreground truncate mt-0.5">"{n.content}"</p>}
                       <p className="text-[11px] text-gray-400 dark:text-muted-foreground mt-0.5">{timeAgo(n.created_at)}</p>
-                    </div>
-                    {!n.is_read && <div className="w-3 h-3 rounded-full bg-blue-600 shrink-0" />}
-                  </button>
+                    </button>
+                    {!n.is_read && <div className="w-3 h-3 rounded-full bg-red-600 shrink-0" />}
+                  </div>
                 ))}
               </div>
             )}
