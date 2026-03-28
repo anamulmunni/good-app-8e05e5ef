@@ -47,14 +47,44 @@ export type ExternalReelVideo = {
   title: string;
   video_url: string;
   watch_url?: string;
-  source: "dailymotion";
+  source: "dailymotion" | "good-app";
   creator?: string | null;
   thumbnail_url?: string | null;
   video_id?: string;
   duration?: number;
   category?: string;
   country?: string | null;
+  created_at?: string | null;
 };
+
+export const LONG_VIDEO_MARKER = "__GOODAPP_LONG__::";
+
+function parseLongVideoMeta(content?: string | null): { title: string; duration?: number } | null {
+  if (!content || !content.startsWith(LONG_VIDEO_MARKER)) return null;
+  const raw = content.slice(LONG_VIDEO_MARKER.length);
+  const [durationRaw, ...titleParts] = raw.split("::");
+  const duration = Number(durationRaw);
+  const title = titleParts.join("::").trim() || "Long video";
+  return {
+    title,
+    duration: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+  };
+}
+
+function buildLongVideoContent(title: string, duration?: number): string {
+  const safeTitle = (title || "Long video").trim();
+  const safeDuration = Number.isFinite(duration) ? Math.max(0, Math.floor(duration as number)) : 0;
+  return `${LONG_VIDEO_MARKER}${safeDuration}::${safeTitle}`;
+}
+
+export function isLongVideoPostContent(content?: string | null): boolean {
+  return !!content && content.startsWith(LONG_VIDEO_MARKER);
+}
+
+function isMusicIntent(searchQuery?: string): boolean {
+  const q = (searchQuery || "").toLowerCase();
+  return /(song|music|audio|lyrics|gan|gaan|গান|nazrul|rabindra|hindi song|bangla song)/.test(q);
+}
 
 export const REACTION_EMOJIS: Record<string, string> = {
   like: "👍",
@@ -75,7 +105,7 @@ function detectExternalCategory(title: string): string {
   return "tiktok";
 }
 
-function scoreFallbackVideo(title: string, queryWords: string[]): number {
+function scoreFallbackVideo(title: string, queryWords: string[], searchQuery?: string): number {
   const lower = title.toLowerCase();
   let score = 0;
   for (const word of queryWords) {
@@ -83,6 +113,12 @@ function scoreFallbackVideo(title: string, queryWords: string[]): number {
   }
   if (queryWords.length >= 2 && queryWords.every((w) => lower.includes(w))) score += 4;
   if (lower.includes("full") || lower.includes("official") || lower.includes("live")) score += 1;
+
+  if (isMusicIntent(searchQuery)) {
+    if (/(song|music|audio|lyrics|official music video|গান)/.test(lower)) score += 8;
+    if (/(natok|drama|movie|serial|episode|cartoon)/.test(lower)) score -= 10;
+  }
+
   return score;
 }
 
@@ -104,7 +140,17 @@ function buildSearchVariants(searchQuery?: string): string[] {
     ];
   }
 
-  // Only add closely related variants — don't pollute with unrelated categories
+  if (isMusicIntent(q)) {
+    return [
+      q,
+      `${q} song`,
+      `${q} official song`,
+      `${q} music video`,
+      `${q} lyrics`,
+      `${q} audio`,
+    ];
+  }
+
   return [
     q,
     `${q} official`,
@@ -172,7 +218,7 @@ async function fetchDailymotionFallback(
       seen.add(v.id);
 
       const title = String(v?.title || "বাংলা ভিডিও");
-      const score = scoreFallbackVideo(title, queryWords)
+      const score = scoreFallbackVideo(title, queryWords, searchQuery)
         + (duration >= 600 ? 3 : 0)
         + (duration >= 300 ? 2 : 0)
         + (duration >= 60 ? 1 : 0);
@@ -198,6 +244,64 @@ async function fetchDailymotionFallback(
     .map(({ _score, ...rest }: any) => rest);
 
   return { videos: filtered, hasMore: list.length > 0 };
+}
+
+export async function createLongVideoUpload(userId: number, videoUrl: string, title: string, duration?: number): Promise<Post> {
+  const { data, error } = await (supabase.from("posts").insert({
+    user_id: userId,
+    content: buildLongVideoContent(title, duration),
+    video_url: videoUrl,
+  } as any).select().single() as any);
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getUploadedLongVideos(
+  page = 1,
+  rows = 10,
+  searchQuery?: string,
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
+  const from = Math.max(0, (page - 1) * rows);
+  const to = from + rows - 1;
+
+  let query = (supabase.from("posts").select("id,user_id,video_url,content,created_at", { count: "exact" }) as any)
+    .not("video_url", "is", null)
+    .like("content", `${LONG_VIDEO_MARKER}%`)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (searchQuery?.trim()) {
+    query = query.ilike("content", `%${searchQuery.trim()}%`);
+  }
+
+  const { data: posts, count } = await query;
+  if (!posts || posts.length === 0) return { videos: [], hasMore: false };
+
+  const userIds = [...new Set(posts.map((p: any) => p.user_id))];
+  const { data: users } = await (supabase.from("users").select("id, display_name") as any).in("id", userIds);
+  const userMap: Record<number, string> = {};
+  (users || []).forEach((u: any) => { userMap[u.id] = u.display_name || "Unknown"; });
+
+  const videos: ExternalReelVideo[] = posts.map((p: any) => {
+    const parsed = parseLongVideoMeta(p.content);
+    return {
+      id: `local-${p.id}`,
+      title: parsed?.title || "Long video",
+      source: "good-app",
+      video_url: p.video_url,
+      creator: userMap[p.user_id] || "Unknown",
+      duration: parsed?.duration,
+      created_at: p.created_at,
+      category: "music",
+      country: "BD",
+    };
+  });
+
+  return {
+    videos,
+    hasMore: typeof count === "number" ? from + videos.length < count : videos.length === rows,
+  };
 }
 
 export async function getBangladeshExternalVideos(
@@ -291,7 +395,9 @@ export async function getFeedPosts(limit = 30, searchQuery?: string): Promise<Po
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
-  let result = posts.map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
+  let result = posts
+    .filter((p: any) => !isLongVideoPostContent(p.content))
+    .map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
 
   // Client-side search filter
   if (searchQuery && searchQuery.trim()) {

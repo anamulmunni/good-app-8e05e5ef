@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { getBangladeshExternalVideos, type ExternalReelVideo, markReelsSeen } from "@/lib/feed-api";
+import {
+  createLongVideoUpload,
+  getBangladeshExternalVideos,
+  getUploadedLongVideos,
+  type ExternalReelVideo,
+  markReelsSeen,
+  uploadPostMedia,
+} from "@/lib/feed-api";
 
 type VideoItem = {
   id: string;
@@ -75,11 +82,18 @@ export default function Reels() {
   const [extVideos, setExtVideos] = useState<ExternalReelVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [viewCounts] = useState<Record<string, string>>({});
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [longTitle, setLongTitle] = useState("");
+  const [longVideoFile, setLongVideoFile] = useState<File | null>(null);
+  const [longVideoPreview, setLongVideoPreview] = useState<string | null>(null);
+  const [longVideoDuration, setLongVideoDuration] = useState<number | undefined>(undefined);
 
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -102,13 +116,17 @@ export default function Reels() {
     setLoading(true);
     const p = reset ? 1 : page;
     try {
-      const result = await getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long");
+      const [externalResult, localResult] = await Promise.all([
+        getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long"),
+        getUploadedLongVideos(p, 12, activeQuery || undefined),
+      ]);
+      const merged = [...localResult.videos, ...externalResult.videos];
       setExtVideos((prev) => {
         const base = reset ? [] : prev;
         const seen = new Set(base.map((v) => v.id));
-        return [...base, ...result.videos.filter((v) => !seen.has(v.id))];
+        return [...base, ...merged.filter((v) => !seen.has(v.id))];
       });
-      setHasMore(result.hasMore && result.videos.length > 0);
+      setHasMore(localResult.hasMore || externalResult.hasMore);
       setPage(p + 1);
     } finally {
       loadingRef.current = false;
@@ -126,9 +144,13 @@ export default function Reels() {
       loadingRef.current = true;
       setLoading(true);
       try {
-        const result = await getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long");
-        setExtVideos(result.videos);
-        setHasMore(result.hasMore && result.videos.length > 0);
+        const [externalResult, localResult] = await Promise.all([
+          getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long"),
+          getUploadedLongVideos(1, 10, activeQuery || undefined),
+        ]);
+        const merged = [...localResult.videos, ...externalResult.videos];
+        setExtVideos(merged);
+        setHasMore(localResult.hasMore || externalResult.hasMore);
         setPage(2);
       } finally {
         loadingRef.current = false;
@@ -159,9 +181,50 @@ export default function Reels() {
       thumbnail_url: v.thumbnail_url,
       creator: v.creator || "",
       duration: v.duration,
-      isExternal: true,
+      isExternal: v.source !== "good-app",
     }));
   }, [extVideos]);
+
+  const handleLongVideoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+    video.preload = "metadata";
+    video.src = objectUrl;
+    video.onloadedmetadata = () => {
+      const duration = Math.floor(video.duration || 0);
+      if (duration <= 120) {
+        URL.revokeObjectURL(objectUrl);
+        alert("২ মিনিটের কম ভিডিও Short হিসেবে নিউজ ফিডে দিন। এখানে Long (২ মিনিট+) ভিডিও দিন।");
+        return;
+      }
+      setLongVideoFile(file);
+      setLongVideoPreview(objectUrl);
+      setLongVideoDuration(duration);
+      if (!longTitle.trim()) {
+        setLongTitle(file.name.replace(/\.[^/.]+$/, ""));
+      }
+    };
+  }, [longTitle]);
+
+  const submitLongVideo = useCallback(async () => {
+    if (!user || !longVideoFile) return;
+    try {
+      setUploading(true);
+      const videoUrl = await uploadPostMedia(longVideoFile, longVideoFile.name);
+      await createLongVideoUpload(user.id, videoUrl, longTitle.trim() || longVideoFile.name, longVideoDuration);
+      setShowUpload(false);
+      setLongVideoFile(null);
+      setLongVideoPreview(null);
+      setLongTitle("");
+      setLongVideoDuration(undefined);
+      await loadMore(true);
+    } finally {
+      setUploading(false);
+    }
+  }, [loadMore, longTitle, longVideoDuration, longVideoFile, user]);
 
   useEffect(() => {
     if (allVideos.length === 0) {
@@ -378,6 +441,9 @@ export default function Reels() {
                   <p className="text-[12px] mt-0.5 line-clamp-1" style={{ color: "#aaa" }}>
                     {video.creator || "Unknown"} • {getViewCount(video.id)}{video.duration ? ` • ${fmt(video.duration)}` : ""}
                   </p>
+                  {!video.isExternal && (
+                    <p className="text-[11px] mt-0.5 text-primary">good-app long upload</p>
+                  )}
                 </div>
               </div>
             </button>
@@ -391,12 +457,63 @@ export default function Reels() {
 
       {/* ─── Floating Create/Upload Button (YouTube-style) ─── */}
       <button
-        onClick={() => navigate("/feed")}
+        onClick={() => setShowUpload(true)}
         className="fixed bottom-6 right-4 z-30 w-14 h-14 rounded-full shadow-lg grid place-items-center"
         style={{ background: "#ff0000" }}
       >
         <Plus className="w-7 h-7" style={{ color: "#fff" }} />
       </button>
+
+      {showUpload && (
+        <div className="fixed inset-0 z-40 bg-background/95 flex items-end sm:items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card text-card-foreground p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Upload Long Video</h3>
+              <button onClick={() => setShowUpload(false)} className="h-8 w-8 grid place-items-center rounded-full hover:bg-muted">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <input
+              value={longTitle}
+              onChange={(e) => setLongTitle(e.target.value)}
+              placeholder="ভিডিও টাইটেল"
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm outline-none"
+            />
+
+            {longVideoPreview ? (
+              <video src={longVideoPreview} controls className="w-full rounded-md max-h-56" />
+            ) : (
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                className="w-full h-28 border border-dashed border-border rounded-md grid place-items-center text-muted-foreground"
+              >
+                <div className="flex flex-col items-center gap-2 text-sm">
+                  <Video className="w-5 h-5" />
+                  <span>Long ভিডিও সিলেক্ট করুন (2 মিনিট+)</span>
+                </div>
+              </button>
+            )}
+
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={handleLongVideoSelect}
+            />
+
+            <button
+              onClick={submitLongVideo}
+              disabled={!longVideoFile || uploading}
+              className="w-full h-10 rounded-md bg-primary text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              Upload to good-app Video
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
