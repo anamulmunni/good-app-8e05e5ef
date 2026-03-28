@@ -48,6 +48,9 @@ const CAT_LABEL: Record<string, string> = {
   movie: "🎬 মুভি", song: "🎶 গান", shortfilm: "🎥 শর্ট ফিল্ম",
 };
 
+const CACHE_KEY_PREFIX = "reels_ext_cache_v1";
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
 export default function Reels() {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -71,6 +74,7 @@ export default function Reels() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
+  const [iframeReady, setIframeReady] = useState<Record<string, boolean>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
@@ -78,6 +82,7 @@ export default function Reels() {
   const lastTapRef = useRef<Record<string, number>>({});
   const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const touchStartY = useRef(0);
+  const extLoadingRef = useRef(false);
 
   useEffect(() => { if (!isLoading && !user) navigate("/"); }, [user, isLoading, navigate]);
   useEffect(() => { if (user) markReelsSeen(user.id); }, [user]);
@@ -97,33 +102,58 @@ export default function Reels() {
     enabled: !!user,
   });
 
+  const loadMoreExternal = useCallback(async () => {
+    if (extLoadingRef.current) return;
+    extLoadingRef.current = true;
+    setExtLoading(true);
+
+    const preferred = getPreferredCategories();
+    const cacheKey = `${CACHE_KEY_PREFIX}:${activeSearch || "all"}:${preferred.join("|") || "none"}:${extPage}`;
+
+    try {
+      const cachedRaw = localStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw) as { ts: number; result: { videos: ExternalReelVideo[]; hasMore: boolean } };
+        if (Date.now() - cached.ts < CACHE_TTL_MS) {
+          setExtVideos((prev) => {
+            const ids = new Set(prev.map((v) => v.id));
+            return [...prev, ...cached.result.videos.filter((v) => !ids.has(v.id))];
+          });
+          setExtHasMore(cached.result.hasMore);
+          setExtPage((p) => p + 1);
+          extLoadingRef.current = false;
+          setExtLoading(false);
+          return;
+        }
+      }
+
+      const result = await getBangladeshExternalVideos(extPage, 10, preferred, activeSearch || undefined);
+      setExtVideos((prev) => {
+        const ids = new Set(prev.map((v) => v.id));
+        return [...prev, ...result.videos.filter((v) => !ids.has(v.id))];
+      });
+      setExtHasMore(result.hasMore);
+      setExtPage((p) => p + 1);
+
+      localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), result: { videos: result.videos, hasMore: result.hasMore } }));
+    } catch {}
+
+    extLoadingRef.current = false;
+    setExtLoading(false);
+  }, [extPage, activeSearch]);
+
   useEffect(() => {
     if (!user || initialLoaded) return;
     setInitialLoaded(true);
     loadMoreExternal();
-  }, [user, initialLoaded]);
-
-  const loadMoreExternal = useCallback(async () => {
-    if (extLoading) return;
-    setExtLoading(true);
-    try {
-      const preferred = getPreferredCategories();
-      const result = await getBangladeshExternalVideos(extPage, 12, preferred, activeSearch || undefined);
-      setExtVideos(prev => {
-        const ids = new Set(prev.map(v => v.id));
-        return [...prev, ...result.videos.filter(v => !ids.has(v.id))];
-      });
-      setExtHasMore(result.hasMore);
-      setExtPage(p => p + 1);
-    } catch {}
-    setExtLoading(false);
-  }, [extPage, extLoading, activeSearch]);
+  }, [user, initialLoaded, loadMoreExternal]);
 
   // Reset and search when user submits search
   const handleSearch = useCallback(() => {
     const q = searchInput.trim();
     setActiveSearch(q);
     setExtVideos([]);
+    setIframeReady({});
     setExtPage(1);
     setExtHasMore(true);
     setCurrentIndex(0);
@@ -134,10 +164,10 @@ export default function Reels() {
   // Load when search changes
   useEffect(() => {
     if (!user || !initialLoaded) return;
-    if (extVideos.length === 0 && extHasMore && !extLoading) {
+    if (extVideos.length === 0 && extHasMore && !extLoadingRef.current) {
       loadMoreExternal();
     }
-  }, [activeSearch, extVideos.length, extHasMore, extLoading, user, initialLoaded]);
+  }, [activeSearch, extVideos.length, extHasMore, user, initialLoaded, loadMoreExternal]);
 
   const allReels = useMemo<ReelItem[]>(() => {
     const ur: ReelItem[] = activeSearch ? [] : reels.map(r => ({
@@ -194,17 +224,25 @@ export default function Reels() {
     }
   }, []);
 
-  // Scroll snap observer
+  // Stable scroll snap observer (prevents random index jumping/auto-scroll feeling)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) setCurrentIndex(parseInt(e.target.getAttribute("data-index") || "0"));
-      });
-    }, { root: container, threshold: 0.6 });
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+      if (!visible) return;
+
+      const nextIndex = parseInt(visible.target.getAttribute("data-index") || "0");
+      setCurrentIndex((prev) => (prev === nextIndex ? prev : nextIndex));
+    }, { root: container, threshold: [0.55, 0.75] });
+
     const items = container.querySelectorAll("[data-index]");
-    items.forEach(item => observer.observe(item));
+    items.forEach((item) => observer.observe(item));
+
     return () => observer.disconnect();
   }, [allReels.length]);
 
