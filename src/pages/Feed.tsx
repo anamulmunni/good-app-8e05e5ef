@@ -838,8 +838,8 @@ export default function Feed() {
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                   <button onClick={() => storyInputRef.current?.click()}
                     className="relative min-w-[110px] h-[170px] rounded-xl overflow-hidden bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border flex flex-col shrink-0">
-                    <div className="flex-1 bg-gray-200 dark:bg-secondary flex items-center justify-center">
-                      {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : <User className="w-8 h-8 text-gray-400" />}
+                    <div className="flex-1 bg-gradient-to-b from-blue-100 to-gray-100 dark:from-secondary dark:to-card flex items-center justify-center">
+                      <Image className="w-8 h-8 text-blue-400" />
                     </div>
                     <div className="relative flex items-center justify-center py-4">
                       <div className="absolute -top-4 w-8 h-8 rounded-full bg-blue-600 border-[3px] border-white dark:border-card flex items-center justify-center">
