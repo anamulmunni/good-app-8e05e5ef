@@ -153,11 +153,38 @@ export default function Chat() {
       if (!activeConversation || !user) throw new Error("No conversation");
       return sendMessage(activeConversation.id, user.id, content, type, mediaUrl);
     },
-    onMutate: async () => {
-      queryClient.invalidateQueries({ queryKey: ["messages", activeConversation?.id] });
+    onMutate: async ({ type, content, mediaUrl }) => {
+      if (!activeConversation || !user) return null;
+      const tempId = `temp-msg-${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        conversation_id: activeConversation.id,
+        sender_id: user.id,
+        content: content || null,
+        message_type: type,
+        media_url: mediaUrl || null,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData(["messages", activeConversation.id], (old: Message[] = []) => [
+        ...old,
+        optimisticMessage,
+      ]);
+
+      return { tempId, conversationId: activeConversation.id };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["messages", activeConversation?.id] });
+    onError: (_err, _vars, ctx) => {
+      if (!ctx) return;
+      queryClient.setQueryData(["messages", ctx.conversationId], (old: Message[] = []) =>
+        old.filter((m) => m.id !== ctx.tempId)
+      );
+    },
+    onSuccess: (saved, _vars, ctx) => {
+      if (!ctx) return;
+      queryClient.setQueryData(["messages", ctx.conversationId], (old: Message[] = []) =>
+        old.map((m) => (m.id === ctx.tempId ? saved : m))
+      );
       queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
     },
   });

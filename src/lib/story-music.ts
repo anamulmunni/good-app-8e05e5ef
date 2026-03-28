@@ -78,7 +78,15 @@ export function resolveStoryMusic(storedValue: string | null | undefined): {
 
     const trackId = idPart.replace("track:", "").trim();
     const track = STORY_MUSIC_LIBRARY.find((m) => m.id === trackId) || null;
-    const decodedUrl = urlPart ? decodeURIComponent(urlPart.replace("url:", "")) : null;
+
+    let decodedUrl: string | null = null;
+    if (urlPart) {
+      try {
+        decodedUrl = decodeURIComponent(urlPart.replace("url:", ""));
+      } catch {
+        decodedUrl = null;
+      }
+    }
 
     return {
       track,
