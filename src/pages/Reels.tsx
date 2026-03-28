@@ -101,7 +101,7 @@ export default function Reels() {
     if (!user || initialLoaded) return;
     setInitialLoaded(true);
     loadMoreExternal();
-  }, [user, initialLoaded]);
+  }, [user, initialLoaded, loadMoreExternal]);
 
   const loadMoreExternal = useCallback(async () => {
     if (extLoading) return;
@@ -137,7 +137,7 @@ export default function Reels() {
     if (extVideos.length === 0 && extHasMore && !extLoading) {
       loadMoreExternal();
     }
-  }, [activeSearch, extVideos.length, extHasMore, extLoading, user, initialLoaded]);
+  }, [activeSearch, extVideos.length, extHasMore, extLoading, user, initialLoaded, loadMoreExternal]);
 
   const allReels = useMemo<ReelItem[]>(() => {
     const ur: ReelItem[] = activeSearch ? [] : reels.map(r => ({
