@@ -83,7 +83,7 @@ export default function Reels() {
     setLoading(true);
     const p = reset ? 1 : page;
     try {
-      const result = await getBangladeshExternalVideos(p, 20, undefined, activeQuery || undefined, "long");
+      const result = await getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long");
       setExtVideos((prev) => {
         const base = reset ? [] : prev;
         const seen = new Set(base.map((v) => v.id));
@@ -108,8 +108,9 @@ export default function Reels() {
       setLoading(true);
       try {
         const result = await getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long");
-        setExtVideos(result.videos);
-        setHasMore(result.hasMore && result.videos.length > 0);
+        const adjusted = result.videos;
+        setExtVideos(adjusted);
+        setHasMore(result.hasMore && adjusted.length > 0);
         setPage(2);
       } finally {
         loadingRef.current = false;
@@ -126,7 +127,7 @@ export default function Reels() {
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingRef.current) loadMore();
       },
-      { threshold: 0.1 },
+      { threshold: 0, rootMargin: "800px 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -143,6 +144,17 @@ export default function Reels() {
       isExternal: true,
     }));
   }, [extVideos]);
+
+  useEffect(() => {
+    if (allVideos.length === 0) {
+      setSelectedVideo(null);
+      return;
+    }
+    setSelectedVideo((prev) => {
+      if (prev && allVideos.some((v) => v.id === prev.id)) return prev;
+      return allVideos[0];
+    });
+  }, [allVideos]);
 
   const handleSearch = useCallback(() => {
     const q = searchInput.trim();
@@ -250,7 +262,7 @@ export default function Reels() {
 
           {allVideos.map((video) => (
             <button key={video.id} onClick={() => playVideo(video)} className="w-full text-left">
-              <div className="w-full aspect-video rounded-xl overflow-hidden bg-secondary relative">
+              <div className={`w-full aspect-video rounded-xl overflow-hidden bg-secondary relative border ${selectedVideo?.id === video.id ? "border-primary" : "border-border"}`}>
                 {video.thumbnail_url ? (
                   <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
                 ) : (
@@ -282,6 +294,15 @@ export default function Reels() {
           <div ref={sentinelRef} className="h-12 flex items-center justify-center">
             {loading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
           </div>
+
+          {hasMore && !loading && (
+            <button
+              onClick={() => loadMore(false)}
+              className="w-full h-10 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm font-semibold"
+            >
+              আরও ভিডিও দেখুন
+            </button>
+          )}
         </div>
       </main>
     </div>
