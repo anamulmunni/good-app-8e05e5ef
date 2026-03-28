@@ -307,7 +307,7 @@ export default function Reels() {
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => navigate(-1)} className="h-10 w-10 shrink-0 grid place-items-center">
+              <button onClick={() => { if (selectedVideo) { setSelectedVideo(null); } else { navigate("/feed"); } }} className="h-10 w-10 shrink-0 grid place-items-center">
                 <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
               <div className="flex items-center gap-1.5">
@@ -354,10 +354,10 @@ export default function Reels() {
       </header>
 
       {/* ─── Main Content ─── */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto flex flex-col">
         {/* Player */}
         {selectedVideo && (
-          <div ref={playerRef}>
+          <div ref={playerRef} className="shrink-0 sticky top-0 z-10" style={{ background: "#0f0f0f" }}>
             <div className="w-full aspect-video" style={{ background: "#000" }}>
               {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
                 <iframe
@@ -397,7 +397,7 @@ export default function Reels() {
         )}
 
         {/* Video List */}
-        <div className={`pb-20 ${selectedVideo ? "" : ""}`}>
+        <div className="pb-20 flex-1">
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
               {activeQuery ? `No results for "${activeQuery}"` : "Loading videos..."}
