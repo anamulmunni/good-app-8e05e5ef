@@ -12,6 +12,7 @@ import AdminPanel from "./pages/AdminPanel";
 import AddKeys from "./pages/AddKeys";
 import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
+import Reels from "./pages/Reels";
 import UserProfile from "./pages/UserProfile";
 import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
@@ -47,6 +48,7 @@ function AppInner() {
         <Route path="/add-keys" element={<AddKeys />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/feed" element={<Feed />} />
+        <Route path="/reels" element={<Reels />} />
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/call/:userId" element={<CallPage />} />
         <Route path="/install" element={<Install />} />

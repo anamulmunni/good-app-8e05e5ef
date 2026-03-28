@@ -14,7 +14,7 @@ import { getOrCreateConversation, getUnreadCount } from "@/lib/chat-api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import {
   Heart, MessageCircle, Send, Image, X, ArrowLeft,
-  Plus, User, Search, Phone, Share2, Loader2, MoreVertical, Trash2, ZoomIn
+  Plus, User, Search, Phone, Share2, Loader2, MoreVertical, Trash2, ZoomIn, Play
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -337,6 +337,10 @@ export default function Feed() {
             </h1>
           </div>
           <div className="flex items-center gap-1">
+            {/* Reels button */}
+            <button onClick={() => navigate("/reels")} className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors">
+              <Play size={20} />
+            </button>
             <button onClick={() => setShowSearch(!showSearch)} className={`p-2 rounded-full transition-colors ${showSearch ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
               <Search size={20} />
             </button>
