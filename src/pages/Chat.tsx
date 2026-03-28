@@ -536,16 +536,10 @@ export default function Chat() {
             ) : (
               <>
                 <button
-                  onTouchStart={handleHoldToRecordStart}
-                  onTouchEnd={handleHoldToRecordEnd}
-                  onTouchCancel={() => handleHoldToRecordCancel()}
-                  onMouseDown={handleHoldToRecordStart}
-                  onMouseUp={handleHoldToRecordEnd}
-                  onMouseLeave={() => { if (isRecording) handleHoldToRecordCancel(); }}
-                  onContextMenu={(e) => e.preventDefault()}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors select-none ${isRecording ? "bg-destructive text-destructive-foreground" : "text-blue-600 hover:bg-blue-50"}`}
+                  onClick={handleMicToggle}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors select-none ${isRecording ? "bg-destructive text-destructive-foreground animate-pulse" : "text-blue-600 hover:bg-blue-50"}`}
                 >
-                  <Mic size={22} />
+                  {isRecording ? <MicOff size={22} /> : <Mic size={22} />}
                 </button>
                 {!isRecording && (
                   <button onClick={() => sendMutation.mutate({ type: "text", content: "❤️" })}
