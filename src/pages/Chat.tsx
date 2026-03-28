@@ -172,6 +172,12 @@ export default function Chat() {
     onMutate: async ({ type, content, mediaUrl }) => {
       if (!activeConversation || !user) return null;
       const tempId = `temp-msg-${Date.now()}`;
+      const optimisticTime = new Date().toISOString();
+      const optimisticPreview = type === "text"
+        ? (content || "")
+        : type === "image"
+          ? "📷 ছবি"
+          : "🎤 ভয়েস";
       const optimisticMessage: Message = {
         id: tempId,
         conversation_id: activeConversation.id,
@@ -180,13 +186,28 @@ export default function Chat() {
         message_type: type,
         media_url: mediaUrl || null,
         is_read: false,
-        created_at: new Date().toISOString(),
+        created_at: optimisticTime,
       };
 
       queryClient.setQueryData(["messages", activeConversation.id], (old: Message[] = []) => [
         ...old,
         optimisticMessage,
       ]);
+
+      queryClient.setQueryData(["conversations", user.id], (old: Conversation[] = []) => {
+        const updatedCurrent: Conversation = {
+          ...activeConversation,
+          last_message: optimisticPreview || activeConversation.last_message,
+          last_message_at: optimisticTime,
+        };
+
+        const rest = old.filter((c) => c.id !== activeConversation.id);
+        return [updatedCurrent, ...rest].sort((a, b) => {
+          const ta = new Date(a.last_message_at || a.created_at || 0).getTime();
+          const tb = new Date(b.last_message_at || b.created_at || 0).getTime();
+          return tb - ta;
+        });
+      });
 
       return { tempId, conversationId: activeConversation.id };
     },
@@ -275,6 +296,17 @@ export default function Chat() {
     });
   };
 
+  const lastSeenAgo = (onlineAt: string | null) => {
+    if (!onlineAt) return "কিছুক্ষণ আগে";
+    const diffMs = Date.now() - new Date(onlineAt).getTime();
+    const mins = Math.max(1, Math.floor(diffMs / 60000));
+    if (mins < 60) return `${mins} মিনিট আগে`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} ঘন্টা আগে`;
+    const days = Math.floor(hrs / 24);
+    return `${days} দিন আগে`;
+  };
+
   const timeAgo = (dateStr: string | null) => {
     if (!dateStr) return "";
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -311,7 +343,7 @@ export default function Chat() {
           </button>
           <button onClick={() => navigate(`/user/${otherUser.id}`)} className="flex-1 text-left min-w-0">
             <p className="font-bold text-[15px] text-gray-900 dark:text-foreground truncate">{otherUser.display_name || "User"}</p>
-            <p className="text-[11px] text-gray-500 dark:text-muted-foreground">{otherOnline ? "Active now" : timeAgo(otherUser.online_at)}</p>
+            <p className="text-[11px] text-gray-500 dark:text-muted-foreground">{otherOnline ? "Active now" : `Last seen ${lastSeenAgo(otherUser.online_at)}`}</p>
           </button>
           <button onClick={() => navigate(`/call/${otherUser.id}`)}
             className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 dark:text-primary hover:bg-blue-50 dark:hover:bg-primary/10">
@@ -355,7 +387,7 @@ export default function Chat() {
                         ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md"
                         : "bg-white dark:bg-card text-gray-900 dark:text-foreground rounded-bl-md shadow-sm"
                     }`}>
-                      <p className="text-[14px] whitespace-pre-wrap break-words">{msg.content}</p>
+                      <p className="text-[16px] leading-6 whitespace-pre-wrap break-words">{msg.content}</p>
                     </div>
                   )}
                   {msg.message_type === "image" && msg.media_url && (
@@ -605,7 +637,7 @@ export default function Chat() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <p className={`text-[13px] truncate flex-1 ${hasUnread ? "font-bold text-gray-900 dark:text-foreground" : "text-gray-500 dark:text-muted-foreground"}`}>{convo.last_message || "কথা শুরু করুন"}</p>
+                  <p className={`text-[15px] truncate flex-1 ${hasUnread ? "font-bold text-gray-900 dark:text-foreground" : "text-gray-500 dark:text-muted-foreground"}`}>{convo.last_message || "কথা শুরু করুন"}</p>
                   {hasUnread && (
                     <span className="min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shrink-0">
                       {unreadCount > 99 ? "99+" : unreadCount}
