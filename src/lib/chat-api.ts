@@ -54,7 +54,14 @@ export async function getUserConversations(userId: number): Promise<Conversation
     .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
     .order("last_message_at", { ascending: false });
 
-  return data || [];
+  // Client-side sort to guarantee recency order
+  const results = data || [];
+  results.sort((a: any, b: any) => {
+    const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+    const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+    return tb - ta;
+  });
+  return results;
 }
 
 // Get messages for a conversation
