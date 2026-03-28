@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 const CALL_REMOTE_AUDIO_CLASS = "call-remote-audio";
+let activeRingtoneStop: (() => void) | null = null;
 
 export type CallSignal = {
   id: string;
@@ -33,6 +34,11 @@ export async function cleanupCallSignals(userId1: number, userId2: number) {
 
 // Ringtone using Web Audio API - with proper AudioContext resume for PWA/standalone
 export function playRingtone(): { stop: () => void } {
+  if (activeRingtoneStop) {
+    activeRingtoneStop();
+    activeRingtoneStop = null;
+  }
+
   let stopped = false;
   let loopTimer: number | null = null;
   let toneTimer1: number | null = null;
@@ -89,8 +95,7 @@ export function playRingtone(): { stop: () => void } {
     // no-op
   });
 
-  return {
-    stop: () => {
+  const stop = () => {
       stopped = true;
       if (loopTimer) {
         clearInterval(loopTimer);
@@ -108,8 +113,15 @@ export function playRingtone(): { stop: () => void } {
         audioCtx.close().catch(() => {});
       }
       audioCtx = null;
-    },
-  };
+
+      if (activeRingtoneStop === stop) {
+        activeRingtoneStop = null;
+      }
+    };
+
+  activeRingtoneStop = stop;
+
+  return { stop };
 }
 
 // Attach remote audio stream to a real <audio> element for reliable playback (especially PWA)
