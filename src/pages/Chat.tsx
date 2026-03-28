@@ -50,14 +50,14 @@ export default function Chat() {
     queryKey: ["conversations", user?.id],
     queryFn: () => getUserConversations(user!.id),
     enabled: !!user,
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", activeConversation?.id],
     queryFn: () => getMessages(activeConversation!.id, 200),
     enabled: !!activeConversation,
-    refetchInterval: 3000,
+    refetchInterval: 1200,
   });
 
   const { data: searchResults = [] } = useQuery({

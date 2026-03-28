@@ -213,7 +213,9 @@ export default function Feed() {
       });
       setShowReactionPicker(null);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["feed-posts"] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["feed-posts", searchQuery] });
+    },
   });
 
   const commentMutation = useMutation({
