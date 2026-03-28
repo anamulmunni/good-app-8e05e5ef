@@ -220,22 +220,25 @@ export default function Feed() {
   });
 
   const commentMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ text }: { text: string }) => {
       if (!user || !commentingPostId) throw new Error("Error");
-      return addComment(commentingPostId, user.id, commentText.trim());
+      return addComment(commentingPostId, user.id, text);
     },
-    onMutate: async () => {
+    onMutate: async ({ text }) => {
       if (!user || !commentingPostId) return;
       setComments(prev => [...prev, {
         id: `temp-${Date.now()}`, post_id: commentingPostId, user_id: user.id,
-        content: commentText.trim(), created_at: new Date().toISOString(),
+        content: text, created_at: new Date().toISOString(),
         user: { display_name: user.display_name, avatar_url: user.avatar_url, guest_id: user.guest_id },
       }]);
       setCommentText("");
     },
-    onSuccess: () => {
+    onSuccess: (_data, _vars) => {
       if (commentingPostId) loadComments(commentingPostId);
       queryClient.invalidateQueries({ queryKey: ["feed-posts", searchQuery] });
+    },
+    onError: () => {
+      if (commentingPostId) loadComments(commentingPostId);
     },
   });
 
@@ -665,10 +668,10 @@ export default function Feed() {
                     )}
                   <div className="flex items-center gap-2">
                     <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && commentText.trim() && commentMutation.mutate()}
+                      onKeyDown={(e) => e.key === "Enter" && commentText.trim() && commentMutation.mutate({ text: commentText.trim() })}
                       placeholder="মন্তব্য লিখুন..."
                       className="flex-1 bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-full px-4 py-2 text-sm border-none outline-none placeholder:text-gray-400 dark:placeholder:text-muted-foreground" />
-                    <button onClick={() => commentText.trim() && commentMutation.mutate()}
+                    <button onClick={() => commentText.trim() && commentMutation.mutate({ text: commentText.trim() })}
                       disabled={!commentText.trim() || commentMutation.isPending}
                       className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center disabled:opacity-40">
                       <Send className="w-3.5 h-3.5 text-white" />
