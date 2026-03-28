@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import {
   toggleReaction, getUserReactions, getPostComments, addComment,
   REACTION_EMOJIS, type Post, type PostComment, markReelsSeen
