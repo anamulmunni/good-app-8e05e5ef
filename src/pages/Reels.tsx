@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import goodAppLogo from "@/assets/good-app-logo.jpg";
 import {
   createLongVideoUpload,
   getBangladeshExternalVideos,
@@ -58,6 +59,11 @@ function timeAgo(sec?: number) {
 
 function isEmbed(url: string) {
   return url.includes("/embed/");
+}
+
+function buildExternalPlayerUrl(url: string) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}autoplay=1&quality=1080&mute=0&sharing-enable=false`;
 }
 
 function viewCount() {
@@ -304,13 +310,12 @@ export default function Reels() {
               <button onClick={() => navigate(-1)} className="h-10 w-10 shrink-0 grid place-items-center">
                 <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
-              {/* YouTube-style red logo */}
-              <div className="flex items-center gap-1.5">
-                <div className="w-7 h-5 rounded-[4px] grid place-items-center" style={{ background: "#ff0000" }}>
-                  <Play className="w-3.5 h-3.5 fill-white" style={{ color: "#fff" }} />
-                </div>
-                <span className="font-bold text-[18px] tracking-tight" style={{ color: "#fff" }}>good-app</span>
-              </div>
+              <img
+                src={goodAppLogo}
+                alt="good-app logo"
+                className="h-7 w-auto object-contain rounded-sm"
+                loading="lazy"
+              />
             </div>
             <div className="flex items-center gap-1">
               <button className="h-10 w-10 grid place-items-center rounded-full">
@@ -354,10 +359,10 @@ export default function Reels() {
               {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
                 <iframe
                   key={selectedVideo.id}
-                  src={`${selectedVideo.video_url}?autoplay=1`}
+                  src={buildExternalPlayerUrl(selectedVideo.video_url)}
                   title={selectedVideo.title}
                   className="w-full h-full"
-                  allow="autoplay; fullscreen; picture-in-picture"
+                  allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
                   allowFullScreen
                 />
               ) : (
