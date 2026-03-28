@@ -68,6 +68,8 @@ export type Settings = {
   minRequestVerified: number;
   paymentMode: string;
   minWithdraw: number;
+  withdrawLockUntil: string | null;
+  requestLockUntil: string | null;
 };
 
 // Auth / User APIs
@@ -106,7 +108,9 @@ export async function getUser(userId: number): Promise<User | null> {
 
 // Settings APIs
 export async function getPublicSettings(): Promise<Settings> {
-  const { data } = await supabase.from("settings").select("*");
+  const { data, error } = await supabase.from("settings").select("*");
+  if (error) throw error;
+
   const settings: Settings = {
     rewardRate: 40,
     buyStatus: "on",
@@ -118,24 +122,45 @@ export async function getPublicSettings(): Promise<Settings> {
     minRequestVerified: 10,
     paymentMode: "off",
     minWithdraw: 50,
+    withdrawLockUntil: null,
+    requestLockUntil: null,
   };
+
   data?.forEach((s) => {
-    if (s.key === "rewardRate") settings.rewardRate = parseInt(s.value);
+    if (s.key === "rewardRate") settings.rewardRate = parseInt(s.value) || settings.rewardRate;
     if (s.key === "buyStatus") settings.buyStatus = s.value;
     if (s.key === "bonusStatus") settings.bonusStatus = s.value;
-    if (s.key === "bonusTarget") settings.bonusTarget = parseInt(s.value);
+    if (s.key === "bonusTarget") settings.bonusTarget = parseInt(s.value) || settings.bonusTarget;
     if (s.key === "customNotice") settings.customNotice = s.value;
     if (s.key === "videoUrl") settings.videoUrl = s.value;
     if (s.key === "requestSubmitPassword") settings.requestSubmitPassword = s.value;
     if (s.key === "minRequestVerified") settings.minRequestVerified = parseInt(s.value) || 10;
     if (s.key === "paymentMode") settings.paymentMode = s.value;
     if (s.key === "minWithdraw") settings.minWithdraw = parseInt(s.value) || 50;
+    if (s.key === "withdrawLockUntil") settings.withdrawLockUntil = s.value || null;
+    if (s.key === "requestLockUntil") settings.requestLockUntil = s.value || null;
   });
+
   return settings;
 }
 
 export async function updateSetting(key: string, value: string) {
-  await supabase.from("settings").update({ value }).eq("key", key);
+  const { data: existingRows, error: existingError } = await supabase
+    .from("settings")
+    .select("id")
+    .eq("key", key)
+    .limit(1);
+
+  if (existingError) throw existingError;
+
+  if (existingRows && existingRows.length > 0) {
+    const { error } = await supabase.from("settings").update({ value }).eq("key", key);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from("settings").insert({ key, value });
+  if (error) throw error;
 }
 
 // Transactions
