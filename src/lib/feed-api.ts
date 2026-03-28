@@ -60,28 +60,37 @@ export const REACTION_EMOJIS: Record<string, string> = {
   angry: "😡",
 };
 
-const ARCHIVE_BD_QUERY = "(title:(Bangladesh OR Bangla OR Dhaka) OR description:(Bangladesh OR Bangla OR Dhaka)) AND mediatype:(movies)";
-const ARCHIVE_VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v", ".mov"];
-
-const isArchivePlayableVideo = (name?: string) => {
-  if (!name || typeof name !== "string") return false;
-  const lower = name.toLowerCase();
-  return ARCHIVE_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
-};
-
-const buildArchiveDownloadUrl = (identifier: string, fileName: string) => {
-  const encodedIdentifier = encodeURIComponent(identifier);
-  const encodedPath = fileName.split("/").map((part) => encodeURIComponent(part)).join("/");
-  return `https://archive.org/download/${encodedIdentifier}/${encodedPath}`;
-};
-
 export async function getBangladeshExternalVideos(
   page = 1,
   rows = 8,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
   try {
+    // Try edge function first (server-side proxy, no CORS issues)
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      const res = await fetch(
+        `${supabaseUrl}/functions/v1/fetch-external-videos?page=${page}&rows=${rows}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${supabaseKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          videos: Array.isArray(data.videos) ? data.videos : [],
+          hasMore: !!data.hasMore,
+        };
+      }
+    }
+
+    // Fallback: direct archive.org call
     const params = new URLSearchParams();
-    params.set("q", ARCHIVE_BD_QUERY);
+    params.set("q", "(title:(Bangladesh OR Bangla OR Dhaka) OR description:(Bangladesh OR Bangla OR Dhaka)) AND mediatype:(movies)");
     params.append("fl[]", "identifier");
     params.append("fl[]", "title");
     params.append("fl[]", "creator");
@@ -106,20 +115,23 @@ export async function getBangladeshExternalVideos(
 
         const metadataJson = await metadataRes.json();
         const files = Array.isArray(metadataJson?.files) ? metadataJson.files : [];
-        const videoFile = files.find((f: any) => isArchivePlayableVideo(f?.name));
+        const videoFile = files.find((f: any) => {
+          const name = String(f?.name || "").toLowerCase();
+          return [".mp4", ".webm", ".m4v", ".mov"].some((ext) => name.endsWith(ext));
+        });
         if (!videoFile?.name) return null;
 
         const title = String(doc?.title || metadataJson?.metadata?.title || "Bangla Video").trim();
         const creator = String(doc?.creator || metadataJson?.metadata?.creator || "").trim() || null;
-        const thumbnail = `https://archive.org/services/img/${encodeURIComponent(identifier)}`;
+        const encodedPath = videoFile.name.split("/").map((part: string) => encodeURIComponent(part)).join("/");
 
         return {
           id: `ext-${identifier}-${videoFile.name}`,
           title,
           creator,
           source: "internet_archive" as const,
-          thumbnail_url: thumbnail,
-          video_url: buildArchiveDownloadUrl(identifier, videoFile.name),
+          thumbnail_url: `https://archive.org/services/img/${encodeURIComponent(identifier)}`,
+          video_url: `https://archive.org/download/${encodeURIComponent(identifier)}/${encodedPath}`,
         };
       }),
     );
@@ -129,11 +141,9 @@ export async function getBangladeshExternalVideos(
       .map((r) => r.value)
       .filter((v): v is ExternalReelVideo => !!v);
 
-    return {
-      videos,
-      hasMore: page * rows < numFound,
-    };
-  } catch {
+    return { videos, hasMore: page * rows < numFound };
+  } catch (e) {
+    console.error("External videos error:", e);
     return { videos: [], hasMore: false };
   }
 }
