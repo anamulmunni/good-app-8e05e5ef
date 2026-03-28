@@ -75,7 +75,6 @@ export async function getFriendshipStatus(userId: number, targetId: number): Pro
 
 // Get suggested people (users who are not friends and no pending requests)
 export async function getSuggestedPeople(userId: number, limit = 6): Promise<any[]> {
-  // Get existing friend request user IDs
   const { data: existingRequests } = await (supabase.from("friend_requests").select("sender_id, receiver_id") as any)
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
 
@@ -85,7 +84,6 @@ export async function getSuggestedPeople(userId: number, limit = 6): Promise<any
     excludeIds.add(r.receiver_id);
   });
 
-  // Get random users not in exclude list
   const { data: allUsers } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, cover_url") as any)
     .neq("id", userId)
     .order("created_at", { ascending: false })
@@ -93,7 +91,33 @@ export async function getSuggestedPeople(userId: number, limit = 6): Promise<any
 
   if (!allUsers) return [];
   const filtered = allUsers.filter((u: any) => !excludeIds.has(u.id));
-  // Shuffle and take limit
   const shuffled = filtered.sort(() => Math.random() - 0.5);
   return shuffled.slice(0, limit);
+}
+
+// Get ALL users with friendship status for Friends tab
+export async function getAllUsersWithStatus(userId: number): Promise<any[]> {
+  const { data: allUsers } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, cover_url") as any)
+    .neq("id", userId)
+    .order("created_at", { ascending: false });
+
+  if (!allUsers) return [];
+
+  const { data: requests } = await (supabase.from("friend_requests").select("*") as any)
+    .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+
+  const statusMap: Record<number, { status: string; direction: string; requestId: string }> = {};
+  (requests || []).forEach((r: any) => {
+    const otherId = r.sender_id === userId ? r.receiver_id : r.sender_id;
+    statusMap[otherId] = {
+      status: r.status,
+      direction: r.sender_id === userId ? "sent" : "received",
+      requestId: r.id,
+    };
+  });
+
+  return allUsers.map((u: any) => ({
+    ...u,
+    friendship: statusMap[u.id] || null,
+  }));
 }
