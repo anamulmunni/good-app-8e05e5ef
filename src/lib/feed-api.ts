@@ -445,12 +445,16 @@ export async function getBangladeshExternalVideos(
       ? data.videos.map(normalizeExternalVideo).filter(Boolean) as ExternalReelVideo[]
       : [];
 
-    if (normalized.length === 0) {
+    const normalizedForMode = searchQuery?.trim()
+      ? normalized
+      : normalized.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
+
+    if (normalizedForMode.length === 0) {
       return direct;
     }
 
     return {
-      videos: normalized,
+      videos: normalizedForMode,
       hasMore: !!data.hasMore,
       categories: data.categories,
     };
