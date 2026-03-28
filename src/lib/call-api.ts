@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const CALL_REMOTE_AUDIO_CLASS = "call-remote-audio";
+
 export type CallSignal = {
   id: string;
   caller_id: number;
@@ -32,8 +34,46 @@ export async function cleanupCallSignals(userId1: number, userId2: number) {
 // Ringtone using Web Audio API - with proper AudioContext resume for PWA/standalone
 export function playRingtone(): { stop: () => void } {
   let stopped = false;
-  let timeoutId: any;
+  let loopTimer: number | null = null;
+  let toneTimer1: number | null = null;
+  let toneTimer2: number | null = null;
   let audioCtx: AudioContext | null = null;
+
+  const playBeep = (freq: number, duration = 0.32) => {
+    if (!audioCtx || audioCtx.state === "closed") return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.55, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.02, audioCtx.currentTime + duration);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  };
+
+  const playRingCycle = () => {
+    if (stopped || !audioCtx || audioCtx.state === "closed") return;
+
+    try {
+      playBeep(720, 0.34);
+      toneTimer1 = window.setTimeout(() => {
+        if (stopped) return;
+        playBeep(860, 0.34);
+      }, 420);
+
+      toneTimer2 = window.setTimeout(() => {
+        if (stopped) return;
+        playBeep(720, 0.34);
+      }, 840);
+    } catch {
+      // no-op
+    }
+  };
 
   const init = async () => {
     audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -41,49 +81,29 @@ export function playRingtone(): { stop: () => void } {
     if (audioCtx.state === "suspended") {
       await audioCtx.resume();
     }
-    playTone();
+    playRingCycle();
+    loopTimer = window.setInterval(playRingCycle, 2400);
   };
 
-  const playTone = () => {
-    if (stopped || !audioCtx || audioCtx.state === "closed") return;
-
-    try {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.frequency.value = 440;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.7);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.7);
-
-      timeoutId = setTimeout(() => {
-        if (stopped || !audioCtx || audioCtx.state === "closed") return;
-        try {
-          const osc2 = audioCtx.createOscillator();
-          const gain2 = audioCtx.createGain();
-          osc2.connect(gain2);
-          gain2.connect(audioCtx.destination);
-          osc2.frequency.value = 554;
-          osc2.type = "sine";
-          gain2.gain.setValueAtTime(0.4, audioCtx.currentTime);
-          gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.7);
-          osc2.start();
-          osc2.stop(audioCtx.currentTime + 0.7);
-        } catch {}
-        timeoutId = setTimeout(playTone, 1800);
-      }, 900);
-    } catch {}
-  };
-
-  init();
+  init().catch(() => {
+    // no-op
+  });
 
   return {
     stop: () => {
       stopped = true;
-      clearTimeout(timeoutId);
+      if (loopTimer) {
+        clearInterval(loopTimer);
+        loopTimer = null;
+      }
+      if (toneTimer1) {
+        clearTimeout(toneTimer1);
+        toneTimer1 = null;
+      }
+      if (toneTimer2) {
+        clearTimeout(toneTimer2);
+        toneTimer2 = null;
+      }
       if (audioCtx && audioCtx.state !== "closed") {
         audioCtx.close().catch(() => {});
       }
@@ -95,40 +115,74 @@ export function playRingtone(): { stop: () => void } {
 // Attach remote audio stream to a real <audio> element for reliable playback (especially PWA)
 export function attachRemoteAudio(stream: MediaStream): HTMLAudioElement {
   // Remove any existing call audio elements
-  document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
+  document.querySelectorAll(`.${CALL_REMOTE_AUDIO_CLASS}`).forEach(el => el.remove());
+
+  stream.getAudioTracks().forEach((track) => {
+    track.enabled = true;
+  });
 
   const audio = document.createElement("audio");
-  audio.className = "call-remote-audio";
+  audio.className = CALL_REMOTE_AUDIO_CLASS;
   audio.autoplay = true;
+  audio.muted = false;
   (audio as any).playsInline = true;
   audio.setAttribute("playsinline", "true");
   audio.setAttribute("webkit-playsinline", "true");
   audio.volume = 1.0;
   audio.srcObject = stream;
-  // Some mobile browsers need the element in the DOM
-  audio.style.display = "none";
+
+  // Keep in DOM but off-screen; display:none can break playback on some mobile browsers.
+  audio.style.position = "fixed";
+  audio.style.width = "1px";
+  audio.style.height = "1px";
+  audio.style.opacity = "0";
+  audio.style.pointerEvents = "none";
+  audio.style.left = "-9999px";
+  audio.style.bottom = "0";
+
   document.body.appendChild(audio);
 
-  // Force play - critical for standalone/PWA mode
+  let playAttemptTimer: number | null = null;
+  let attempts = 0;
+
   const tryPlay = () => {
     const p = audio.play();
     if (p) {
-      p.catch(() => {
+      p.then(() => {
+        if (playAttemptTimer) {
+          clearInterval(playAttemptTimer);
+          playAttemptTimer = null;
+        }
+      }).catch(() => {
         // If autoplay blocked, retry on next user tap
         const handler = () => {
           audio.play().catch(() => {});
           document.removeEventListener("touchstart", handler);
           document.removeEventListener("click", handler);
         };
-        document.addEventListener("click", handler, { once: false });
-        document.addEventListener("touchstart", handler, { once: false });
+        document.addEventListener("click", handler, { once: true });
+        document.addEventListener("touchstart", handler, { once: true });
       });
     }
   };
 
   tryPlay();
-  // Also retry after a short delay (helps on some devices)
-  setTimeout(tryPlay, 300);
+  audio.addEventListener("loadedmetadata", tryPlay);
+  audio.addEventListener("canplay", tryPlay);
+
+  playAttemptTimer = window.setInterval(() => {
+    attempts += 1;
+    if (!audio.isConnected || attempts > 8) {
+      if (playAttemptTimer) {
+        clearInterval(playAttemptTimer);
+        playAttemptTimer = null;
+      }
+      return;
+    }
+    if (audio.paused) {
+      tryPlay();
+    }
+  }, 450);
 
   return audio;
 }

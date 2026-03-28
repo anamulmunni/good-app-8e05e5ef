@@ -194,12 +194,12 @@ export default function UserProfile() {
 
       {/* Cover Photo + Profile */}
       <div className="bg-white dark:bg-card">
-        <div className="h-[130px] bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden relative">
+        <div className="h-[150px] bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden relative">
           {(targetUser as any).cover_url && (
             <img src={(targetUser as any).cover_url} alt="Cover" className="w-full h-full object-cover object-center" />
           )}
         </div>
-        <div className="px-4 pb-4 -mt-[50px]">
+        <div className="px-4 pb-4 pt-3">
           <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white dark:border-card bg-gray-200 flex items-center justify-center shadow-lg">
             {targetUser.avatar_url ? (
               <img src={targetUser.avatar_url} alt="" className="w-full h-full object-cover" />

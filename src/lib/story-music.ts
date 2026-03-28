@@ -99,13 +99,16 @@ export function resolveStoryMusic(storedValue: string | null | undefined): {
     return {
       track,
       label: labelPart || (track ? `${track.title} - ${track.artist}` : storedValue),
-      audioUrl: decodedUrl || track?.audioUrl || null,
+      // Prefer current library URL for this track id so old/wrong stored URLs don't play random audio.
+      audioUrl: track?.audioUrl || decodedUrl || null,
     };
   }
 
-  const legacyTrack = STORY_MUSIC_LIBRARY.find(
-    (m) => storedValue === `${m.title} - ${m.artist}` || storedValue.includes(m.title)
-  );
+  const normalizedValue = storedValue.toLowerCase().trim();
+  const legacyTrack = STORY_MUSIC_LIBRARY.find((m) => {
+    const fullLabel = `${m.title} - ${m.artist}`.toLowerCase();
+    return normalizedValue === fullLabel || normalizedValue === m.title.toLowerCase();
+  });
 
   if (legacyTrack) {
     return {

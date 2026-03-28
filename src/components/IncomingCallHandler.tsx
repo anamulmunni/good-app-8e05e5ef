@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { getUser } from "@/lib/api";
 import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig } from "@/lib/call-api";
 import { Phone, PhoneOff, User } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 export default function IncomingCallHandler() {
   const { user } = useAuth();
@@ -21,6 +21,56 @@ export default function IncomingCallHandler() {
   const [callDuration, setCallDuration] = useState(0);
   const durationTimerRef = useRef<any>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const incomingCallRef = useRef(incomingCall);
+  const callActiveRef = useRef(callActive);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
+
+  useEffect(() => {
+    callActiveRef.current = callActive;
+  }, [callActive]);
+
+  const stopRingtone = () => {
+    ringtoneRef.current?.stop();
+    ringtoneRef.current = null;
+  };
+
+  const clearRemoteAudio = () => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.pause();
+      remoteAudioRef.current.remove();
+      remoteAudioRef.current = null;
+    }
+    document.querySelectorAll(".call-remote-audio").forEach((el) => el.remove());
+  };
+
+  const endCall = (sendSignal = true) => {
+    stopRingtone();
+    clearInterval(durationTimerRef.current);
+    clearRemoteAudio();
+
+    if (peerRef.current) {
+      peerRef.current.close();
+      peerRef.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+
+    const currentIncomingCall = incomingCallRef.current;
+    if (sendSignal && user && currentIncomingCall) {
+      sendCallSignal(user.id, currentIncomingCall.callerId, "call-ended");
+    }
+
+    setCallActive(false);
+    setIsMuted(false);
+    setIncomingCall(null);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -33,7 +83,7 @@ export default function IncomingCallHandler() {
       }, async (payload: any) => {
         const signal = payload.new;
 
-        if (signal.signal_type === "call-request" && !callActive && !incomingCall) {
+        if (signal.signal_type === "call-request" && !callActiveRef.current && !incomingCallRef.current) {
           const caller = await getUser(signal.caller_id);
           if (caller) {
             setIncomingCall({
@@ -56,15 +106,34 @@ export default function IncomingCallHandler() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [user, callActive, incomingCall]);
+    return () => {
+      supabase.removeChannel(channel);
+      stopRingtone();
+      clearRemoteAudio();
+      clearInterval(durationTimerRef.current);
+      if (peerRef.current) {
+        peerRef.current.close();
+        peerRef.current = null;
+      }
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+      }
+    };
+  }, [user]);
 
   const acceptCall = async () => {
     if (!user || !incomingCall) return;
-    ringtoneRef.current?.stop();
+    stopRingtone();
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       localStreamRef.current = stream;
 
       const pc = new RTCPeerConnection(rtcConfig);
@@ -73,7 +142,14 @@ export default function IncomingCallHandler() {
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
-        attachRemoteAudio(event.streams[0]);
+        const remoteStream = event.streams?.[0] || new MediaStream([event.track]);
+        remoteAudioRef.current = attachRemoteAudio(remoteStream);
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (["failed", "closed"].includes(pc.connectionState)) {
+          endCall(false);
+        }
       };
 
       pc.onicecandidate = (event) => {
@@ -91,6 +167,7 @@ export default function IncomingCallHandler() {
 
       await sendCallSignal(user.id, incomingCall.callerId, "call-accepted");
       setCallActive(true);
+      setIsMuted(false);
       setCallDuration(0);
       durationTimerRef.current = setInterval(() => setCallDuration(d => d + 1), 1000);
     } catch {
@@ -102,20 +179,7 @@ export default function IncomingCallHandler() {
     if (user && incomingCall) {
       sendCallSignal(user.id, incomingCall.callerId, "call-rejected");
     }
-    ringtoneRef.current?.stop();
-    ringtoneRef.current = null;
-    setIncomingCall(null);
-  };
-
-  const endCall = (sendSignal = true) => {
-    ringtoneRef.current?.stop();
-    ringtoneRef.current = null;
-    clearInterval(durationTimerRef.current);
-    document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
-    if (peerRef.current) { peerRef.current.close(); peerRef.current = null; }
-    if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
-    if (sendSignal && user && incomingCall) sendCallSignal(user.id, incomingCall.callerId, "call-ended");
-    setCallActive(false);
+    stopRingtone();
     setIncomingCall(null);
   };
 
@@ -131,60 +195,62 @@ export default function IncomingCallHandler() {
   if (!incomingCall) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-xl flex flex-col items-center justify-center gap-8 p-6">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-xl flex flex-col items-center justify-center gap-8 p-6"
+    >
 
-        {/* Caller info */}
-        <motion.div animate={!callActive ? { scale: [1, 1.05, 1] } : {}} transition={{ repeat: Infinity, duration: 2 }}
-          className="relative">
-          <div className={`w-28 h-28 rounded-full flex items-center justify-center overflow-hidden border-4 ${callActive ? "border-[hsl(var(--emerald))]" : "border-primary"}`}>
-            {incomingCall.callerAvatar ? <img src={incomingCall.callerAvatar} className="w-full h-full object-cover" /> :
-              <div className="w-full h-full bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 flex items-center justify-center">
-                <User className="w-14 h-14 text-primary/50" />
-              </div>}
-          </div>
-          {!callActive && (
-            <motion.div animate={{ scale: [1, 1.6], opacity: [0.4, 0] }} transition={{ repeat: Infinity, duration: 1.5 }}
-              className="absolute inset-0 rounded-full border-2 border-primary" />
-          )}
-        </motion.div>
-
-        <div className="text-center">
-          <h2 className="text-2xl font-black">{incomingCall.callerName}</h2>
-          <p className="text-muted-foreground mt-1">
-            {callActive ? formatDuration(callDuration) : "ইনকামিং কল..."}
-          </p>
+      {/* Caller info */}
+      <motion.div animate={!callActive ? { scale: [1, 1.05, 1] } : {}} transition={{ repeat: Infinity, duration: 2 }}
+        className="relative">
+        <div className={`w-28 h-28 rounded-full flex items-center justify-center overflow-hidden border-4 ${callActive ? "border-[hsl(var(--emerald))]" : "border-primary"}`}>
+          {incomingCall.callerAvatar ? <img src={incomingCall.callerAvatar} className="w-full h-full object-cover" /> :
+            <div className="w-full h-full bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 flex items-center justify-center">
+              <User className="w-14 h-14 text-primary/50" />
+            </div>}
         </div>
-
-        {/* Controls */}
-        <div className="flex items-center gap-8">
-          {!callActive ? (
-            <>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={rejectCall}
-                className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-xl shadow-destructive/30">
-                <PhoneOff className="w-7 h-7 text-destructive-foreground" />
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={acceptCall}
-                className="w-16 h-16 rounded-full bg-[hsl(var(--emerald))] flex items-center justify-center shadow-xl shadow-[hsl(var(--emerald))]/30"
-                animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
-                <Phone className="w-7 h-7 text-foreground" />
-              </motion.button>
-            </>
-          ) : (
-            <>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={toggleMute}
-                className={`w-14 h-14 rounded-full flex items-center justify-center ${isMuted ? "bg-destructive/20 text-destructive" : "bg-secondary text-foreground"}`}>
-                {isMuted ? <span className="text-xs font-bold">🔇</span> : <span className="text-xs font-bold">🔊</span>}
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={() => endCall()}
-                className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-xl">
-                <PhoneOff className="w-7 h-7 text-destructive-foreground" />
-              </motion.button>
-            </>
-          )}
-        </div>
+        {!callActive && (
+          <motion.div animate={{ scale: [1, 1.6], opacity: [0.4, 0] }} transition={{ repeat: Infinity, duration: 1.5 }}
+            className="absolute inset-0 rounded-full border-2 border-primary" />
+        )}
       </motion.div>
-    </AnimatePresence>
+
+      <div className="text-center">
+        <h2 className="text-2xl font-black">{incomingCall.callerName}</h2>
+        <p className="text-muted-foreground mt-1">
+          {callActive ? formatDuration(callDuration) : "ইনকামিং কল..."}
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-8">
+        {!callActive ? (
+          <>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={rejectCall}
+              className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-xl shadow-destructive/30">
+              <PhoneOff className="w-7 h-7 text-destructive-foreground" />
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={acceptCall}
+              className="w-16 h-16 rounded-full bg-[hsl(var(--emerald))] flex items-center justify-center shadow-xl shadow-[hsl(var(--emerald))]/30"
+              animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
+              <Phone className="w-7 h-7 text-foreground" />
+            </motion.button>
+          </>
+        ) : (
+          <>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={toggleMute}
+              className={`w-14 h-14 rounded-full flex items-center justify-center ${isMuted ? "bg-destructive/20 text-destructive" : "bg-secondary text-foreground"}`}>
+              {isMuted ? <span className="text-xs font-bold">🔇</span> : <span className="text-xs font-bold">🔊</span>}
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => endCall()}
+              className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-xl">
+              <PhoneOff className="w-7 h-7 text-destructive-foreground" />
+            </motion.button>
+          </>
+        )}
+      </div>
+    </motion.div>
   );
 }

@@ -150,7 +150,7 @@ export default function Profile() {
         {/* Avatar & Name Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl overflow-hidden">
           {/* Cover Photo */}
-          <div className="h-24 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative overflow-hidden group">
+          <div className="h-28 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative overflow-hidden group">
             {(user as any).cover_url && (
               <img src={(user as any).cover_url} alt="Cover" className="w-full h-full object-cover object-center" />
             )}
@@ -162,7 +162,7 @@ export default function Profile() {
             </button>
             <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
           </div>
-          <div className="px-8 pb-8 -mt-12 text-center">
+          <div className="px-8 pb-8 pt-4 text-center">
             <div className="relative inline-block mb-4">
               <button onClick={handleAvatarClick} disabled={uploading} className="relative group">
                 <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-background bg-secondary flex items-center justify-center shadow-xl shadow-primary/10">
