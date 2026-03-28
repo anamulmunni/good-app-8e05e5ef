@@ -93,12 +93,26 @@ function getQueryWords(searchQuery?: string): string[] {
     .filter((word) => word.length >= 2 && !SONG_STOP_WORDS.has(word));
 }
 
+function hasFreshMarker(title: string): boolean {
+  return /(\bnew\b|\blatest\b|202[4-9]|নতুন)/i.test(title);
+}
+
+function hasQualityMarker(title: string): boolean {
+  return /(full\s*hd|1080|4k|\bhd\b)/i.test(title);
+}
+
+function isBanglaSongTitle(title: string): boolean {
+  const lower = title.toLowerCase();
+  const hasBanglaMarker = /(bangla|বাংলা|bengali|dhallywood|baul|nazrul|rabindra|bd song|deshi song)/i.test(lower);
+  const hasSongMarker = /(song|music|audio|lyrics|গান|gaan|gan|gana|album|official)/i.test(lower);
+  const hasNonMusicMarker = /(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower);
+  return hasBanglaMarker && hasSongMarker && !hasNonMusicMarker;
+}
+
 function isBanglaDefaultSuggestion(title: string, country?: string | null): boolean {
   const lower = title.toLowerCase();
-  const isBanglaMarker = /(bangla|বাংলা|bengali|dhallywood|baul|nazrul|rabindra|bd song|deshi song)/i.test(lower);
   const isNonBanglaMarker = /(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower);
-  const fromBangladesh = String(country || "").toUpperCase() === "BD";
-  return (fromBangladesh || isBanglaMarker) && !isNonBanglaMarker;
+  return isBanglaSongTitle(title) && !isNonBanglaMarker;
 }
 
 function getQueryCoverage(queryWords: string[], normalizedTitle: string): number {
@@ -208,8 +222,14 @@ function buildSearchVariants(searchQuery?: string): string[] {
     .filter((q, idx, arr) => arr.indexOf(q) === idx);
 }
 
-async function fetchDailymotionByQuery(query: string, page: number, limit: number, sort: "relevance" | "recent" = "relevance") {
-  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_1080_url,thumbnail_720_url,thumbnail_480_url,thumbnail_360_url,thumbnail_url,duration,owner.screenname,country&sort=${sort}&longer_than=0`;
+async function fetchDailymotionByQuery(
+  query: string,
+  page: number,
+  limit: number,
+  sort: "relevance" | "recent" = "relevance",
+  freshnessToken = 0,
+) {
+  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_1080_url,thumbnail_720_url,thumbnail_480_url,thumbnail_360_url,thumbnail_url,duration,owner.screenname,country&sort=${sort}&longer_than=0&_=${freshnessToken}`;
   const res = await fetch(dmUrl);
   if (!res.ok) return [];
   const data = await res.json();
@@ -242,14 +262,19 @@ async function fetchDailymotionFallback(
   rows: number,
   searchQuery?: string,
   mode: "short" | "long" = "long",
+  freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
   const canonicalQuery = canonicalizeSearchQuery(searchQuery || "");
   const variants = buildSearchVariants(canonicalQuery);
+  const shift = canonicalQuery ? 0 : Math.abs((freshnessToken || page) % Math.max(variants.length, 1));
+  const orderedVariants = shift > 0
+    ? [...variants.slice(shift), ...variants.slice(0, shift)]
+    : variants;
   const perQueryLimit = Math.max(Math.ceil((rows * 3) / variants.length) + 10, 14);
   const sort = canonicalQuery ? "relevance" : "recent";
 
   const responses = await Promise.all(
-    variants.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, sort))
+    orderedVariants.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, sort, freshnessToken))
   );
 
   let list = responses.flat();
@@ -261,7 +286,7 @@ async function fetchDailymotionFallback(
       `${canonicalQuery} official`,
       `${canonicalQuery} lyrics`,
     ].filter((q, idx, arr) => q.length > 3 && arr.indexOf(q) === idx);
-    const fallbackResponses = await Promise.all(fallbackQueries.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, "relevance")));
+    const fallbackResponses = await Promise.all(fallbackQueries.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, "relevance", freshnessToken)));
     list = fallbackResponses.flat();
   }
 
@@ -269,6 +294,7 @@ async function fetchDailymotionFallback(
   const normalizedQuery = normalizeForMatch(canonicalQuery);
   const isMusicSearch = isMusicIntent(canonicalQuery);
   const seen = new Set<string>();
+  const seenTitleCreator = new Set<string>();
 
   const filtered = list
     .map((v: any) => {
@@ -280,6 +306,10 @@ async function fetchDailymotionFallback(
 
       const title = String(v?.title || "বাংলা ভিডিও");
       const normalizedTitle = normalizeForMatch(title);
+      const creator = String(v?.["owner.screenname"] || "").toLowerCase().trim();
+      const titleCreatorKey = `${normalizedTitle}::${creator}`;
+      if (seenTitleCreator.has(titleCreatorKey)) return null;
+      seenTitleCreator.add(titleCreatorKey);
       const coverage = getQueryCoverage(queryWords, normalizedTitle);
       const hasMusicMarker = /(song|music|audio|lyrics|গান|mp3|album|official|bhojpuri)/i.test(title);
       const hasNonMusicMarker = /(natok|drama|movie|serial|episode|cartoon)/i.test(title);
@@ -297,6 +327,9 @@ async function fetchDailymotionFallback(
         }
       } else if (!isBanglaDefault) {
         return null;
+      } else {
+        if (!hasFreshMarker(title)) return null;
+        if (!hasQualityMarker(title)) return null;
       }
 
       let score = scoreFallbackVideo(title, queryWords, canonicalQuery)
@@ -306,8 +339,8 @@ async function fetchDailymotionFallback(
         + ((v.thumbnail_1080_url || v.thumbnail_720_url) ? 2 : 0);
 
       if (!canonicalQuery) {
-        if (/(\bnew\b|\blatest\b|202[4-9]|নতুন)/i.test(title)) score += 12;
-        if (/(full\s*hd|1080|4k|hd)/i.test(title)) score += 10;
+        if (hasFreshMarker(title)) score += 12;
+        if (hasQualityMarker(title)) score += 10;
       }
 
       if (!canonicalQuery && hasNonMusicMarker && !hasMusicMarker) {
@@ -392,8 +425,16 @@ export async function getUploadedLongVideos(
     };
   });
 
+  const strictDefaultVideos = searchQuery?.trim()
+    ? videos
+    : videos.filter((video) =>
+      isBanglaDefaultSuggestion(video.title, video.country)
+      && hasFreshMarker(video.title)
+      && hasQualityMarker(video.title)
+    );
+
   return {
-    videos,
+    videos: strictDefaultVideos,
     hasMore: typeof count === "number" ? from + videos.length < count : videos.length === rows,
   };
 }
@@ -404,8 +445,9 @@ export async function getBangladeshExternalVideos(
   preferredCategories?: string[],
   searchQuery?: string,
   mode: "short" | "long" = "long",
+  freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
-  const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode);
+  const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
   if ((searchQuery && searchQuery.trim()) || direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
     return direct;
   }
@@ -437,7 +479,7 @@ export async function getBangladeshExternalVideos(
 
     if (!res.ok) {
       console.warn("External videos API unavailable, using fallback:", res.status);
-      return fetchDailymotionFallback(page, rows, searchQuery, mode);
+      return fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
     }
 
     const data = await res.json();
@@ -461,7 +503,7 @@ export async function getBangladeshExternalVideos(
   } catch (e) {
     console.warn("External videos edge failed, using fallback:", e);
     try {
-      return await fetchDailymotionFallback(page, rows, searchQuery, mode);
+      return await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
     } catch (fallbackError) {
       console.error("External videos fallback error:", fallbackError);
       return { videos: [], hasMore: false };
