@@ -306,14 +306,14 @@ export default function Feed() {
 
   const handleCommentInputChange = (val: string) => {
     setCommentText(val);
-    const atMatch = val.match(/@(\w*)$/);
+    const atMatch = val.match(/@([^\s@]*)$/);
     if (atMatch && atMatch[1].length >= 1) { setMentionQuery(atMatch[1]); setShowMentionSuggestions(true); }
     else if (val.endsWith("@")) { setMentionQuery(""); setShowMentionSuggestions(true); }
     else { setShowMentionSuggestions(false); }
   };
 
   const insertMention = (name: string) => {
-    setCommentText(commentText.replace(/@\w*$/, `@${name} `));
+    setCommentText(commentText.replace(/@[^\s@]*$/, `@${name} `));
     setShowMentionSuggestions(false);
   };
 
@@ -393,8 +393,8 @@ export default function Feed() {
     video.preload = "metadata";
     video.src = URL.createObjectURL(file);
     video.onloadedmetadata = () => {
-      if (video.duration > 120) {
-        toast({ title: "ভিডিও সর্বোচ্চ ২ মিনিট হতে পারবে", variant: "destructive" });
+      if (video.duration > 900) {
+        toast({ title: "ভিডিও সর্বোচ্চ ১৫ মিনিট হতে পারবে", variant: "destructive" });
         return;
       }
       setPostVideoFile(file);
@@ -761,44 +761,69 @@ export default function Feed() {
       </header>
 
       {/* ===== Tab Bar ===== */}
-      <nav className="sticky top-[52px] z-40 bg-white dark:bg-card border-b border-gray-200 dark:border-border/30 shadow-sm">
-        <div className="max-w-lg mx-auto flex items-center justify-around">
-          <button onClick={() => { setActiveTab("home"); setShowFriendRequests(false); }}
-            className={`flex-1 py-2.5 flex items-center justify-center border-b-[3px] relative ${activeTab === "home" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 dark:text-muted-foreground"}`}>
-            <Home className="w-5 h-5" />
+      <nav className="sticky top-[52px] z-40 bg-card/95 border-b border-border/40 backdrop-blur-sm">
+        <div className="max-w-lg mx-auto px-2 py-2 grid grid-cols-5 gap-1.5">
+          <button
+            onClick={() => { setActiveTab("home"); setShowFriendRequests(false); }}
+            className={`relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              activeTab === "home" ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Home className="w-4.5 h-4.5" />
+            <span className="text-[10px] font-semibold">Home</span>
           </button>
-          <button onClick={() => setActiveTab("friends")}
-            className={`flex-1 py-2.5 flex items-center justify-center border-b-[3px] relative ${activeTab === "friends" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 dark:text-muted-foreground"}`}>
-            <Users className="w-5 h-5" />
+
+          <button
+            onClick={() => setActiveTab("friends")}
+            className={`relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              activeTab === "friends" ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4.5 h-4.5" />
+            <span className="text-[10px] font-semibold">Friends</span>
             {friendRequestCount > 0 && (
-              <span className="absolute top-1 right-1/4 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {friendRequestCount}
               </span>
             )}
           </button>
-          <button onClick={() => navigate("/chat")}
-            className="relative flex-1 py-2.5 flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground">
-            <MessageCircle className="w-5 h-5" />
+
+          <button
+            onClick={() => navigate("/chat")}
+            className="relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors bg-secondary/70 text-muted-foreground hover:text-foreground"
+          >
+            <MessageCircle className="w-4.5 h-4.5" />
+            <span className="text-[10px] font-semibold">Messenger</span>
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1/4 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </button>
-          <button onClick={() => { if (user) { markReelsSeen(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["new-reels-count"] })); } navigate("/reels"); }}
-            className="relative flex-1 py-2.5 flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground">
-            <Play className="w-5 h-5" />
+
+          <button
+            onClick={() => { if (user) { markReelsSeen(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["new-reels-count"] })); } navigate("/reels"); }}
+            className="relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors bg-secondary/70 text-muted-foreground hover:text-foreground"
+          >
+            <Play className="w-4.5 h-4.5" />
+            <span className="text-[10px] font-semibold">Video</span>
             {newReelsCount > 0 && (
-              <span className="absolute top-1 right-1/4 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {newReelsCount > 99 ? "99+" : newReelsCount}
               </span>
             )}
           </button>
-          <button onClick={() => { setActiveTab("notif"); if (user) markNotificationsRead(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["notif-count"] })); }}
-            className={`relative flex-1 py-2.5 flex items-center justify-center border-b-[3px] ${activeTab === "notif" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 dark:text-muted-foreground"}`}>
-            <Bell className="w-5 h-5" />
+
+          <button
+            onClick={() => { setActiveTab("notif"); if (user) markNotificationsRead(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["notif-count"] })); }}
+            className={`relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              activeTab === "notif" ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Bell className="w-4.5 h-4.5" />
+            <span className="text-[10px] font-semibold">Notification</span>
             {notifCount > 0 && (
-              <span className="absolute top-1 right-1/4 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {notifCount > 99 ? "99+" : notifCount}
               </span>
             )}
