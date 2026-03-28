@@ -548,11 +548,14 @@ export default function Chat() {
             ) : (
               <>
                 <button
-                  onPointerDown={handleHoldToRecordStart}
-                  onPointerUp={handleHoldToRecordEnd}
-                  onPointerCancel={handleHoldToRecordCancel}
+                  onTouchStart={handleHoldToRecordStart}
+                  onTouchEnd={handleHoldToRecordEnd}
+                  onTouchCancel={() => handleHoldToRecordCancel()}
+                  onMouseDown={handleHoldToRecordStart}
+                  onMouseUp={handleHoldToRecordEnd}
+                  onMouseLeave={() => { if (isRecording) handleHoldToRecordCancel(); }}
                   onContextMenu={(e) => e.preventDefault()}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isRecording ? "bg-destructive text-destructive-foreground" : "text-blue-600 hover:bg-blue-50"}`}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors select-none touch-none ${isRecording ? "bg-destructive text-destructive-foreground" : "text-blue-600 hover:bg-blue-50"}`}
                 >
                   <Mic size={22} />
                 </button>
