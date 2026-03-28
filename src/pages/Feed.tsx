@@ -800,18 +800,19 @@ export default function Feed() {
                         <div className="px-4 pb-3 pt-1 border-t border-border/20 space-y-2">
                           {loadingComments ? <p className="text-xs text-muted-foreground text-center py-2">লোড হচ্ছে...</p> :
                             comments.length === 0 ? <p className="text-xs text-muted-foreground text-center py-2">কোনো মন্তব্য নেই</p> : (
-                              <div className="space-y-2 max-h-60 overflow-y-auto">
+                              <div className="space-y-2.5 max-h-60 overflow-y-auto" ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
                                 {comments.map((c) => (
                                   <div key={c.id} className="flex gap-2">
                                     <button onClick={() => navigate(`/user/${c.user_id}`)} className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
                                       {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
                                         <span className="text-[10px] text-primary font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
                                     </button>
-                                    <div className="bg-secondary/60 rounded-2xl px-3 py-1.5 flex-1">
-                                      <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-xs font-bold text-foreground hover:underline">
+                                    <div className="bg-secondary rounded-2xl px-3 py-2 flex-1">
+                                      <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-xs font-bold text-foreground hover:underline block">
                                         {c.user?.display_name || "User"}
                                       </button>
-                                      <p className="text-xs text-foreground/80">{c.content}</p>
+                                      <p className="text-sm text-foreground mt-0.5 break-words">{c.content}</p>
+                                      <p className="text-[10px] text-muted-foreground mt-1">{timeAgo(c.created_at)}</p>
                                     </div>
                                   </div>
                                 ))}
