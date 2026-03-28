@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getUserConversations, getMessages, sendMessage, getOrCreateConversation,
-  searchUsers, uploadChatMedia, markMessagesRead,
+  searchUsers, uploadChatMedia, markMessagesRead, getUnreadCountsPerConversation,
   type Conversation, type Message
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
@@ -71,6 +71,13 @@ export default function Chat() {
     queryFn: () => getOnlineUsers(user!.id),
     enabled: !!user,
     refetchInterval: 30000,
+  });
+
+  const { data: unreadCounts = {} } = useQuery({
+    queryKey: ["unread-counts-per-convo", user?.id, conversations.map(c => c.id).join(",")],
+    queryFn: () => getUnreadCountsPerConversation(user!.id, conversations.map(c => c.id)),
+    enabled: !!user && conversations.length > 0,
+    refetchInterval: 3000,
   });
 
   // Realtime
@@ -267,7 +274,10 @@ export default function Chat() {
     if (mins < 60) return `${mins} মি.`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs} ঘ.`;
-    return `${Math.floor(hrs / 24)} দি.`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days} দি.`;
+    const d = new Date(dateStr);
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear().toString().slice(2)}`;
   };
 
   if (isLoading || !user) return null;
@@ -540,11 +550,11 @@ export default function Chat() {
           const otherId = getOtherUserId(convo);
           const other = userCache[otherId];
           const otherOnline = isUserOnline(other?.online_at);
-          // Check if there are unread messages from other user
-          const hasUnread = convo.last_message_at && convo.last_message;
+          const unreadCount = unreadCounts[convo.id] || 0;
+          const hasUnread = unreadCount > 0;
           return (
             <button key={convo.id} onClick={() => openConversation(convo)}
-              className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-secondary/50 transition-colors text-left">
+              className={`w-full flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-secondary/50 transition-colors text-left ${hasUnread ? "bg-blue-50/60 dark:bg-primary/5" : ""}`}>
               <div className="relative">
                 <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden">
                   {other?.avatar_url ? <img src={other.avatar_url} alt="" className="w-full h-full object-cover" /> :
@@ -554,12 +564,19 @@ export default function Chat() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center">
-                  <p className="font-bold text-[15px] text-gray-900 dark:text-foreground truncate">{other?.display_name || `User #${otherId}`}</p>
-                  <span className="text-[11px] text-gray-400 whitespace-nowrap ml-2">
+                  <p className={`text-[15px] truncate ${hasUnread ? "font-black text-gray-900 dark:text-foreground" : "font-semibold text-gray-700 dark:text-foreground/80"}`}>{other?.display_name || `User #${otherId}`}</p>
+                  <span className={`text-[11px] whitespace-nowrap ml-2 ${hasUnread ? "text-blue-600 dark:text-primary font-bold" : "text-gray-400"}`}>
                     {timeAgo(convo.last_message_at)}
                   </span>
                 </div>
-                <p className="text-[13px] text-gray-500 dark:text-muted-foreground truncate mt-0.5">{convo.last_message || "কথা শুরু করুন"}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className={`text-[13px] truncate flex-1 ${hasUnread ? "font-bold text-gray-900 dark:text-foreground" : "text-gray-500 dark:text-muted-foreground"}`}>{convo.last_message || "কথা শুরু করুন"}</p>
+                  {hasUnread && (
+                    <span className="min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shrink-0">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </div>
               </div>
             </button>
           );

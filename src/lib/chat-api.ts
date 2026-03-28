@@ -141,3 +141,21 @@ export async function getUnreadCount(userId: number): Promise<number> {
 
   return count || 0;
 }
+
+// Get unread count per conversation
+export async function getUnreadCountsPerConversation(userId: number, conversationIds: string[]): Promise<Record<string, number>> {
+  if (conversationIds.length === 0) return {};
+
+  const { data } = await (supabase
+    .from("messages")
+    .select("conversation_id") as any)
+    .in("conversation_id", conversationIds)
+    .eq("is_read", false)
+    .neq("sender_id", userId);
+
+  const counts: Record<string, number> = {};
+  (data || []).forEach((m: any) => {
+    counts[m.conversation_id] = (counts[m.conversation_id] || 0) + 1;
+  });
+  return counts;
+}
