@@ -449,7 +449,7 @@ export default function Chat() {
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendText()}
                   placeholder="Aa"
                   className="flex-1 bg-transparent text-gray-900 dark:text-foreground text-[14px] border-none outline-none placeholder:text-gray-400" />
-                <button className="text-blue-600 p-1"><Smile size={20} /></button>
+                <button onClick={() => setShowEmoji(!showEmoji)} className={`p-1 ${showEmoji ? "text-blue-700" : "text-blue-600"}`}><Smile size={20} /></button>
               </div>
               {messageText.trim() ? (
                 <button onClick={handleSendText}
@@ -471,6 +471,13 @@ export default function Chat() {
             </>
           )}
         </div>
+
+        {/* Emoji Picker */}
+        <EmojiPicker
+          isOpen={showEmoji}
+          onClose={() => setShowEmoji(false)}
+          onSelect={(emoji) => setMessageText(prev => prev + emoji)}
+        />
 
         {/* Image viewer */}
         <AnimatePresence>
