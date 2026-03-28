@@ -33,6 +33,7 @@ export default function Reels() {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
   const lastTapRef = useRef<Record<string, number>>({});
+  const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
