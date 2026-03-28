@@ -111,8 +111,12 @@ function isBanglaSongTitle(title: string): boolean {
 
 function isBanglaDefaultSuggestion(title: string, country?: string | null): boolean {
   const lower = title.toLowerCase();
-  const isNonBanglaMarker = /(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower);
-  return isBanglaSongTitle(title) && !isNonBanglaMarker;
+  const fromBangladesh = String(country || "").toUpperCase() === "BD";
+  const hasBanglaMarker = /(bangla|বাংলা|bengali|dhallywood|baul|nazrul|rabindra|bd song|deshi song)/i.test(lower);
+  const hasSongMarker = /(song|music|audio|lyrics|গান|gaan|gan|gana|album|official)/i.test(lower);
+  const hasNonBanglaMarker = /(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower);
+  const hasNonMusicMarker = /(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower);
+  return (fromBangladesh || hasBanglaMarker) && hasSongMarker && !hasNonBanglaMarker && !hasNonMusicMarker;
 }
 
 function getQueryCoverage(queryWords: string[], normalizedTitle: string): number {
@@ -327,9 +331,6 @@ async function fetchDailymotionFallback(
         }
       } else if (!isBanglaDefault) {
         return null;
-      } else {
-        if (!hasFreshMarker(title)) return null;
-        if (!hasQualityMarker(title)) return null;
       }
 
       let score = scoreFallbackVideo(title, queryWords, canonicalQuery)
@@ -427,14 +428,14 @@ export async function getUploadedLongVideos(
 
   const strictDefaultVideos = searchQuery?.trim()
     ? videos
-    : videos.filter((video) =>
-      isBanglaDefaultSuggestion(video.title, video.country)
-      && hasFreshMarker(video.title)
-      && hasQualityMarker(video.title)
-    );
+    : videos.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
+
+  const safeDefaultVideos = searchQuery?.trim()
+    ? strictDefaultVideos
+    : (strictDefaultVideos.length > 0 ? strictDefaultVideos : videos);
 
   return {
-    videos: strictDefaultVideos,
+    videos: safeDefaultVideos,
     hasMore: typeof count === "number" ? from + videos.length < count : videos.length === rows,
   };
 }

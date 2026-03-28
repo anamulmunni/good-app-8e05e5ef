@@ -145,13 +145,23 @@ export default function Reels() {
     if (!reset && !hasMore) return;
     loadingRef.current = true;
     setLoading(true);
-    const p = reset ? (activeQuery ? 1 : Math.floor(Math.random() * 80) + 1) : page;
+    let p = reset ? (activeQuery ? 1 : Math.floor(Math.random() * 8) + 1) : page;
     try {
-      const [externalResult, localResult] = await Promise.all([
+      let [externalResult, localResult] = await Promise.all([
         getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long", refreshTick),
         getUploadedLongVideos(p, 12, activeQuery || undefined),
       ]);
-      const merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+      let merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+
+      if (!activeQuery && merged.length === 0 && p !== 1) {
+        p = 1;
+        [externalResult, localResult] = await Promise.all([
+          getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick),
+          getUploadedLongVideos(1, 12),
+        ]);
+        merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+      }
+
       setExtVideos((prev) => {
         const base = reset ? [] : prev;
         const seen = new Set(base.map((v) => v.id));
@@ -175,12 +185,22 @@ export default function Reels() {
       loadingRef.current = true;
       setLoading(true);
       try {
-        const externalStartPage = activeQuery ? 1 : Math.floor(Math.random() * 80) + 1;
-        const [externalResult, localResult] = await Promise.all([
+        let externalStartPage = activeQuery ? 1 : Math.floor(Math.random() * 8) + 1;
+        let [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
-        const merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+        let merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+
+        if (!activeQuery && merged.length === 0 && externalStartPage !== 1) {
+          externalStartPage = 1;
+          [externalResult, localResult] = await Promise.all([
+            getBangladeshExternalVideos(1, 20, undefined, undefined, "long", refreshTick),
+            getUploadedLongVideos(1, 10),
+          ]);
+          merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+        }
+
         setExtVideos(merged);
         setHasMore(localResult.hasMore || externalResult.hasMore);
         setPage(externalStartPage + 1);
