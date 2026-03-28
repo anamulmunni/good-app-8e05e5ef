@@ -201,9 +201,14 @@ export default function Reels() {
     video.src = objectUrl;
     video.onloadedmetadata = () => {
       const duration = Math.floor(video.duration || 0);
-      if (duration <= 120) {
+      if (duration < 120) {
         URL.revokeObjectURL(objectUrl);
-        alert("২ মিনিটের কম ভিডিও Short হিসেবে নিউজ ফিডে দিন। এখানে Long (২ মিনিট+) ভিডিও দিন।");
+        alert("এখানে ২ মিনিট থেকে ১ ঘণ্টার মধ্যে ভিডিও আপলোড করুন।");
+        return;
+      }
+      if (duration > 3600) {
+        URL.revokeObjectURL(objectUrl);
+        alert("সর্বোচ্চ ১ ঘণ্টার ভিডিও আপলোড করা যাবে।");
         return;
       }
       setLongVideoFile(file);
