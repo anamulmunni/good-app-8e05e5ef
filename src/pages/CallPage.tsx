@@ -167,6 +167,9 @@ export default function CallPage() {
     ringtoneRef.current = null;
     clearInterval(durationTimerRef.current);
 
+    // Clean up remote audio elements
+    document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
+
     if (peerRef.current) {
       peerRef.current.close();
       peerRef.current = null;
