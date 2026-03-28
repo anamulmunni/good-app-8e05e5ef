@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, cleanupCallSignals, playRingtone, rtcConfig } from "@/lib/call-api";
+import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig } from "@/lib/call-api";
 import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
