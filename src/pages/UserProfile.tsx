@@ -177,7 +177,11 @@ export default function UserProfile() {
       {/* Profile Card */}
       <div className="max-w-lg mx-auto px-4 pt-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl overflow-hidden mb-6">
-          <div className="h-20 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20" />
+          <div className="h-28 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 overflow-hidden">
+            {(targetUser as any).cover_url && (
+              <img src={(targetUser as any).cover_url} alt="Cover" className="w-full h-full object-cover" />
+            )}
+          </div>
           <div className="px-6 pb-6 -mt-10 text-center">
             <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-background bg-secondary flex items-center justify-center mx-auto mb-3 shadow-xl">
               {targetUser.avatar_url ? (

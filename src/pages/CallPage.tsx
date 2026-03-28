@@ -108,11 +108,15 @@ export default function CallPage() {
       // Add audio tracks
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-      // Handle remote audio
+      // Handle remote audio - properly attach to DOM for mobile
       pc.ontrack = (event) => {
-        const audio = new Audio();
+        const audio = document.createElement("audio");
+        audio.autoplay = true;
+        audio.playsInline = true;
+        audio.setAttribute("playsinline", "true");
         audio.srcObject = event.streams[0];
-        audio.play();
+        document.body.appendChild(audio);
+        audio.play().catch(() => {});
       };
 
       // ICE candidates

@@ -20,7 +20,29 @@ export default function Profile() {
   const [savingName, setSavingName] = useState(false);
   const [showSentRequests, setShowSentRequests] = useState(false);
   const [showSubmittedBatches, setShowSubmittedBatches] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingCover(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const filePath = `cover-${user.id}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      await (supabase.from("users").update({ cover_url: urlData.publicUrl } as any).eq("id", user.id) as any);
+      await refreshUser();
+      toast({ title: "কভার ফটো আপডেট হয়েছে" });
+    } catch {
+      toast({ title: "আপলোড ব্যর্থ হয়েছে", variant: "destructive" });
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   const { data: sentRequests = [] } = useQuery({
     queryKey: ["user-sent-requests", user?.guest_id],

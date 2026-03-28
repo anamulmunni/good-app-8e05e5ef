@@ -7,13 +7,14 @@ import {
   getFeedPosts, createPost, toggleReaction, getUserReactions,
   getPostComments, addComment, uploadPostMedia, getActiveStories,
   createStory, uploadStoryMedia, searchFeedUsers, getSuggestedUsers,
+  deletePost, deleteStory,
   REACTION_EMOJIS, type Post, type PostComment, type Story
 } from "@/lib/feed-api";
-import { getOrCreateConversation } from "@/lib/chat-api";
+import { getOrCreateConversation, getUnreadCount } from "@/lib/chat-api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import {
   Heart, MessageCircle, Send, Image, X, ArrowLeft,
-  Plus, User, Search, Phone, Share2, Loader2
+  Plus, User, Search, Phone, Share2, Loader2, MoreVertical, Trash2, ZoomIn
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,8 @@ export default function Feed() {
   const [postContent, setPostContent] = useState("");
   const [postImageFile, setPostImageFile] = useState<File | null>(null);
   const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
+  const [postVideoFile, setPostVideoFile] = useState<File | null>(null);
+  const [postVideoPreview, setPostVideoPreview] = useState<string | null>(null);
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
@@ -37,8 +40,13 @@ export default function Feed() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [viewingStory, setViewingStory] = useState<Story | null>(null);
+  const [showPostMenu, setShowPostMenu] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [doubleTapTimer, setDoubleTapTimer] = useState<Record<string, number>>({});
+  const [showLoveAnimation, setShowLoveAnimation] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const storyInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,6 +84,13 @@ export default function Feed() {
     enabled: searchQuery.length >= 2,
   });
 
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["unread-count"],
+    queryFn: () => getUnreadCount(user!.id),
+    enabled: !!user,
+    refetchInterval: 10000,
+  });
+
   useEffect(() => {
     if (user && posts.length > 0) {
       getUserReactions(user.id, posts.map(p => p.id)).then(setUserReactions);
@@ -90,6 +105,9 @@ export default function Feed() {
       .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, () => {
         queryClient.invalidateQueries({ queryKey: ["stories"] });
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["unread-count"] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
@@ -98,15 +116,43 @@ export default function Feed() {
     mutationFn: async () => {
       if (!user) throw new Error("Login required");
       let imageUrl: string | undefined;
+      let videoUrl: string | undefined;
       if (postImageFile) imageUrl = await uploadPostMedia(postImageFile, postImageFile.name);
-      return createPost(user.id, postContent, imageUrl);
+      if (postVideoFile) videoUrl = await uploadPostMedia(postVideoFile, postVideoFile.name);
+      return createPost(user.id, postContent, imageUrl, videoUrl);
     },
     onSuccess: () => {
-      setPostContent(""); setPostImageFile(null); setPostImagePreview(null); setShowCreatePost(false);
+      setPostContent(""); setPostImageFile(null); setPostImagePreview(null);
+      setPostVideoFile(null); setPostVideoPreview(null); setShowCreatePost(false);
       queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
       toast({ title: "পোস্ট প্রকাশিত! 🎉" });
     },
     onError: (e: Error) => toast({ title: "পোস্ট করা যায়নি", description: e.message, variant: "destructive" }),
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      if (!user) throw new Error("Login");
+      await deletePost(postId, user.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
+      toast({ title: "পোস্ট মুছে ফেলা হয়েছে 🗑️" });
+      setShowPostMenu(null);
+    },
+    onError: () => toast({ title: "মুছতে পারা যায়নি", variant: "destructive" }),
+  });
+
+  const deleteStoryMutation = useMutation({
+    mutationFn: async (storyId: string) => {
+      if (!user) throw new Error("Login");
+      await deleteStory(storyId, user.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stories"] });
+      setViewingStory(null);
+      toast({ title: "স্টোরি মুছে ফেলা হয়েছে" });
+    },
   });
 
   const reactionMutation = useMutation({
@@ -194,9 +240,43 @@ export default function Feed() {
     reader.readAsDataURL(file);
   };
 
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Max 2 minutes check
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.src = URL.createObjectURL(file);
+    video.onloadedmetadata = () => {
+      if (video.duration > 120) {
+        toast({ title: "ভিডিও সর্বোচ্চ ২ মিনিট হতে পারবে", variant: "destructive" });
+        return;
+      }
+      setPostVideoFile(file);
+      setPostVideoPreview(video.src);
+    };
+  };
+
   const handleStorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) storyMutation.mutate(file);
+  };
+
+  // Double tap to love
+  const handleDoubleTap = (postId: string) => {
+    const now = Date.now();
+    const lastTap = doubleTapTimer[postId] || 0;
+    if (now - lastTap < 300) {
+      // Double tap!
+      if (!userReactions[postId]) {
+        reactionMutation.mutate({ postId, type: "love" });
+      }
+      setShowLoveAnimation(postId);
+      setTimeout(() => setShowLoveAnimation(null), 1000);
+      setDoubleTapTimer(prev => ({ ...prev, [postId]: 0 }));
+    } else {
+      setDoubleTapTimer(prev => ({ ...prev, [postId]: now }));
+    }
   };
 
   const startChatWith = async (targetUserId: number) => {
@@ -207,37 +287,20 @@ export default function Feed() {
   const sharePost = async (post: Post) => {
     const text = post.content || "দেখুন এই পোস্টটি!";
     const shareUrl = window.location.origin;
-    
     if (navigator.share) {
-      const shareData: ShareData = {
-        title: "Good App - পোস্ট শেয়ার",
-        text: text,
-        url: shareUrl,
-      };
-
-      // Try to share image if available
+      const shareData: ShareData = { title: "Good App - পোস্ট শেয়ার", text, url: shareUrl };
       if (post.image_url) {
         try {
           const response = await fetch(post.image_url);
           const blob = await response.blob();
           const file = new File([blob], "post-image.jpg", { type: blob.type });
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            shareData.files = [file];
-          }
-        } catch (e) {
-          // If image fetch fails, share without image
-        }
+          if (navigator.canShare && navigator.canShare({ files: [file] })) shareData.files = [file];
+        } catch {}
       }
-
-      try {
-        await navigator.share(shareData);
-      } catch (e) {
-        // User cancelled share
-      }
+      try { await navigator.share(shareData); } catch {}
     } else {
-      // Fallback: copy text
       navigator.clipboard.writeText(`${text}\n${shareUrl}`);
-      toast({ title: "লিংক কপি করা হয়েছে!", description: "এখন যেকোনো জায়গায় পেস্ট করে শেয়ার করুন" });
+      toast({ title: "লিংক কপি করা হয়েছে!" });
     }
   };
 
@@ -277,6 +340,15 @@ export default function Feed() {
             <button onClick={() => setShowSearch(!showSearch)} className={`p-2 rounded-full transition-colors ${showSearch ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
               <Search size={20} />
             </button>
+            {/* Chat button with unread badge */}
+            <button onClick={() => navigate("/chat")} className="relative p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors">
+              <MessageCircle size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-black rounded-full flex items-center justify-center px-1 animate-pulse">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
             <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowCreatePost(true)}
               className="w-9 h-9 bg-primary rounded-full flex items-center justify-center shadow-md shadow-primary/30">
               <Plus className="w-5 h-5 text-primary-foreground" />
@@ -301,7 +373,6 @@ export default function Feed() {
                   )}
                 </div>
 
-                {/* User search results */}
                 {searchResults.length > 0 && (
                   <div className="mt-2 space-y-1">
                     {searchResults.filter((u: any) => u.id !== user.id).slice(0, 4).map((u: any) => (
@@ -319,7 +390,6 @@ export default function Feed() {
                   </div>
                 )}
 
-                {/* Online users when no search */}
                 {!searchQuery && onlineUsers.length > 0 && (
                   <div className="mt-2">
                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1.5 px-1">🟢 অনলাইন</p>
@@ -366,7 +436,6 @@ export default function Feed() {
         <div className="border-b border-border/30 bg-card/50">
           <div className="max-w-lg mx-auto px-4 py-3">
             <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-              {/* Add story button */}
               <button onClick={() => storyInputRef.current?.click()}
                 className="flex flex-col items-center gap-1.5 min-w-[68px]">
                 <div className="w-16 h-16 rounded-full border-2 border-dashed border-primary/40 flex items-center justify-center bg-primary/5">
@@ -376,7 +445,6 @@ export default function Feed() {
               </button>
               <input ref={storyInputRef} type="file" accept="image/*" className="hidden" onChange={handleStorySelect} />
 
-              {/* User stories */}
               {Object.entries(storyGroups).map(([uid, userStories]) => {
                 const storyUser = userStories[0].user;
                 return (
@@ -404,7 +472,6 @@ export default function Feed() {
         </div>
       )}
 
-      {/* Add story when no stories exist */}
       {!showSearch && Object.keys(storyGroups).length === 0 && (
         <div className="border-b border-border/30 bg-card/50">
           <div className="max-w-lg mx-auto px-4 py-3">
@@ -422,7 +489,7 @@ export default function Feed() {
         </div>
       )}
 
-      {/* Story viewer */}
+      {/* Story viewer with delete option */}
       <AnimatePresence>
         {viewingStory && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -438,6 +505,12 @@ export default function Feed() {
                 <p className="text-white/60 text-[10px]">{timeAgo(viewingStory.created_at)}</p>
               </button>
               <div className="flex items-center gap-2">
+                {viewingStory.user_id === user.id && (
+                  <button onClick={(e) => { e.stopPropagation(); deleteStoryMutation.mutate(viewingStory.id); }}
+                    className="text-white/80 hover:text-destructive p-1">
+                    <Trash2 size={20} />
+                  </button>
+                )}
                 <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/chat`); startChatWith(viewingStory.user_id); }}
                   className="text-white/80 hover:text-white p-1"><MessageCircle size={20} /></button>
                 <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/call/${viewingStory.user_id}`); }}
@@ -448,6 +521,27 @@ export default function Feed() {
             <div className="flex-1 flex items-center justify-center p-4">
               <img src={viewingStory.image_url} alt="" className="max-w-full max-h-full object-contain rounded-2xl" />
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Image Zoom Viewer */}
+      <AnimatePresence>
+        {viewingImage && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center" onClick={() => setViewingImage(null)}>
+            <button onClick={() => setViewingImage(null)} className="absolute top-4 right-4 z-10 text-white/80 hover:text-white">
+              <X size={28} />
+            </button>
+            <motion.img
+              src={viewingImage}
+              alt=""
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="max-w-full max-h-full object-contain p-4"
+              onClick={(e) => e.stopPropagation()}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -472,12 +566,12 @@ export default function Feed() {
             className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm">
             <div className="max-w-lg mx-auto px-4 pt-4">
               <div className="flex items-center justify-between mb-4">
-                <button onClick={() => { setShowCreatePost(false); setPostImageFile(null); setPostImagePreview(null); setPostContent(""); }}>
+                <button onClick={() => { setShowCreatePost(false); setPostImageFile(null); setPostImagePreview(null); setPostVideoFile(null); setPostVideoPreview(null); setPostContent(""); }}>
                   <X className="w-6 h-6 text-muted-foreground" />
                 </button>
                 <h2 className="font-bold text-lg">নতুন পোস্ট</h2>
                 <motion.button whileTap={{ scale: 0.95 }} onClick={() => createPostMutation.mutate()}
-                  disabled={createPostMutation.isPending || (!postContent.trim() && !postImageFile)}
+                  disabled={createPostMutation.isPending || (!postContent.trim() && !postImageFile && !postVideoFile)}
                   className="px-5 py-2 bg-primary text-primary-foreground rounded-full text-sm font-bold disabled:opacity-50">
                   {createPostMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "পোস্ট"}
                 </motion.button>
@@ -502,11 +596,25 @@ export default function Feed() {
                 </div>
               )}
 
+              {postVideoPreview && (
+                <div className="mt-4 relative">
+                  <video src={postVideoPreview} className="w-full rounded-2xl max-h-60" controls />
+                  <button onClick={() => { setPostVideoFile(null); setPostVideoPreview(null); }}
+                    className="absolute top-2 right-2 w-8 h-8 bg-background/80 rounded-full flex items-center justify-center">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="mt-4 flex items-center gap-3 border-t border-border/50 pt-4">
                 <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 text-primary hover:bg-primary/10 px-3 py-2 rounded-xl transition-colors">
                   <Image className="w-5 h-5" /><span className="text-sm font-medium">ছবি</span>
                 </button>
+                <button onClick={() => videoInputRef.current?.click()} className="flex items-center gap-2 text-[hsl(var(--pink))] hover:bg-[hsl(var(--pink))]/10 px-3 py-2 rounded-xl transition-colors">
+                  <span className="text-lg">🎬</span><span className="text-sm font-medium">ভিডিও</span>
+                </button>
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoSelect} />
               </div>
             </div>
           </motion.div>
@@ -531,7 +639,7 @@ export default function Feed() {
               const myReaction = userReactions[post.id];
               return (
                 <div key={post.id} className="bg-card">
-                  {/* Post header */}
+                  {/* Post header with 3-dot menu */}
                   <div className="flex items-center gap-3 px-4 pt-3 pb-2">
                     <button onClick={() => navigate(`/user/${post.user_id}`)}
                       className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 flex items-center justify-center border border-primary/20 overflow-hidden">
@@ -544,27 +652,69 @@ export default function Feed() {
                       </button>
                       <p className="text-[10px] text-muted-foreground">{timeAgo(post.created_at)}</p>
                     </div>
-                    {post.user_id !== user.id && (
-                      <div className="flex gap-1">
-                        <button onClick={() => startChatWith(post.user_id)}
-                          className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-primary">
-                          <MessageCircle className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => navigate(`/call/${post.user_id}`)}
-                          className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-[hsl(var(--emerald))]">
-                          <Phone className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {post.user_id !== user.id && (
+                        <>
+                          <button onClick={() => startChatWith(post.user_id)}
+                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-primary">
+                            <MessageCircle className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => navigate(`/call/${post.user_id}`)}
+                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-[hsl(var(--emerald))]">
+                            <Phone className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      {/* 3-dot menu for own posts */}
+                      {post.user_id === user.id && (
+                        <div className="relative">
+                          <button onClick={() => setShowPostMenu(showPostMenu === post.id ? null : post.id)}
+                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          <AnimatePresence>
+                            {showPostMenu === post.id && (
+                              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                                className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[140px]">
+                                <button onClick={() => deletePostMutation.mutate(post.id)}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-destructive hover:bg-destructive/10 text-sm font-bold transition-colors">
+                                  <Trash2 className="w-4 h-4" /> পোস্ট মুছুন
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Content */}
                   {post.content && <p className="text-sm text-foreground leading-relaxed px-4 pb-2 whitespace-pre-wrap">{post.content}</p>}
 
-                  {/* Image */}
+                  {/* Image - clickable to zoom + double tap to love */}
                   {post.image_url && (
-                    <div className="border-y border-border/20">
-                      <img src={post.image_url} alt="" className="w-full max-h-[400px] object-cover" />
+                    <div className="border-y border-border/20 relative cursor-pointer" onClick={() => handleDoubleTap(post.id)}>
+                      <img src={post.image_url} alt="" className="w-full max-h-[400px] object-cover" onClick={(e) => {
+                        // Single tap opens zoom after a delay
+                      }} />
+                      <button onClick={(e) => { e.stopPropagation(); setViewingImage(post.image_url); }}
+                        className="absolute bottom-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white/80 hover:text-white">
+                        <ZoomIn className="w-4 h-4" />
+                      </button>
+                      {/* Love animation on double tap */}
+                      <AnimatePresence>
+                        {showLoveAnimation === post.id && (
+                          <motion.div
+                            initial={{ scale: 0, opacity: 1 }}
+                            animate={{ scale: 1.5, opacity: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.8 }}
+                            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                          >
+                            <span className="text-7xl">❤️</span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   )}
 
@@ -587,7 +737,6 @@ export default function Feed() {
 
                   {/* Action buttons */}
                   <div className="px-4 py-1 border-t border-border/20 grid grid-cols-3 relative">
-                    {/* Like/React */}
                     <div className="relative">
                       <motion.button whileTap={{ scale: 0.9 }}
                         onClick={() => reactionMutation.mutate({ postId: post.id, type: myReaction || "like" })}
@@ -605,10 +754,9 @@ export default function Feed() {
                         ) : (
                           <Heart className="w-4 h-4" />
                         )}
-                        <span className="text-xs font-bold">{myReaction ? Object.entries(REACTION_EMOJIS).find(([k]) => k === myReaction)?.[0] === "like" ? "পছন্দ" : "" : "পছন্দ"}</span>
+                        <span className="text-xs font-bold">{myReaction ? "" : "পছন্দ"}</span>
                       </motion.button>
 
-                      {/* Reaction picker */}
                       <AnimatePresence>
                         {showReactionPicker === post.id && (
                           <motion.div initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.8 }}
@@ -626,7 +774,6 @@ export default function Feed() {
                       </AnimatePresence>
                     </div>
 
-                    {/* Comment */}
                     <button onClick={() => openComments(post.id)}
                       className="flex items-center justify-center gap-1.5 py-2 text-muted-foreground hover:bg-secondary/50 rounded-lg transition-colors">
                       <MessageCircle className="w-4 h-4" />
@@ -634,7 +781,6 @@ export default function Feed() {
                       {post.comments_count > 0 && <span className="text-[10px]">({post.comments_count})</span>}
                     </button>
 
-                    {/* Share */}
                     <button onClick={() => sharePost(post)}
                       className="flex items-center justify-center gap-1.5 py-2 text-muted-foreground hover:bg-secondary/50 rounded-lg transition-colors">
                       <Share2 className="w-4 h-4" />
