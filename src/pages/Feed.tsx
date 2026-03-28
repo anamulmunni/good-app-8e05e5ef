@@ -760,7 +760,7 @@ export default function Feed() {
                                     <div className="flex-1 min-w-0">
                                       <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-1.5">
                                         <button onClick={() => navigate(`/user/${r.user_id}`)} className="text-[11px] font-bold text-gray-900 dark:text-foreground">{r.user?.display_name || "User"}</button>
-                                        <p className="text-[13px] leading-4 text-gray-900 dark:text-foreground break-words">{r.content}</p>
+                                        <p className="text-[13px] leading-4 text-gray-900 dark:text-foreground break-words">{renderMentionText(r.content)}</p>
                                       </div>
                                       <div className="flex items-center gap-3 px-1 mt-0.5">
                                         <span className="text-[10px] text-gray-500">{timeAgo(r.created_at)}</span>
