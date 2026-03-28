@@ -28,6 +28,8 @@ export default function CallPage() {
   const durationTimerRef = useRef<any>(null);
   const noAnswerTimerRef = useRef<number | null>(null);
   const callStateRef = useRef<CallState>("idle");
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const remoteDescriptionSetRef = useRef(false);
   const targetUserId = parseInt(userId || "0");
 
   useEffect(() => {
@@ -64,8 +66,10 @@ export default function CallPage() {
               clearTimeout(noAnswerTimerRef.current);
               noAnswerTimerRef.current = null;
             }
-            setCallState("connected");
-            startDurationTimer();
+            if (callStateRef.current !== "connected") {
+              setCallState("connected");
+              startDurationTimer();
+            }
             break;
           case "call-rejected":
           case "call-ended":
@@ -76,21 +80,38 @@ export default function CallPage() {
             if (peerRef.current && signal.signal_data) {
               try {
                 await peerRef.current.setRemoteDescription(new RTCSessionDescription(signal.signal_data));
+                remoteDescriptionSetRef.current = true;
+
+                if (pendingIceCandidatesRef.current.length > 0) {
+                  for (const candidate of pendingIceCandidatesRef.current) {
+                    try {
+                      await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch {}
+                  }
+                  pendingIceCandidatesRef.current = [];
+                }
+
                 stopRingtone();
                 if (noAnswerTimerRef.current) {
                   clearTimeout(noAnswerTimerRef.current);
                   noAnswerTimerRef.current = null;
                 }
-                setCallState("connected");
-                startDurationTimer();
+                if (callStateRef.current !== "connected") {
+                  setCallState("connected");
+                  startDurationTimer();
+                }
               } catch (e) { console.error("Error setting remote desc:", e); }
             }
             break;
           case "ice-candidate":
-            if (peerRef.current && signal.signal_data) {
-              try {
-                await peerRef.current.addIceCandidate(new RTCIceCandidate(signal.signal_data));
-              } catch (e) { console.error("Error adding ICE:", e); }
+            if (signal.signal_data) {
+              if (peerRef.current && remoteDescriptionSetRef.current) {
+                try {
+                  await peerRef.current.addIceCandidate(new RTCIceCandidate(signal.signal_data));
+                } catch (e) { console.error("Error adding ICE:", e); }
+              } else {
+                pendingIceCandidatesRef.current.push(signal.signal_data);
+              }
             }
             break;
         }
@@ -144,6 +165,8 @@ export default function CallPage() {
       // Create peer connection
       const pc = new RTCPeerConnection(rtcConfig);
       peerRef.current = pc;
+      pendingIceCandidatesRef.current = [];
+      remoteDescriptionSetRef.current = false;
 
       // Add audio tracks
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
@@ -155,7 +178,19 @@ export default function CallPage() {
       };
 
       pc.onconnectionstatechange = () => {
-        if (["failed", "closed"].includes(pc.connectionState)) {
+        if (pc.connectionState === "connected") {
+          stopRingtone();
+          if (noAnswerTimerRef.current) {
+            clearTimeout(noAnswerTimerRef.current);
+            noAnswerTimerRef.current = null;
+          }
+          if (callStateRef.current !== "connected") {
+            setCallState("connected");
+            startDurationTimer();
+          }
+        }
+
+        if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
           endCall(false);
         }
       };
@@ -201,6 +236,8 @@ export default function CallPage() {
 
     clearInterval(durationTimerRef.current);
     clearRemoteAudio();
+    pendingIceCandidatesRef.current = [];
+    remoteDescriptionSetRef.current = false;
 
     if (peerRef.current) {
       peerRef.current.close();
@@ -237,6 +274,8 @@ export default function CallPage() {
       if (noAnswerTimerRef.current) clearTimeout(noAnswerTimerRef.current);
       clearInterval(durationTimerRef.current);
       clearRemoteAudio();
+      pendingIceCandidatesRef.current = [];
+      remoteDescriptionSetRef.current = false;
       if (peerRef.current) peerRef.current.close();
       if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
     };
