@@ -48,6 +48,9 @@ const CAT_LABEL: Record<string, string> = {
   movie: "🎬 মুভি", song: "🎶 গান", shortfilm: "🎥 শর্ট ফিল্ম",
 };
 
+const CACHE_KEY_PREFIX = "reels_ext_cache_v1";
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
 export default function Reels() {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
