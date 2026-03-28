@@ -98,6 +98,30 @@ export type Database = {
           },
         ]
       }
+      friend_requests: {
+        Row: {
+          created_at: string | null
+          id: string
+          receiver_id: number
+          sender_id: number
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          receiver_id: number
+          sender_id: number
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          receiver_id?: number
+          sender_id?: number
+          status?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string | null
