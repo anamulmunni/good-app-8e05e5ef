@@ -127,7 +127,19 @@ export default function Profile() {
       <main className="max-w-md mx-auto px-4 pt-8 space-y-6 relative z-10">
         {/* Avatar & Name Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl overflow-hidden">
-          <div className="h-24 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative" />
+          {/* Cover Photo */}
+          <div className="h-32 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative overflow-hidden group">
+            {(user as any).cover_url && (
+              <img src={(user as any).cover_url} alt="Cover" className="w-full h-full object-cover" />
+            )}
+            <button onClick={() => coverInputRef.current?.click()}
+              className="absolute bottom-2 right-2 bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+              style={{ opacity: 1 }}>
+              {uploadingCover ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Camera className="w-3 h-3" />}
+              কভার ফটো
+            </button>
+            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
+          </div>
           <div className="px-8 pb-8 -mt-12 text-center">
             <div className="relative inline-block mb-4">
               <button onClick={handleAvatarClick} disabled={uploading} className="relative group">
