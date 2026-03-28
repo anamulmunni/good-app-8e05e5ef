@@ -39,6 +39,13 @@ export default function Reels() {
     if (!isLoading && !user) navigate("/");
   }, [user, isLoading, navigate]);
 
+  // Mark reels as seen when entering
+  useEffect(() => {
+    if (user) {
+      markReelsSeen(user.id);
+    }
+  }, [user]);
+
   // Fetch video posts only
   const { data: reels = [], isLoading: reelsLoading } = useQuery({
     queryKey: ["reels-posts"],
