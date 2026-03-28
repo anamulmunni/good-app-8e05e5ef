@@ -313,7 +313,13 @@ export default function Feed() {
 
   const handleStorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) storyMutation.mutate(file);
+    if (file) setStoryEditorFile(file);
+    if (e.target) e.target.value = "";
+  };
+
+  const handleStoryPublish = (editedFile: File, musicName?: string) => {
+    storyMutation.mutate(editedFile);
+    setStoryEditorFile(null);
   };
 
   const handleImageTap = (postId: string, imageUrl: string) => {
