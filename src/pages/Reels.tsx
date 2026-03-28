@@ -79,18 +79,21 @@ export default function Reels() {
     const currentReel = reels[currentIndex];
     if (!currentReel) return;
 
+    // First pause ALL videos
     Object.entries(videoRefs.current).forEach(([id, video]) => {
       if (!video) return;
-      if (id === currentReel.id) {
-        video.currentTime = 0;
-        video.muted = muted;
-        video.play().catch(() => {});
-        setPaused(null);
-      } else {
-        video.pause();
-        video.currentTime = 0;
-      }
+      video.pause();
+      video.muted = true;
     });
+
+    // Then play only the current one
+    const currentVideo = videoRefs.current[currentReel.id];
+    if (currentVideo) {
+      currentVideo.currentTime = 0;
+      currentVideo.muted = muted;
+      currentVideo.play().catch(() => {});
+      setPaused(null);
+    }
   }, [currentIndex, reels, muted]);
 
   // Scroll snap observer
