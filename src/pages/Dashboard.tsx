@@ -587,84 +587,44 @@ export default function Dashboard() {
           )}
         </AnimatePresence>
 
-        {/* Key Submitter - MOVED TO TOP */}
-        <motion.div custom={3} variants={cardVariants} initial="hidden" animate="visible">
-          <KeySubmitter />
-        </motion.div>
-
-        {/* Bonus Section */}
-        {bonusEnabled && (
-          <motion.div
-            custom={4}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            className="space-y-3"
-          >
-            <div className="relative overflow-hidden rounded-2xl border border-accent/30">
-              <div className="absolute inset-0 bg-gradient-to-r from-accent/15 via-[hsl(var(--amber))]/10 to-[hsl(var(--orange))]/15" />
-              <motion.div
-                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-accent/10 to-transparent"
-              />
-              <div className="relative p-5 text-center">
-                <p className="text-lg font-black text-accent mb-1">🔥 ধামাকা বোনাস অফার! 🔥</p>
-                <p className="text-xs font-bold leading-relaxed text-foreground/80">
-                  {targetAmount}টি ভেরিফাই করলে <span className="text-accent">বোনাস</span> পাবেন!
-                </p>
-              </div>
-            </div>
-
-            <div className="glass-card p-5 rounded-2xl border border-border/50 space-y-3">
-              <div className="flex justify-between items-center">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">বোনাস প্রগ্রেস</p>
-                <p className="text-xs font-mono bg-primary/20 text-primary px-2.5 py-1 rounded-lg font-bold">{user.key_count}/{targetAmount}</p>
-              </div>
-              <div className="w-full h-3 bg-secondary/80 rounded-full overflow-hidden border border-border/50">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((user.key_count / targetAmount) * 100, 100)}%` }}
-                  transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-                  className="h-full bg-gradient-to-r from-primary via-[hsl(var(--emerald))] to-[hsl(var(--cyan))] rounded-full relative"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent to-foreground/10 rounded-full" />
-                </motion.div>
-              </div>
-              {user.key_count >= targetAmount ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="p-3 bg-primary/15 border border-primary/30 rounded-xl text-center"
-                >
-                  <p className="text-primary font-bold text-sm">🎉 বোনাসের জন্য এলিজিবল!</p>
-                </motion.div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground text-center">টার্গেট পূর্ণ হলে বোনাস আনলক হবে</p>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* User Request Section - hidden when payment mode is ON */}
+        {/* User Request Section - MOVED UP */}
         {!paymentMode && <motion.section
-          custom={5}
+          custom={3}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
-          className="glass-card rounded-2xl border border-primary/20 overflow-hidden"
+          className="relative overflow-hidden rounded-3xl border-2 border-[hsl(var(--cyan))]/30"
         >
+          <motion.div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[hsl(var(--cyan))]/10 via-[hsl(var(--blue))]/5 to-[hsl(var(--purple))]/10"
+            animate={{ opacity: [0.5, 0.8, 0.5] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
+          <motion.div
+            className="pointer-events-none absolute -top-16 -right-16 w-32 h-32 bg-[hsl(var(--cyan))] rounded-full blur-[60px] opacity-20"
+            animate={{ scale: [1, 1.4, 1] }}
+            transition={{ duration: 4, repeat: Infinity }}
+          />
+          <motion.div
+            className="pointer-events-none absolute -bottom-16 -left-16 w-32 h-32 bg-[hsl(var(--purple))] rounded-full blur-[60px] opacity-15"
+            animate={{ scale: [1.3, 1, 1.3] }}
+            transition={{ duration: 4, repeat: Infinity }}
+          />
           <button
             onClick={() => setShowRequestSection(!showRequestSection)}
-            className="w-full p-5 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+            className="w-full relative z-10 p-5 flex items-center justify-between hover:bg-secondary/10 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-[hsl(var(--cyan))]/20 flex items-center justify-center">
-                <Send className="w-5 h-5 text-primary" />
-              </div>
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] flex items-center justify-center shadow-lg shadow-[hsl(var(--cyan))]/30"
+              >
+                <Send className="w-6 h-6 text-foreground" />
+              </motion.div>
               <div className="text-left">
-                <h2 className="text-base font-bold">User Request পাঠান</h2>
-                <p className="text-[10px] text-muted-foreground">ট্যাপ করে খুলুন</p>
+                <h2 className="text-base font-black bg-gradient-to-r from-[hsl(var(--cyan))] to-[hsl(var(--blue))] bg-clip-text text-transparent">💸 Payment Request</h2>
+                <p className="text-[10px] text-muted-foreground">ট্যাপ করে রিকুয়েস্ট পাঠান</p>
               </div>
             </div>
             <motion.div animate={{ rotate: showRequestSection ? 180 : 0 }} transition={{ duration: 0.3 }}>
@@ -675,7 +635,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {showRequestSection && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
-                <div className="px-5 pb-5 space-y-4">
+                <div className="px-5 pb-5 space-y-4 relative z-10">
                   <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-xl p-4 space-y-2">
                     <p className="text-xs text-foreground/80 leading-relaxed">
                       রিকুয়েস্ট পাঠাতে সর্বনিম্ন <span className="text-[hsl(var(--amber))] font-black">{minRequestVerified}</span> টি ভেরিফাইড কাউন্ট দরকার।
@@ -718,10 +678,13 @@ export default function Dashboard() {
                         <input type="text" placeholder="01XXXXXXXXX" value={requestPaymentNumber}
                           onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field" />
                       </div>
-                      <button onClick={() => createUserRequestMutation.mutate()} className="btn-primary py-3.5 font-black"
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => createUserRequestMutation.mutate()}
+                        className="btn-primary py-3.5 font-black relative overflow-hidden"
                         disabled={isRequestLocked || createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
                         {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-4 h-4" /> Request পাঠান</>}
-                      </button>
+                      </motion.button>
                     </div>
                   )}
 
@@ -798,6 +761,65 @@ export default function Dashboard() {
             )}
           </AnimatePresence>
         </motion.section>}
+
+        {/* Key Submitter */}
+        <motion.div custom={4} variants={cardVariants} initial="hidden" animate="visible">
+          <KeySubmitter />
+        </motion.div>
+
+        {/* Bonus Section */}
+        {bonusEnabled && (
+          <motion.div
+            custom={4}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-3"
+          >
+            <div className="relative overflow-hidden rounded-2xl border border-accent/30">
+              <div className="absolute inset-0 bg-gradient-to-r from-accent/15 via-[hsl(var(--amber))]/10 to-[hsl(var(--orange))]/15" />
+              <motion.div
+                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 bg-[length:200%_100%] bg-gradient-to-r from-transparent via-accent/10 to-transparent"
+              />
+              <div className="relative p-5 text-center">
+                <p className="text-lg font-black text-accent mb-1">🔥 ধামাকা বোনাস অফার! 🔥</p>
+                <p className="text-xs font-bold leading-relaxed text-foreground/80">
+                  {targetAmount}টি ভেরিফাই করলে <span className="text-accent">বোনাস</span> পাবেন!
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-card p-5 rounded-2xl border border-border/50 space-y-3">
+              <div className="flex justify-between items-center">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">বোনাস প্রগ্রেস</p>
+                <p className="text-xs font-mono bg-primary/20 text-primary px-2.5 py-1 rounded-lg font-bold">{user.key_count}/{targetAmount}</p>
+              </div>
+              <div className="w-full h-3 bg-secondary/80 rounded-full overflow-hidden border border-border/50">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((user.key_count / targetAmount) * 100, 100)}%` }}
+                  transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+                  className="h-full bg-gradient-to-r from-primary via-[hsl(var(--emerald))] to-[hsl(var(--cyan))] rounded-full relative"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent to-foreground/10 rounded-full" />
+                </motion.div>
+              </div>
+              {user.key_count >= targetAmount ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="p-3 bg-primary/15 border border-primary/30 rounded-xl text-center"
+                >
+                  <p className="text-primary font-bold text-sm">🎉 বোনাসের জন্য এলিজিবল!</p>
+                </motion.div>
+              ) : (
+                <p className="text-[10px] text-muted-foreground text-center">টার্গেট পূর্ণ হলে বোনাস আনলক হবে</p>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         {/* Transaction History */}
         <motion.div custom={6} variants={cardVariants} initial="hidden" animate="visible" className="pt-2">
