@@ -46,12 +46,14 @@ export type ExternalReelVideo = {
   id: string;
   title: string;
   video_url: string;
-  source: "dailymotion" | "internet_archive";
+  watch_url?: string;
+  source: "dailymotion";
   creator?: string | null;
   thumbnail_url?: string | null;
   video_id?: string;
   duration?: number;
   category?: string;
+  country?: string | null;
 };
 
 export const REACTION_EMOJIS: Record<string, string> = {
@@ -68,6 +70,7 @@ export async function getBangladeshExternalVideos(
   rows = 10,
   preferredCategories?: string[],
   searchQuery?: string,
+  mode: "short" | "long" = "long",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -76,6 +79,7 @@ export async function getBangladeshExternalVideos(
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("rows", String(rows));
+    params.set("mode", mode);
     if (preferredCategories && preferredCategories.length > 0) {
       params.set("preferred", preferredCategories.join(","));
     }
