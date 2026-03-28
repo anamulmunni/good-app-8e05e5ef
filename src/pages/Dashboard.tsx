@@ -12,6 +12,7 @@ import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
 import { hasUserPosted } from "@/lib/feed-api";
+import { formatCountdown, getRemainingMilliseconds } from "@/lib/countdown";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
@@ -36,11 +37,16 @@ export default function Dashboard() {
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [showRequestSection, setShowRequestSection] = useState(false);
   const [showWalletDrawer, setShowWalletDrawer] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now());
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
-    refetchInterval: 10000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 5000,
   });
 
   const { data: incomingRequests = [] } = useQuery({
@@ -56,21 +62,6 @@ export default function Dashboard() {
     enabled: !!user?.id,
     refetchInterval: 30000,
   });
-
-  // Realtime: auto-refresh user data when admin changes settings or user record
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["public-settings"] });
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` }, () => {
-        refreshUser();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user?.id, queryClient, refreshUser]);
 
   const createUserRequestMutation = useMutation({
     mutationFn: async () => {
@@ -131,6 +122,13 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
     const settingsChannel = supabase
       .channel('dashboard-settings')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
@@ -168,6 +166,9 @@ export default function Dashboard() {
   const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
+  const requestLockRemainingMs = !paymentMode ? getRemainingMilliseconds(publicSettings?.requestLockUntil, nowMs) : 0;
+  const isRequestLocked = requestLockRemainingMs > 0;
+  const requestCountdownText = formatCountdown(requestLockRemainingMs);
 
   const copyId = () => {
     if (user?.guest_id) {
@@ -658,7 +659,16 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  {!canSendRequest ? (
+                  {isRequestLocked ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-center"
+                    >
+                      <p className="text-[10px] text-muted-foreground mb-1">রিকুয়েস্ট সিস্টেম চালু হবে</p>
+                      <p className="text-2xl font-black text-destructive tracking-wide">{requestCountdownText}</p>
+                    </motion.div>
+                  ) : !canSendRequest ? (
                     <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-center">
                       <p className="text-sm text-destructive font-bold">
                         {userVerifiedCount} / {minRequestVerified} ভেরিফাইড
@@ -681,7 +691,7 @@ export default function Dashboard() {
                           onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field" />
                       </div>
                       <button onClick={() => createUserRequestMutation.mutate()} className="btn-primary py-3.5 font-black"
-                        disabled={createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
+                        disabled={isRequestLocked || createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
                         {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-4 h-4" /> Request পাঠান</>}
                       </button>
                     </div>
@@ -738,7 +748,7 @@ export default function Dashboard() {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <button onClick={() => submitIncomingRequestsMutation.mutate()} className="btn-primary py-3"
-                                disabled={submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}>
+                                disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}>
                                 {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin" /> : "Admin এ পাঠান"}
                               </button>
                               <button onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
