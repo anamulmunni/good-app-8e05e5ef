@@ -266,14 +266,20 @@ async function fetchDailymotionFallback(
           if (coverage < 0.15 && normalizedQuery.length > 3 && !normalizedTitle.includes(normalizedQuery)) return null;
         }
       } else {
-        if (hasNonMusicMarker && !hasMusicMarker) score -= 15;
+        if (hasNonMusicMarker && !hasMusicMarker) {
+          // Will be applied as penalty below
+        }
       }
 
-      const score = scoreFallbackVideo(title, queryWords, searchQuery)
+      let score = scoreFallbackVideo(title, queryWords, searchQuery)
         + (duration >= 600 ? 3 : 0)
         + (duration >= 300 ? 2 : 0)
         + (duration >= 60 ? 1 : 0)
         + ((v.thumbnail_1080_url || v.thumbnail_720_url) ? 2 : 0);
+
+      if (!searchQuery?.trim() && hasNonMusicMarker && !hasMusicMarker) {
+        score -= 15;
+      }
 
       return {
         id: `dm-${v.id}`,
