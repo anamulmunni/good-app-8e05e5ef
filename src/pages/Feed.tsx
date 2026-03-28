@@ -120,7 +120,7 @@ export default function Feed() {
   const { data: friendRequests = [] } = useQuery({
     queryKey: ["friend-requests"],
     queryFn: () => getReceivedRequests(user!.id),
-    enabled: !!user && showFriendRequests,
+    enabled: !!user && activeTab === "friends",
   });
 
   const { data: searchResults = [] } = useQuery({
