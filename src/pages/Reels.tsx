@@ -194,17 +194,25 @@ export default function Reels() {
     }
   }, []);
 
-  // Scroll snap observer
+  // Stable scroll snap observer (prevents random index jumping/auto-scroll feeling)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) setCurrentIndex(parseInt(e.target.getAttribute("data-index") || "0"));
-      });
-    }, { root: container, threshold: 0.6 });
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+      if (!visible) return;
+
+      const nextIndex = parseInt(visible.target.getAttribute("data-index") || "0");
+      setCurrentIndex((prev) => (prev === nextIndex ? prev : nextIndex));
+    }, { root: container, threshold: [0.55, 0.75] });
+
     const items = container.querySelectorAll("[data-index]");
-    items.forEach(item => observer.observe(item));
+    items.forEach((item) => observer.observe(item));
+
     return () => observer.disconnect();
   }, [allReels.length]);
 
