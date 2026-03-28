@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import StoryEditor from "@/components/StoryEditor";
 
 export default function Feed() {
   const { user, isLoading } = useAuth();
