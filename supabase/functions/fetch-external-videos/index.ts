@@ -6,20 +6,16 @@ const corsHeaders = {
 };
 
 const CATEGORIES = [
-  { key: "funny", query: "bangla funny video" },
-  { key: "cartoon", query: "bangla cartoon gopal bhar" },
-  { key: "romantic", query: "bangla romantic song video" },
-  { key: "natok", query: "bangla natok" },
-  { key: "viral", query: "bangladesh viral video" },
+  { key: "funny", query: "bangla funny video short" },
+  { key: "cartoon", query: "bangla cartoon gopal bhar short" },
+  { key: "romantic", query: "bangla romantic video short" },
+  { key: "natok", query: "bangla natok clip short" },
+  { key: "viral", query: "bangladesh viral video short" },
   { key: "music", query: "bangla music video" },
-  { key: "comedy", query: "bangla comedy video" },
-  { key: "vlog", query: "bangladesh vlog" },
+  { key: "comedy", query: "bangla comedy short video" },
   { key: "tiktok", query: "bangla tiktok viral" },
-  { key: "movie", query: "bangla movie scene" },
-  { key: "song", query: "bangla gan" },
-  { key: "shortfilm", query: "bangla short film" },
-  { key: "gopal", query: "gopal bhar bangla cartoon" },
-  { key: "rupkotha", query: "rupkothar golpo bangla" },
+  { key: "song", query: "bangla gan short" },
+  { key: "gopal", query: "gopal bhar bangla cartoon short" },
 ];
 
 serve(async (req) => {
@@ -38,10 +34,14 @@ serve(async (req) => {
     let queries: string[] = [];
 
     if (searchQuery.trim()) {
-      // User searched — use their query directly
-      queries = [searchQuery.trim(), `${searchQuery.trim()} bangla`];
+      // User searched — use their query, add "short" and "bangla" variants
+      const q = searchQuery.trim();
+      queries = [
+        `${q} short`,
+        `${q} bangla short`,
+        q,
+      ];
     } else if (preferredKeys.length > 0) {
-      // Personalized
       for (let i = 0; i < 2; i++) {
         const key = preferredKeys[(page + i) % preferredKeys.length];
         const cat = CATEGORIES.find(c => c.key === key);
@@ -50,24 +50,23 @@ serve(async (req) => {
       const randomIdx = (page * 7 + 3) % CATEGORIES.length;
       queries.push(CATEGORIES[randomIdx].query);
     } else {
-      // Default rotation
       for (let i = 0; i < 3; i++) {
         const idx = ((page - 1) * 3 + i) % CATEGORIES.length;
         queries.push(CATEGORIES[idx].query);
       }
     }
 
-    const perQuery = Math.ceil(rows / queries.length) + 3;
+    const perQuery = Math.ceil(rows / queries.length) + 5;
 
     const fetchPromises = queries.map(async (q) => {
       try {
-        // shorter_than=20 means under 20 minutes, allow up to 1200 seconds
-        const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&limit=${perQuery}&page=${page}&fields=id,title,thumbnail_url,duration,owner.screenname,embed_url&shorter_than=20&sort=relevance`;
+        // shorter_than=1 = under 1 minute for TikTok-style short videos
+        // Also try shorter_than=2 (under 2 min) for slightly more results
+        const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&limit=${perQuery}&page=${page}&fields=id,title,thumbnail_url,duration,owner.screenname,embed_url&shorter_than=2&sort=relevance&language=bn`;
         const res = await fetch(dmUrl);
         if (!res.ok) { await res.text(); return []; }
         const data = await res.json();
         return (data.list || []).map((v: any) => {
-          // Detect category
           let cat = "";
           const title = String(v.title || "").toLowerCase();
           if (title.includes("cartoon") || title.includes("gopal") || title.includes("rupkotha")) cat = "cartoon";
@@ -75,7 +74,7 @@ serve(async (req) => {
           else if (title.includes("romantic") || title.includes("love")) cat = "romantic";
           else if (title.includes("natok") || title.includes("নাটক")) cat = "natok";
           else if (title.includes("song") || title.includes("গান") || title.includes("gan")) cat = "song";
-          else if (title.includes("movie") || title.includes("সিনেমা")) cat = "movie";
+          else if (title.includes("tiktok")) cat = "tiktok";
           else cat = "viral";
           return { ...v, _category: cat };
         });
@@ -92,7 +91,8 @@ serve(async (req) => {
 
     for (const item of allItems) {
       if (seen.has(item.id)) continue;
-      if (item.duration > 1200 || item.duration < 3) continue;
+      // Only allow SHORT videos: max 120 seconds (2 minutes), min 3 seconds
+      if (item.duration > 120 || item.duration < 3) continue;
       seen.add(item.id);
 
       videos.push({
@@ -101,8 +101,7 @@ serve(async (req) => {
         creator: item["owner.screenname"] || null,
         source: "dailymotion",
         thumbnail_url: item.thumbnail_url,
-        // Embed with autoplay, no controls chrome, loop
-        video_url: `https://geo.dailymotion.com/player.html?video=${item.id}&autoplay=true&mute=false&loop=true&controls=true&ui-start-screen-info=false&ui-logo=false&sharing-enable=false`,
+        video_url: `https://geo.dailymotion.com/player.html?video=${item.id}&autoplay=true&mute=true&loop=true&controls=false&ui-start-screen-info=false&ui-logo=false&sharing-enable=false`,
         video_id: item.id,
         duration: item.duration,
         category: item._category,
