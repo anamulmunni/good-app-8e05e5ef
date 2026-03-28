@@ -149,18 +149,29 @@ export default function Reels() {
     setLoadingComments(false);
   };
 
-  const handleDoubleTap = (postId: string) => {
+  const handleVideoTap = (postId: string) => {
     const now = Date.now();
     const last = lastTapRef.current[postId] || 0;
+
+    // Clear any pending single-tap timer
+    if (tapTimerRef.current[postId]) {
+      clearTimeout(tapTimerRef.current[postId]);
+    }
+
     if (now - last < 300) {
+      // Double tap = like
+      lastTapRef.current[postId] = 0;
       if (!userReactions[postId]) {
         reactionMutation.mutate({ postId, type: "love" });
       }
       setShowLoveAnim(postId);
       setTimeout(() => setShowLoveAnim(null), 1000);
-      lastTapRef.current[postId] = 0;
     } else {
+      // Single tap = play/pause (with delay to detect double tap)
       lastTapRef.current[postId] = now;
+      tapTimerRef.current[postId] = setTimeout(() => {
+        togglePause(postId);
+      }, 300);
     }
   };
 
