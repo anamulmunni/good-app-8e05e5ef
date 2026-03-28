@@ -9,18 +9,20 @@ const MIN_DURATION_SECONDS = 4;
 const MAX_DURATION_SECONDS = 70;
 const MAX_ASPECT_RATIO = 0.82;
 const SHORT_HINTS = ["tiktok", "tik tok", "short", "reels", "viral", "bangla"];
+const BD_HINTS = ["bangladesh", "বাংলাদেশ", "bd", "dhaka", "chittagong", "sylhet"];
+const NON_BD_PENALTY_HINTS = ["india", "indian", "hindi", "kolkata", "tollywood"];
 
 const CATEGORIES = [
-  { key: "tiktok", query: "bangla tiktok short vertical" },
-  { key: "funny", query: "bangla funny short vertical video" },
+  { key: "tiktok", query: "bangladesh tiktok short vertical" },
+  { key: "funny", query: "bangladesh funny short vertical video" },
   { key: "cartoon", query: "bangla cartoon gopal bhar short" },
-  { key: "romantic", query: "bangla romantic short tiktok" },
-  { key: "natok", query: "bangla natok short clip" },
+  { key: "romantic", query: "bangladesh romantic short tiktok" },
+  { key: "natok", query: "bangladesh natok short clip" },
   { key: "viral", query: "bangladesh viral short video" },
-  { key: "music", query: "bangla song short video" },
-  { key: "comedy", query: "bangla comedy short vertical" },
-  { key: "song", query: "bangla gan short vertical" },
-  { key: "gopal", query: "gopal bhar bangla cartoon short" },
+  { key: "music", query: "bangladesh trending bangla song short" },
+  { key: "comedy", query: "bangladesh comedy short vertical" },
+  { key: "song", query: "bangladesh bangla gan short vertical" },
+  { key: "gopal", query: "bangladesh gopal bhar bangla cartoon short" },
 ];
 
 function normalizeSearch(input: string) {
@@ -30,8 +32,9 @@ function normalizeSearch(input: string) {
 function buildSearchQueries(search: string): string[] {
   const q = normalizeSearch(search);
   return [
-    `${q} tiktok short`,
-    `${q} short vertical`,
+    `${q} bangladesh tiktok short`,
+    `${q} bangladesh viral short`,
+    `${q} bangla short vertical`,
     `${q} reels short`,
     q,
   ];
@@ -46,6 +49,12 @@ function scoreTitle(title: string, keywords: string[]) {
   }
   for (const hint of SHORT_HINTS) {
     if (lower.includes(hint)) score += 1;
+  }
+  for (const hint of BD_HINTS) {
+    if (lower.includes(hint)) score += 2;
+  }
+  for (const hint of NON_BD_PENALTY_HINTS) {
+    if (lower.includes(hint)) score -= 3;
   }
   return score;
 }
@@ -87,7 +96,7 @@ serve(async (req) => {
 
     const fetchPromises = queries.map(async (q) => {
       try {
-        const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&limit=${perQuery}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,aspect_ratio,owner.screenname,tags&sort=relevance`;
+        const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&limit=${perQuery}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,aspect_ratio,owner.screenname,tags,country&sort=relevance&language=bn`;
         const res = await fetch(dmUrl);
         if (!res.ok) { await res.text(); return []; }
         const data = await res.json();
@@ -103,6 +112,7 @@ serve(async (req) => {
 
             const duration = Number(v.duration || metadata?.duration || 0);
             const aspectRatio = Number(v.aspect_ratio || metadata?.aspect_ratio || 0);
+            const country = String(v.country || metadata?.country || "").toUpperCase();
 
             let cat = "";
             const title = String(v.title || "").toLowerCase();
@@ -123,7 +133,9 @@ serve(async (req) => {
             const score = scoreTitle(String(v.title || ""), searchKeywords)
               + (aspectOk ? 3 : 0)
               + (duration <= 40 ? 2 : 0)
-              + (shortHint ? 2 : 0);
+              + (shortHint ? 2 : 0)
+              + (country === "BD" ? 6 : 0)
+              + (country === "IN" ? -4 : 0);
 
             return {
               id: v.id,
@@ -133,6 +145,7 @@ serve(async (req) => {
               duration,
               category: cat,
               stream_url: stream,
+              country,
               score,
             };
           } catch {
@@ -180,6 +193,7 @@ serve(async (req) => {
         duration: item.duration,
         category: item._category,
         score: item.score || 0,
+        country: item.country || null,
       });
     }
 
