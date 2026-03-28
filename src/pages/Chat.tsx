@@ -267,9 +267,6 @@ export default function Chat() {
             className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 dark:text-primary hover:bg-blue-50 dark:hover:bg-primary/10">
             <Phone size={20} />
           </button>
-          <button className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 dark:text-primary hover:bg-blue-50 dark:hover:bg-primary/10">
-            <Video size={20} />
-          </button>
         </div>
 
         {/* Messages area - Messenger gradient bubbles */}
