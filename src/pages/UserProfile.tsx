@@ -1,11 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrCreateConversation } from "@/lib/chat-api";
-import { toggleLike, getUserLikes, getPostComments, addComment, type Post, type PostComment } from "@/lib/feed-api";
-import { ArrowLeft, User, MessageCircle, Heart, Send, Key, Calendar } from "lucide-react";
+import {
+  toggleReaction, getUserReactions, getPostComments, addComment,
+  REACTION_EMOJIS, type Post, type PostComment
+} from "@/lib/feed-api";
+import { sendFriendRequest, getFriendshipStatus } from "@/lib/friend-api";
+import {
+  ArrowLeft, User, MessageCircle, Heart, Send, Key, Calendar,
+  Globe, MoreHorizontal, Share2, ThumbsUp, UserPlus, Phone, X
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,11 +22,13 @@ export default function UserProfile() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [userReactions, setUserReactions] = useState<Record<string, string>>({});
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [showPostMenu, setShowPostMenu] = useState<string | null>(null);
 
   const targetUserId = parseInt(userId || "0");
 
@@ -27,7 +36,6 @@ export default function UserProfile() {
     if (!authLoading && !user) navigate("/");
   }, [user, authLoading, navigate]);
 
-  // Fetch target user
   const { data: targetUser, isLoading: userLoading } = useQuery({
     queryKey: ["user-profile", targetUserId],
     queryFn: async () => {
@@ -37,7 +45,6 @@ export default function UserProfile() {
     enabled: targetUserId > 0,
   });
 
-  // Fetch user's posts
   const { data: posts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["user-posts", targetUserId],
     queryFn: async () => {
@@ -52,37 +59,32 @@ export default function UserProfile() {
     enabled: !!targetUser,
   });
 
+  const { data: friendshipStatus } = useQuery({
+    queryKey: ["friendship-status", user?.id, targetUserId],
+    queryFn: () => getFriendshipStatus(user!.id, targetUserId),
+    enabled: !!user && targetUserId > 0 && targetUserId !== user?.id,
+  });
+
   useEffect(() => {
     if (user && posts.length > 0) {
-      getUserLikes(user.id, posts.map((p: Post) => p.id)).then(setLikedPosts);
+      getUserReactions(user.id, posts.map((p: Post) => p.id)).then(setUserReactions);
     }
   }, [user, posts]);
 
-  const likeMutation = useMutation({
-    mutationFn: async (postId: string) => {
+  const reactionMutation = useMutation({
+    mutationFn: async ({ postId, type }: { postId: string; type: string }) => {
       if (!user) throw new Error("Login");
-      return { postId, liked: await toggleLike(postId, user.id) };
+      return toggleReaction(postId, user.id, type);
     },
-    onMutate: async (postId: string) => {
-      const wasLiked = likedPosts.has(postId);
-      setLikedPosts(p => {
-        const next = new Set(p);
-        wasLiked ? next.delete(postId) : next.add(postId);
-        return next;
-      });
-      queryClient.setQueryData<Post[]>(["user-posts", targetUserId], old =>
-        (old || []).map(p => p.id === postId ? { ...p, likes_count: p.likes_count + (wasLiked ? -1 : 1) } : p)
-      );
-      return { wasLiked };
+    onSuccess: (result, { postId, type }) => {
+      if (result) {
+        setUserReactions(prev => ({ ...prev, [postId]: type }));
+      } else {
+        setUserReactions(prev => { const n = { ...prev }; delete n[postId]; return n; });
+      }
+      queryClient.invalidateQueries({ queryKey: ["user-posts", targetUserId] });
+      setShowReactionPicker(null);
     },
-    onError: (_err, postId, context) => {
-      setLikedPosts(p => {
-        const next = new Set(p);
-        context?.wasLiked ? next.add(postId) : next.delete(postId);
-        return next;
-      });
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["user-posts", targetUserId] }),
   });
 
   const commentMutation = useMutation({
@@ -93,11 +95,8 @@ export default function UserProfile() {
     onMutate: async () => {
       if (!user || !commentingPostId) return;
       const optimistic: PostComment = {
-        id: `temp-${Date.now()}`,
-        post_id: commentingPostId,
-        user_id: user.id,
-        content: commentText.trim(),
-        created_at: new Date().toISOString(),
+        id: `temp-${Date.now()}`, post_id: commentingPostId, user_id: user.id,
+        content: commentText.trim(), created_at: new Date().toISOString(),
         user: { display_name: user.display_name, avatar_url: user.avatar_url, guest_id: user.guest_id },
       };
       setComments(prev => [...prev, optimistic]);
@@ -107,6 +106,15 @@ export default function UserProfile() {
       if (commentingPostId) loadComments(commentingPostId);
       queryClient.invalidateQueries({ queryKey: ["user-posts", targetUserId] });
     },
+  });
+
+  const friendRequestMutation = useMutation({
+    mutationFn: () => sendFriendRequest(user!.id, targetUserId),
+    onSuccess: () => {
+      toast({ title: "ফ্রেন্ড রিকুয়েস্ট পাঠানো হয়েছে!" });
+      queryClient.invalidateQueries({ queryKey: ["friendship-status"] });
+    },
+    onError: () => toast({ title: "রিকুয়েস্ট পাঠানো যায়নি", variant: "destructive" }),
   });
 
   const loadComments = async (postId: string) => {
@@ -129,32 +137,42 @@ export default function UserProfile() {
     } catch {}
   };
 
+  const sharePost = async (post: Post) => {
+    const text = post.content || "দেখুন এই পোস্টটি!";
+    if (navigator.share) {
+      try { await navigator.share({ title: "Good App", text, url: window.location.origin }); } catch {}
+    } else {
+      navigator.clipboard.writeText(`${text}\n${window.location.origin}`);
+      toast({ title: "লিংক কপি করা হয়েছে!" });
+    }
+  };
+
   const timeAgo = (dateStr: string | null) => {
     if (!dateStr) return "";
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "এইমাত্র";
-    if (mins < 60) return `${mins} মি. আগে`;
+    if (mins < 60) return `${mins} মি.`;
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs} ঘ. আগে`;
-    return `${Math.floor(hrs / 24)} দি. আগে`;
+    if (hrs < 24) return `${hrs} ঘ.`;
+    return `${Math.floor(hrs / 24)} দি.`;
   };
 
   if (authLoading || !user) return null;
 
   if (userLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-background">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!targetUser) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
-        <p className="text-muted-foreground">ইউজার পাওয়া যায়নি</p>
-        <button onClick={() => navigate(-1)} className="text-primary font-bold">ফিরে যান</button>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-background gap-4">
+        <p className="text-gray-500">ইউজার পাওয়া যায়নি</p>
+        <button onClick={() => navigate(-1)} className="text-blue-600 font-bold">ফিরে যান</button>
       </div>
     );
   }
@@ -163,159 +181,273 @@ export default function UserProfile() {
   const joinDate = targetUser.created_at ? new Date(targetUser.created_at).toLocaleDateString("bn-BD", { year: "numeric", month: "long", day: "numeric" }) : "—";
 
   return (
-    <div className="min-h-screen bg-background pb-8">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border/50">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
+    <div className="min-h-screen bg-gray-100 dark:bg-background pb-8">
+      {/* FB Lite Header */}
+      <header className="sticky top-0 z-50 bg-blue-600 shadow-md">
+        <div className="max-w-lg mx-auto px-3 py-2.5 flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="text-white">
             <ArrowLeft size={22} />
           </button>
-          <h1 className="text-lg font-bold truncate">{targetUser.display_name || "User"}</h1>
+          <h1 className="text-[17px] font-bold text-white truncate">{targetUser.display_name || "User"}</h1>
         </div>
       </header>
 
-      {/* Profile Card */}
-      <div className="max-w-lg mx-auto px-4 pt-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl overflow-hidden mb-6">
-          <div className="h-28 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 overflow-hidden">
-            {(targetUser as any).cover_url && (
-              <img src={(targetUser as any).cover_url} alt="Cover" className="w-full h-full object-cover" />
+      {/* Cover Photo + Profile */}
+      <div className="bg-white dark:bg-card">
+        <div className="h-[180px] bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden relative">
+          {(targetUser as any).cover_url && (
+            <img src={(targetUser as any).cover_url} alt="Cover" className="w-full h-full object-cover" />
+          )}
+        </div>
+        <div className="px-4 pb-4 -mt-[50px]">
+          <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white dark:border-card bg-gray-200 flex items-center justify-center shadow-lg">
+            {targetUser.avatar_url ? (
+              <img src={targetUser.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-12 h-12 text-gray-400" />
             )}
           </div>
-          <div className="px-6 pb-6 -mt-10 text-center">
-            <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-background bg-secondary flex items-center justify-center mx-auto mb-3 shadow-xl">
-              {targetUser.avatar_url ? (
-                <img src={targetUser.avatar_url} alt="" className="w-full h-full object-cover" />
+          <h2 className="text-[22px] font-black text-gray-900 dark:text-foreground mt-2">{targetUser.display_name || "User"}</h2>
+          <p className="text-[13px] text-gray-500 dark:text-muted-foreground">{targetUser.guest_id}</p>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-4 mt-3 text-[13px] text-gray-500">
+            <div className="flex items-center gap-1">
+              <Key className="w-3.5 h-3.5 text-blue-600" />
+              <span className="font-bold text-gray-900 dark:text-foreground">{targetUser.key_count || 0}</span> ভেরিফাইড
+            </div>
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              <span>{joinDate}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          {!isOwnProfile ? (
+            <div className="flex gap-2 mt-3">
+              {friendshipStatus === "friends" ? (
+                <button className="flex-1 py-2 bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground rounded-md text-[13px] font-semibold flex items-center justify-center gap-1.5">
+                  <UserPlus className="w-4 h-4" /> বন্ধু
+                </button>
+              ) : friendshipStatus === "pending" ? (
+                <button className="flex-1 py-2 bg-gray-200 dark:bg-secondary text-gray-600 rounded-md text-[13px] font-semibold">
+                  রিকুয়েস্ট পাঠানো হয়েছে
+                </button>
               ) : (
-                <User className="w-10 h-10 text-muted-foreground" />
+                <button onClick={() => friendRequestMutation.mutate()}
+                  disabled={friendRequestMutation.isPending}
+                  className="flex-1 py-2 bg-blue-600 text-white rounded-md text-[13px] font-semibold flex items-center justify-center gap-1.5">
+                  <UserPlus className="w-4 h-4" /> Add friend
+                </button>
               )}
-            </div>
-            <h2 className="text-xl font-black mb-1">{targetUser.display_name || "User"}</h2>
-            <p className="text-xs text-muted-foreground font-mono mb-4">{targetUser.guest_id}</p>
-
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <div className="text-center">
-                <div className="flex items-center gap-1 justify-center">
-                  <Key className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-lg font-black text-primary">{targetUser.key_count || 0}</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">ভেরিফাইড</p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="text-center">
-                <div className="flex items-center gap-1 justify-center">
-                  <Calendar className="w-3.5 h-3.5 text-[hsl(var(--cyan))]" />
-                  <span className="text-xs font-bold">{joinDate}</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">জয়েন</p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="text-center">
-                <span className="text-lg font-black text-[hsl(var(--amber))]">{posts.length}</span>
-                <p className="text-[10px] text-muted-foreground">পোস্ট</p>
-              </div>
-            </div>
-
-            {!isOwnProfile && (
-              <button
-                onClick={startChat}
-                className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2"
-              >
-                <MessageCircle className="w-4 h-4" /> মেসেজ পাঠান
+              <button onClick={startChat}
+                className="flex-1 py-2 bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground rounded-md text-[13px] font-semibold flex items-center justify-center gap-1.5">
+                <MessageCircle className="w-4 h-4" /> Message
               </button>
-            )}
-            {isOwnProfile && (
-              <button
-                onClick={() => navigate("/profile")}
-                className="w-full py-2.5 bg-secondary text-foreground rounded-xl font-bold text-sm"
-              >
-                প্রোফাইল এডিট করুন
-              </button>
-            )}
-          </div>
-        </motion.div>
+            </div>
+          ) : (
+            <button onClick={() => navigate("/profile")}
+              className="w-full mt-3 py-2 bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground rounded-md text-[13px] font-semibold">
+              প্রোফাইল এডিট করুন
+            </button>
+          )}
+        </div>
+      </div>
 
-        {/* Posts */}
-        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 px-1">পোস্টসমূহ</h3>
+      {/* Posts Section - Facebook Lite News Feed Style */}
+      <div className="mt-2">
+        <div className="bg-white dark:bg-card px-3 py-2.5 border-b border-gray-200 dark:border-border/30">
+          <h3 className="text-[15px] font-bold text-gray-900 dark:text-foreground">পোস্টসমূহ</h3>
+        </div>
 
         {postsLoading ? (
-          <div className="flex justify-center py-10">
-            <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex justify-center py-10 bg-white dark:bg-card">
+            <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : posts.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
+          <div className="text-center py-10 text-gray-500 bg-white dark:bg-card">
             <p className="text-sm">কোনো পোস্ট নেই</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {posts.map((post: Post) => (
-              <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card rounded-2xl p-4">
-                {post.content && <p className="text-sm text-foreground leading-relaxed mb-3 whitespace-pre-wrap">{post.content}</p>}
-                {post.image_url && (
-                  <div className="mb-3 rounded-xl overflow-hidden border border-border/30">
-                    <img src={post.image_url} alt="" className="w-full max-h-80 object-cover" />
-                  </div>
-                )}
-                {post.video_url && (
-                  <div className="mb-3 rounded-xl overflow-hidden border border-border/30">
-                    <video src={post.video_url} controls className="w-full max-h-80" />
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between text-muted-foreground text-xs pt-1">
-                  <div className="flex items-center gap-4">
-                    <motion.button whileTap={{ scale: 1.3 }} onClick={() => likeMutation.mutate(post.id)} className="flex items-center gap-1">
-                      <Heart className={`w-4 h-4 ${likedPosts.has(post.id) ? "fill-[hsl(var(--pink))] text-[hsl(var(--pink))]" : ""}`} />
-                      <span className={likedPosts.has(post.id) ? "text-[hsl(var(--pink))] font-bold" : ""}>{post.likes_count || ""}</span>
-                    </motion.button>
-                    <button onClick={() => openComments(post.id)} className="flex items-center gap-1 hover:text-[hsl(var(--cyan))]">
-                      <MessageCircle className="w-4 h-4" />
-                      <span>{post.comments_count || ""}</span>
+          <div className="space-y-2">
+            {posts.map((post: Post) => {
+              const myReaction = userReactions[post.id];
+              return (
+                <div key={post.id} className="bg-white dark:bg-card">
+                  {/* Post header */}
+                  <div className="flex items-center gap-2.5 px-3 pt-3 pb-1.5">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
+                      {post.user?.avatar_url ? <img src={post.user.avatar_url} className="w-full h-full object-cover" /> :
+                        <span className="text-blue-600 font-bold text-sm">{post.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-[14px] text-gray-900 dark:text-foreground">
+                        {post.user?.display_name || "User"}
+                      </p>
+                      <div className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-muted-foreground">
+                        <span>{timeAgo(post.created_at)}</span>
+                        <span>·</span>
+                        <Globe className="w-3 h-3" />
+                      </div>
+                    </div>
+                    <button onClick={() => setShowPostMenu(showPostMenu === post.id ? null : post.id)}
+                      className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-secondary text-gray-500">
+                      <MoreHorizontal className="w-5 h-5" />
                     </button>
                   </div>
-                  <span>{timeAgo(post.created_at)}</span>
-                </div>
 
-                {/* Comments */}
-                <AnimatePresence>
-                  {commentingPostId === post.id && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                      <div className="mt-3 pt-3 border-t border-border/30 space-y-2">
-                        {loadingComments ? (
-                          <p className="text-xs text-muted-foreground text-center py-2">লোড হচ্ছে...</p>
-                        ) : comments.length === 0 ? (
-                          <p className="text-xs text-muted-foreground text-center py-2">কোনো কমেন্ট নেই</p>
-                        ) : (
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {comments.map((c) => (
-                              <div key={c.id} className="flex gap-2">
-                                <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-                                  <span className="text-[9px] text-primary font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>
-                                </div>
-                                <div className="bg-secondary/60 rounded-xl px-3 py-1.5 flex-1">
-                                  <p className="text-[10px] font-bold text-foreground">{c.user?.display_name || "User"}</p>
-                                  <p className="text-xs text-foreground/80">{c.content}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                  {/* Post menu */}
+                  <AnimatePresence>
+                    {showPostMenu === post.id && (
+                      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                        className="mx-3 mb-2 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-xl z-50 overflow-hidden">
+                        {!isOwnProfile && (
+                          <>
+                            <button onClick={() => { startChat(); setShowPostMenu(null); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-secondary text-sm">
+                              <MessageCircle className="w-4 h-4" /> মেসেজ পাঠান
+                            </button>
+                            <button onClick={() => { navigate(`/call/${post.user_id}`); setShowPostMenu(null); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-secondary text-sm">
+                              <Phone className="w-4 h-4" /> কল করুন
+                            </button>
+                          </>
                         )}
-                        <div className="flex items-center gap-2">
-                          <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && commentText.trim() && commentMutation.mutate()}
-                            placeholder="কমেন্ট করুন..." className="flex-1 bg-secondary/50 text-foreground rounded-full px-3 py-1.5 text-xs border-none outline-none placeholder:text-muted-foreground" />
-                          <button onClick={() => commentText.trim() && commentMutation.mutate()}
-                            disabled={!commentText.trim() || commentMutation.isPending}
-                            className="w-7 h-7 bg-primary rounded-full flex items-center justify-center disabled:opacity-50">
-                            <Send className="w-3 h-3 text-primary-foreground" />
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Post content */}
+                  {post.content && (
+                    <p className="text-[15px] text-gray-900 dark:text-foreground leading-relaxed px-3 pb-2 whitespace-pre-wrap">{post.content}</p>
                   )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
+
+                  {/* Image */}
+                  {post.image_url && (
+                    <img src={post.image_url} alt="" className="w-full max-h-[500px] object-cover" />
+                  )}
+
+                  {/* Video */}
+                  {post.video_url && (
+                    <div className="bg-black">
+                      <video src={post.video_url} controls playsInline preload="metadata" className="w-full max-h-[500px] object-contain" />
+                    </div>
+                  )}
+
+                  {/* Reaction summary */}
+                  {(post.likes_count > 0 || post.comments_count > 0) && (
+                    <div className="px-3 py-1.5 flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        {post.likes_count > 0 && (
+                          <>
+                            <span className="w-[18px] h-[18px] rounded-full bg-blue-600 flex items-center justify-center text-[10px]">👍</span>
+                            <span>{post.likes_count}</span>
+                          </>
+                        )}
+                      </div>
+                      {post.comments_count > 0 && (
+                        <button onClick={() => openComments(post.id)} className="hover:underline">
+                          {post.comments_count} মন্তব্য
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Action buttons - FB Lite style */}
+                  <div className="px-3 py-0.5 border-t border-gray-200 dark:border-border/20 grid grid-cols-3">
+                    <div className="relative">
+                      <button
+                        onClick={() => reactionMutation.mutate({ postId: post.id, type: myReaction || "like" })}
+                        onContextMenu={(e) => { e.preventDefault(); setShowReactionPicker(showReactionPicker === post.id ? null : post.id); }}
+                        onTouchStart={() => {
+                          const timer = setTimeout(() => setShowReactionPicker(showReactionPicker === post.id ? null : post.id), 500);
+                          const cleanup = () => { clearTimeout(timer); document.removeEventListener("touchend", cleanup); };
+                          document.addEventListener("touchend", cleanup);
+                        }}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 w-full rounded-lg ${
+                          myReaction ? "text-blue-600" : "text-gray-600 dark:text-muted-foreground"
+                        }`}>
+                        {myReaction ? (
+                          <span className="text-lg">{REACTION_EMOJIS[myReaction]}</span>
+                        ) : (
+                          <ThumbsUp className="w-[18px] h-[18px]" />
+                        )}
+                        <span className="text-xs font-semibold">{post.likes_count > 0 ? post.likes_count : "পছন্দ"}</span>
+                      </button>
+
+                      <AnimatePresence>
+                        {showReactionPicker === post.id && (
+                          <motion.div initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.8 }}
+                            className="absolute bottom-full left-0 mb-2 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-full shadow-xl px-2 py-1.5 flex gap-0.5 z-50">
+                            {Object.entries(REACTION_EMOJIS).map(([type, emoji]) => (
+                              <motion.button key={type} whileHover={{ scale: 1.4 }} whileTap={{ scale: 0.9 }}
+                                onClick={() => reactionMutation.mutate({ postId: post.id, type })}
+                                className={`text-2xl p-1 rounded-full hover:bg-gray-100 ${myReaction === type ? "bg-blue-50" : ""}`}>
+                                {emoji}
+                              </motion.button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <button onClick={() => openComments(post.id)}
+                      className="flex items-center justify-center gap-1.5 py-2.5 text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary/50 rounded-lg">
+                      <MessageCircle className="w-[18px] h-[18px]" />
+                      <span className="text-xs font-semibold">মন্তব্য {post.comments_count > 0 ? `(${post.comments_count})` : ""}</span>
+                    </button>
+
+                    <button onClick={() => sharePost(post)}
+                      className="flex items-center justify-center gap-1.5 py-2.5 text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary/50 rounded-lg">
+                      <Share2 className="w-[18px] h-[18px]" />
+                      <span className="text-xs font-semibold">শেয়ার</span>
+                    </button>
+                  </div>
+
+                  {/* Comments */}
+                  <AnimatePresence>
+                    {commentingPostId === post.id && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                        <div className="px-3 pb-3 pt-1 border-t border-gray-200 dark:border-border/20 space-y-2">
+                          {loadingComments ? <p className="text-xs text-gray-500 text-center py-2">লোড হচ্ছে...</p> :
+                            comments.length === 0 ? <p className="text-xs text-gray-500 text-center py-2">কোনো মন্তব্য নেই</p> : (
+                              <div className="space-y-2.5 max-h-72 overflow-y-auto">
+                                {comments.map((c) => (
+                                  <div key={c.id} className="flex gap-2">
+                                    <button onClick={() => navigate(`/user/${c.user_id}`)}
+                                      className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
+                                      {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
+                                        <span className="text-[10px] text-blue-600 font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                                    </button>
+                                    <div className="bg-gray-100 dark:bg-secondary rounded-2xl px-3 py-2 flex-1">
+                                      <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-xs font-bold text-gray-900 dark:text-foreground hover:underline block">
+                                        {c.user?.display_name || "User"}
+                                      </button>
+                                      <p className="text-[13px] text-gray-800 dark:text-foreground/90 mt-0.5 break-words">{c.content}</p>
+                                      <p className="text-[10px] text-gray-500 mt-1">{timeAgo(c.created_at)}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          <div className="flex items-center gap-2">
+                            <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && commentText.trim() && commentMutation.mutate()}
+                              placeholder="মন্তব্য লিখুন..."
+                              className="flex-1 bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-full px-4 py-2 text-sm border-none outline-none placeholder:text-gray-400" />
+                            <button onClick={() => commentText.trim() && commentMutation.mutate()}
+                              disabled={!commentText.trim() || commentMutation.isPending}
+                              className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center disabled:opacity-40">
+                              <Send className="w-3.5 h-3.5 text-white" />
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
