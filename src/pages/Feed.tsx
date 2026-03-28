@@ -318,7 +318,7 @@ export default function Feed() {
   };
 
   const handleStoryPublish = (editedFile: File, musicName?: string) => {
-    storyMutation.mutate(editedFile);
+    storyMutation.mutate({ file: editedFile, musicName });
     setStoryEditorFile(null);
   };
 
