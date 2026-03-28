@@ -11,7 +11,7 @@ import {
   REACTION_EMOJIS, type Post, type PostComment, type Story
 } from "@/lib/feed-api";
 import { getOrCreateConversation, getUnreadCount } from "@/lib/chat-api";
-import { getSuggestedPeople, sendFriendRequest, getReceivedRequests, acceptFriendRequest, rejectFriendRequest, getFriendRequestCount } from "@/lib/friend-api";
+import { getSuggestedPeople, sendFriendRequest, getReceivedRequests, acceptFriendRequest, rejectFriendRequest, getFriendRequestCount, getAllUsersWithStatus } from "@/lib/friend-api";
 import { getOnlineUsers } from "@/hooks/use-online";
 import {
   Heart, MessageCircle, Send, Image, X, Home, Users, Bell, Menu,
