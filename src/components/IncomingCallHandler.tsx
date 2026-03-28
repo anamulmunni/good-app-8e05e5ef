@@ -135,6 +135,11 @@ export default function IncomingCallHandler() {
       const isBusy = callActiveRef.current || !!incomingCallRef.current || inCallRoute;
 
       if (isBusy) {
+        // If user is on CallPage calling this same person (glare), don't send busy -
+        // let CallPage handle glare resolution
+        if (inCallRoute && window.location.pathname === `/call/${signal.caller_id}`) {
+          return; // CallPage handles glare
+        }
         sendCallSignal(user.id, signal.caller_id, "call-busy").catch(() => {});
         return;
       }

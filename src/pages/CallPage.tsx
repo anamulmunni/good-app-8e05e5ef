@@ -125,7 +125,84 @@ export default function CallPage() {
             }
             break;
           case "call-request":
-            if (["calling", "ringing", "connected"].includes(callStateRef.current)) {
+            if (["calling", "ringing"].includes(callStateRef.current)) {
+              // Glare resolution: both users called each other simultaneously
+              // Lower user ID yields and becomes the answerer
+              if (user.id < targetUserId && signal.signal_data?.offer) {
+                // I yield: accept their offer instead
+                stopRingtone();
+                if (noAnswerTimerRef.current) {
+                  clearTimeout(noAnswerTimerRef.current);
+                  noAnswerTimerRef.current = null;
+                }
+                // Close existing peer and create new one as answerer
+                if (peerRef.current) {
+                  peerRef.current.close();
+                  peerRef.current = null;
+                }
+                pendingIceCandidatesRef.current = [];
+                remoteDescriptionSetRef.current = false;
+
+                try {
+                  const stream = localStreamRef.current || await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                  });
+                  localStreamRef.current = stream;
+
+                  const pc = new RTCPeerConnection(rtcConfig);
+                  peerRef.current = pc;
+
+                  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+                  pc.ontrack = (event) => {
+                    const remoteStream = event.streams?.[0] || new MediaStream([event.track]);
+                    remoteAudioRef.current = attachRemoteAudio(remoteStream);
+                  };
+
+                  pc.onconnectionstatechange = () => {
+                    if (pc.connectionState === "connected") {
+                      stopRingtone();
+                      if (callStateRef.current !== "connected") {
+                        setCallState("connected");
+                        startDurationTimer();
+                      }
+                    }
+                    if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
+                      endCall(false);
+                    }
+                  };
+
+                  pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                      sendCallSignal(user.id, targetUserId, "ice-candidate", event.candidate.toJSON());
+                    }
+                  };
+
+                  await pc.setRemoteDescription(new RTCSessionDescription(signal.signal_data.offer));
+                  remoteDescriptionSetRef.current = true;
+
+                  // Flush pending ICE candidates
+                  for (const candidate of pendingIceCandidatesRef.current) {
+                    try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+                  }
+                  pendingIceCandidatesRef.current = [];
+
+                  const answer = await pc.createAnswer();
+                  await pc.setLocalDescription(answer);
+                  await sendCallSignal(user.id, targetUserId, "answer", answer);
+                  await sendCallSignal(user.id, targetUserId, "call-accepted");
+
+                  setCallState("connected");
+                  startDurationTimer();
+                } catch (e) {
+                  console.error("Glare resolution failed:", e);
+                  endCall(true);
+                }
+              } else {
+                // Higher ID user: ignore the other's call-request, they will yield to us
+                // Do nothing - our outgoing call takes priority
+              }
+            } else if (callStateRef.current === "connected") {
               sendCallSignal(user.id, targetUserId, "call-busy").catch(() => {});
             }
             break;
