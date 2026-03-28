@@ -18,6 +18,10 @@ export type PostComment = {
   user_id: number;
   content: string;
   created_at: string | null;
+  parent_comment_id?: string | null;
+  likes_count?: number;
+  liked_by_me?: boolean;
+  replies?: PostComment[];
   user?: { display_name: string | null; avatar_url: string | null; guest_id: string };
 };
 
@@ -157,8 +161,8 @@ export async function getPostReactionCounts(postId: string): Promise<Record<stri
 }
 
 // Get comments for a post
-export async function getPostComments(postId: string): Promise<PostComment[]> {
-  const { data: comments } = await (supabase.from("post_comments").select("*") as any)
+export async function getPostComments(postId: string, currentUserId?: number): Promise<PostComment[]> {
+  const { data: comments } = await (supabase.from("post_comments").select("*, parent_comment_id") as any)
     .eq("post_id", postId).order("created_at", { ascending: true });
   if (!comments || comments.length === 0) return [];
 
@@ -167,14 +171,127 @@ export async function getPostComments(postId: string): Promise<PostComment[]> {
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
-  return comments.map((c: any) => ({ ...c, user: userMap[c.user_id] || null }));
+  // Get like counts
+  const commentIds = comments.map((c: any) => c.id);
+  const { data: allLikes } = await (supabase.from("comment_likes").select("comment_id, user_id") as any).in("comment_id", commentIds);
+  const likeCounts: Record<string, number> = {};
+  const myLikes = new Set<string>();
+  (allLikes || []).forEach((l: any) => {
+    likeCounts[l.comment_id] = (likeCounts[l.comment_id] || 0) + 1;
+    if (currentUserId && l.user_id === currentUserId) myLikes.add(l.comment_id);
+  });
+
+  const enriched = comments.map((c: any) => ({
+    ...c,
+    user: userMap[c.user_id] || null,
+    likes_count: likeCounts[c.id] || 0,
+    liked_by_me: myLikes.has(c.id),
+  }));
+
+  // Build tree: top-level + replies
+  const topLevel = enriched.filter((c: any) => !c.parent_comment_id);
+  const replyMap: Record<string, PostComment[]> = {};
+  enriched.filter((c: any) => !!c.parent_comment_id).forEach((c: any) => {
+    if (!replyMap[c.parent_comment_id]) replyMap[c.parent_comment_id] = [];
+    replyMap[c.parent_comment_id].push(c);
+  });
+  topLevel.forEach((c: any) => { c.replies = replyMap[c.id] || []; });
+
+  return topLevel;
 }
 
 // Add comment
-export async function addComment(postId: string, userId: number, content: string): Promise<PostComment> {
-  const { data, error } = await (supabase.from("post_comments").insert({ post_id: postId, user_id: userId, content } as any).select().single() as any);
+export async function addComment(postId: string, userId: number, content: string, parentCommentId?: string): Promise<PostComment> {
+  const insertData: any = { post_id: postId, user_id: userId, content };
+  if (parentCommentId) insertData.parent_comment_id = parentCommentId;
+  const { data, error } = await (supabase.from("post_comments").insert(insertData).select().single() as any);
   if (error) throw error;
+
+  // Update comments_count
+  try {
+    const { count } = await (supabase.from("post_comments").select("id", { count: "exact", head: true }) as any).eq("post_id", postId);
+    await (supabase.from("posts").update({ comments_count: count || 0 } as any).eq("id", postId) as any);
+  } catch {}
+
+  // Parse @mentions and create notifications
+  const mentions = content.match(/@(\w[\w\s]*?\w|\w)/g);
+  if (mentions) {
+    for (const mention of mentions) {
+      const name = mention.slice(1).trim();
+      const { data: mentioned } = await (supabase.from("users").select("id") as any).ilike("display_name", name).limit(1).single();
+      if (mentioned && mentioned.id !== userId) {
+        await (supabase.from("notifications").insert({
+          user_id: mentioned.id,
+          from_user_id: userId,
+          type: "mention",
+          reference_id: postId,
+          content: content.slice(0, 100),
+        } as any) as any);
+      }
+    }
+  }
+
   return data;
+}
+
+// Delete comment
+export async function deleteComment(commentId: string, userId: number): Promise<void> {
+  const { error } = await (supabase.from("post_comments").delete() as any).eq("id", commentId).eq("user_id", userId);
+  if (error) throw error;
+}
+
+// Toggle comment like
+export async function toggleCommentLike(commentId: string, userId: number): Promise<boolean> {
+  const { data: existing } = await (supabase.from("comment_likes").select("id") as any)
+    .eq("comment_id", commentId).eq("user_id", userId).limit(1);
+  if (existing && existing.length > 0) {
+    await (supabase.from("comment_likes").delete() as any).eq("id", existing[0].id);
+    return false;
+  }
+  await (supabase.from("comment_likes").insert({ comment_id: commentId, user_id: userId } as any) as any);
+  return true;
+}
+
+// Get unread notification count
+export async function getUnreadNotificationCount(userId: number): Promise<number> {
+  const { count } = await (supabase.from("notifications").select("id", { count: "exact", head: true }) as any)
+    .eq("user_id", userId).eq("is_read", false);
+  return count || 0;
+}
+
+// Get notifications
+export async function getNotifications(userId: number, limit = 50): Promise<any[]> {
+  const { data } = await (supabase.from("notifications").select("*") as any)
+    .eq("user_id", userId).order("created_at", { ascending: false }).limit(limit);
+  if (!data || data.length === 0) return [];
+
+  const fromIds = [...new Set(data.map((n: any) => n.from_user_id).filter(Boolean))];
+  const userMap: Record<number, any> = {};
+  if (fromIds.length > 0) {
+    const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url") as any).in("id", fromIds);
+    (users || []).forEach((u: any) => { userMap[u.id] = u; });
+  }
+
+  return data.map((n: any) => ({ ...n, from_user: userMap[n.from_user_id] || null }));
+}
+
+// Mark notifications read
+export async function markNotificationsRead(userId: number): Promise<void> {
+  await (supabase.from("notifications").update({ is_read: true } as any).eq("user_id", userId).eq("is_read", false) as any);
+}
+
+// Check new reels since user last seen
+export async function getNewReelsCount(userId: number): Promise<number> {
+  const { data: userData } = await (supabase.from("users").select("last_reels_seen_at") as any).eq("id", userId).single();
+  const lastSeen = userData?.last_reels_seen_at || "2000-01-01";
+  const { count } = await (supabase.from("posts").select("id", { count: "exact", head: true }) as any)
+    .not("video_url", "is", null).gt("created_at", lastSeen);
+  return count || 0;
+}
+
+// Mark reels as seen
+export async function markReelsSeen(userId: number): Promise<void> {
+  await (supabase.from("users").update({ last_reels_seen_at: new Date().toISOString() } as any).eq("id", userId) as any);
 }
 
 // Upload post media
