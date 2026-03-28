@@ -670,7 +670,7 @@ export default function Feed() {
             className={`flex-1 py-2.5 flex items-center justify-center border-b-[3px] relative ${activeTab === "home" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 dark:text-muted-foreground"}`}>
             <Home className="w-5 h-5" />
           </button>
-          <button onClick={() => { setActiveTab("friends"); setShowFriendRequests(true); }}
+          <button onClick={() => setActiveTab("friends")}
             className={`flex-1 py-2.5 flex items-center justify-center border-b-[3px] relative ${activeTab === "friends" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 dark:text-muted-foreground"}`}>
             <Users className="w-5 h-5" />
             {friendRequestCount > 0 && (
