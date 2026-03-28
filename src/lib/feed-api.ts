@@ -69,13 +69,16 @@ export async function getFeedPosts(limit = 30, searchQuery?: string): Promise<Po
   const { data: posts } = await query;
   if (!posts || posts.length === 0) return [];
 
-  const userIds = [...new Set(posts.map((p: any) => p.user_id))];
+  // Filter out video-only posts (those go to Reels)
+  const feedPosts = posts.filter((p: any) => !p.video_url);
+
+  const userIds = [...new Set(feedPosts.map((p: any) => p.user_id))];
   const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id") as any).in("id", userIds);
 
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
-  let result = posts.map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
+  let result = feedPosts.map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
 
   // Client-side search filter
   if (searchQuery && searchQuery.trim()) {
