@@ -823,8 +823,8 @@ export default function Feed() {
             </div>
           )}
 
-          {/* Stories */}
-          {!showSearch && Object.keys(storyGroups).length > 0 && (
+          {/* Stories - always show create story even if no stories */}
+          {!showSearch && (
             <div className="bg-white dark:bg-card border-b border-gray-200 dark:border-border/30">
               <div className="max-w-lg mx-auto px-3 py-3">
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
