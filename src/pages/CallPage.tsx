@@ -3,8 +3,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig } from "@/lib/call-api";
-import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft, Volume2 } from "lucide-react";
+import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification } from "@/lib/call-api";
+import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft, Volume2, PhoneIncoming } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -226,7 +226,7 @@ export default function CallPage() {
       await sendCallSignal(user.id, targetUserId, "call-request", { offer: offer });
 
       setCallState("calling");
-      ringtoneRef.current = playRingtone();
+      ringtoneRef.current = playRingtone("outgoing");
 
       // Auto-end after 30 seconds if no answer
       noAnswerTimerRef.current = window.setTimeout(() => {
@@ -345,41 +345,48 @@ export default function CallPage() {
           <h2 className="text-2xl font-black text-foreground">{targetUser?.display_name || "User"}</h2>
           <p className="text-sm text-muted-foreground mt-1">
             {callState === "idle" && "কল করতে নিচে ট্যাপ করুন"}
-            {callState === "calling" && "কল হচ্ছে..."}
-              {callState === "ringing" && "Ringing..."}
+              {callState === "calling" && "Calling..."}
+              {callState === "ringing" && "Ringing ☎️"}
             {callState === "connected" && formatDuration(callDuration)}
             {callState === "ended" && "কল শেষ"}
           </p>
         </div>
 
         {/* Call controls */}
-        <div className="flex items-center gap-3 rounded-full bg-card/95 border border-border px-3 py-2 shadow-lg">
-          {callState === "connected" && (
-            <motion.button whileTap={{ scale: 0.9 }} onClick={toggleMute}
-              className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
-                isMuted ? "bg-destructive/20 text-destructive" : "bg-secondary text-foreground"
-              }`}>
-              {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-            </motion.button>
-          )}
+        {/* Messenger-style bottom control bar */}
+        <div className="w-full max-w-xs">
+          {callState === "idle" ? (
+            <div className="flex justify-center">
+              <motion.button whileTap={{ scale: 0.9 }} onClick={startCall}
+                className="w-20 h-20 rounded-full bg-[hsl(var(--emerald))] flex items-center justify-center shadow-xl shadow-[hsl(var(--emerald))]/30">
+                <Phone className="w-8 h-8 text-foreground" />
+              </motion.button>
+            </div>
+          ) : callState === "ended" ? null : (
+            <div className="flex items-center justify-around bg-card/80 backdrop-blur-sm border border-border rounded-full px-6 py-3">
+              {/* Mute */}
+              <motion.button whileTap={{ scale: 0.9 }} onClick={toggleMute}
+                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  isMuted ? "bg-destructive/20 text-destructive" : "bg-secondary text-foreground"
+                }`}>
+                {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                <span className="text-[9px] font-medium">{isMuted ? "Unmute" : "Mute"}</span>
+              </motion.button>
 
-          {callState === "connected" && (
-            <div className="w-14 h-14 rounded-full bg-secondary text-foreground flex items-center justify-center">
-              <Volume2 className="w-6 h-6" />
+              {/* End Call */}
+              <motion.button whileTap={{ scale: 0.9 }} onClick={() => endCall()}
+                className="w-16 h-16 rounded-full bg-destructive flex flex-col items-center justify-center gap-0.5 shadow-xl shadow-destructive/30">
+                <PhoneOff className="w-6 h-6 text-destructive-foreground" />
+                <span className="text-[8px] text-destructive-foreground font-medium">End</span>
+              </motion.button>
+
+              {/* Speaker */}
+              <div className="w-14 h-14 rounded-full bg-secondary text-foreground flex flex-col items-center justify-center gap-0.5">
+                <Volume2 className="w-5 h-5" />
+                <span className="text-[9px] font-medium">Speaker</span>
+              </div>
             </div>
           )}
-
-          {callState === "idle" ? (
-            <motion.button whileTap={{ scale: 0.9 }} onClick={startCall}
-              className="w-20 h-20 rounded-full bg-[hsl(var(--emerald))] flex items-center justify-center shadow-xl shadow-[hsl(var(--emerald))]/30">
-              <Phone className="w-8 h-8 text-foreground" />
-            </motion.button>
-          ) : callState !== "ended" ? (
-            <motion.button whileTap={{ scale: 0.9 }} onClick={() => endCall()}
-              className="w-20 h-20 rounded-full bg-destructive flex items-center justify-center shadow-xl shadow-destructive/30">
-              <PhoneOff className="w-8 h-8 text-destructive-foreground" />
-            </motion.button>
-          ) : null}
         </div>
       </div>
     </div>

@@ -13,6 +13,8 @@ import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import EmojiPicker from "@/components/EmojiPicker";
+import { showMessageNotification } from "@/lib/call-api";
 
 type PendingMedia = {
   id: string;
@@ -36,6 +38,7 @@ export default function Chat() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
@@ -98,8 +101,14 @@ export default function Chat() {
     if (!user) return;
     const channel = supabase
       .channel(`all-messages-${user.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
         queryClient.invalidateQueries({ queryKey: ["conversations", user.id] });
+        // Show notification for messages from others when page is hidden
+        const msg = payload.new;
+        if (msg && msg.sender_id !== user.id) {
+          const preview = msg.message_type === "text" ? (msg.content || "") : (msg.message_type === "image" ? "📷 ছবি" : "🎤 ভয়েস");
+          showMessageNotification("New Message", preview);
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -325,6 +334,8 @@ export default function Chat() {
           {messages.map((msg, i) => {
             const isMine = msg.sender_id === user.id;
             const showAvatar = !isMine && (i === messages.length - 1 || messages[i + 1]?.sender_id !== msg.sender_id);
+            const isLastMyMsg = isMine && (i === messages.length - 1 || messages[i + 1]?.sender_id !== msg.sender_id);
+            const isLastMsgOverall = i === messages.length - 1;
             return (
               <div key={msg.id} className={`flex items-end gap-1.5 ${isMine ? "justify-end" : "justify-start"}`}>
                 {!isMine && (
@@ -360,6 +371,23 @@ export default function Chat() {
                   <p className={`text-[10px] mt-0.5 px-1 ${isMine ? "text-right text-gray-500" : "text-gray-400"}`}>
                     {msg.created_at ? new Date(msg.created_at).toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit" }) : ""}
                   </p>
+                  {/* Seen indicator - Messenger style */}
+                  {isMine && isLastMyMsg && isLastMsgOverall && msg.is_read && (
+                    <div className="flex justify-end px-1">
+                      <div className="flex items-center gap-0.5">
+                        {otherUser?.avatar_url ? (
+                          <img src={otherUser.avatar_url} className="w-3.5 h-3.5 rounded-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center">
+                            <span className="text-[6px] text-white font-bold">✓</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {isMine && isLastMyMsg && isLastMsgOverall && !msg.is_read && (
+                    <p className="text-[9px] text-right text-gray-400 px-1">Sent</p>
+                  )}
                 </div>
               </div>
             );
@@ -421,7 +449,7 @@ export default function Chat() {
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendText()}
                   placeholder="Aa"
                   className="flex-1 bg-transparent text-gray-900 dark:text-foreground text-[14px] border-none outline-none placeholder:text-gray-400" />
-                <button className="text-blue-600 p-1"><Smile size={20} /></button>
+                <button onClick={() => setShowEmoji(!showEmoji)} className={`p-1 ${showEmoji ? "text-blue-700" : "text-blue-600"}`}><Smile size={20} /></button>
               </div>
               {messageText.trim() ? (
                 <button onClick={handleSendText}
@@ -443,6 +471,13 @@ export default function Chat() {
             </>
           )}
         </div>
+
+        {/* Emoji Picker */}
+        <EmojiPicker
+          isOpen={showEmoji}
+          onClose={() => setShowEmoji(false)}
+          onSelect={(emoji) => setMessageText(prev => prev + emoji)}
+        />
 
         {/* Image viewer */}
         <AnimatePresence>
