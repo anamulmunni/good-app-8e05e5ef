@@ -46,9 +46,12 @@ export type ExternalReelVideo = {
   id: string;
   title: string;
   video_url: string;
-  source: "internet_archive";
+  source: "dailymotion" | "internet_archive";
   creator?: string | null;
   thumbnail_url?: string | null;
+  video_id?: string;
+  duration?: number;
+  category?: string;
 };
 
 export const REACTION_EMOJIS: Record<string, string> = {
@@ -62,86 +65,41 @@ export const REACTION_EMOJIS: Record<string, string> = {
 
 export async function getBangladeshExternalVideos(
   page = 1,
-  rows = 8,
-): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
+  rows = 10,
+  preferredCategories?: string[],
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   try {
-    // Try edge function first (server-side proxy, no CORS issues)
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-    if (supabaseUrl && supabaseKey) {
-      const res = await fetch(
-        `${supabaseUrl}/functions/v1/fetch-external-videos?page=${page}&rows=${rows}`,
-        {
-          headers: {
-            "Authorization": `Bearer ${supabaseKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        return {
-          videos: Array.isArray(data.videos) ? data.videos : [],
-          hasMore: !!data.hasMore,
-        };
-      }
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("rows", String(rows));
+    if (preferredCategories && preferredCategories.length > 0) {
+      params.set("preferred", preferredCategories.join(","));
     }
 
-    // Fallback: direct archive.org call
-    const params = new URLSearchParams();
-    params.set("q", "(title:(Bangladesh OR Bangla OR Dhaka) OR description:(Bangladesh OR Bangla OR Dhaka)) AND mediatype:(movies)");
-    params.append("fl[]", "identifier");
-    params.append("fl[]", "title");
-    params.append("fl[]", "creator");
-    params.set("rows", String(rows));
-    params.set("page", String(page));
-    params.set("output", "json");
-
-    const searchRes = await fetch(`https://archive.org/advancedsearch.php?${params.toString()}`);
-    if (!searchRes.ok) return { videos: [], hasMore: false };
-
-    const searchJson = await searchRes.json();
-    const docs = Array.isArray(searchJson?.response?.docs) ? searchJson.response.docs : [];
-    const numFound = Number(searchJson?.response?.numFound || 0);
-
-    const metadataResults = await Promise.allSettled(
-      docs.map(async (doc: any) => {
-        const identifier = String(doc?.identifier || "").trim();
-        if (!identifier) return null;
-
-        const metadataRes = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`);
-        if (!metadataRes.ok) return null;
-
-        const metadataJson = await metadataRes.json();
-        const files = Array.isArray(metadataJson?.files) ? metadataJson.files : [];
-        const videoFile = files.find((f: any) => {
-          const name = String(f?.name || "").toLowerCase();
-          return [".mp4", ".webm", ".m4v", ".mov"].some((ext) => name.endsWith(ext));
-        });
-        if (!videoFile?.name) return null;
-
-        const title = String(doc?.title || metadataJson?.metadata?.title || "Bangla Video").trim();
-        const creator = String(doc?.creator || metadataJson?.metadata?.creator || "").trim() || null;
-        const encodedPath = videoFile.name.split("/").map((part: string) => encodeURIComponent(part)).join("/");
-
-        return {
-          id: `ext-${identifier}-${videoFile.name}`,
-          title,
-          creator,
-          source: "internet_archive" as const,
-          thumbnail_url: `https://archive.org/services/img/${encodeURIComponent(identifier)}`,
-          video_url: `https://archive.org/download/${encodeURIComponent(identifier)}/${encodedPath}`,
-        };
-      }),
+    const res = await fetch(
+      `${supabaseUrl}/functions/v1/fetch-external-videos?${params.toString()}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
+        },
+      }
     );
 
-    const videos = metadataResults
-      .filter((r): r is PromiseFulfilledResult<ExternalReelVideo | null> => r.status === "fulfilled")
-      .map((r) => r.value)
-      .filter((v): v is ExternalReelVideo => !!v);
+    if (!res.ok) {
+      console.error("External videos API error:", res.status);
+      return { videos: [], hasMore: false };
+    }
 
-    return { videos, hasMore: page * rows < numFound };
+    const data = await res.json();
+    return {
+      videos: Array.isArray(data.videos) ? data.videos : [],
+      hasMore: !!data.hasMore,
+      categories: data.categories,
+    };
   } catch (e) {
     console.error("External videos error:", e);
     return { videos: [], hasMore: false };

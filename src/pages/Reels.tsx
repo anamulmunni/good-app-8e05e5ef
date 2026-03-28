@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   toggleReaction, getUserReactions, getPostComments, addComment,
@@ -26,7 +26,31 @@ type ReelItem = {
   isExternal?: boolean;
   externalTitle?: string;
   externalCreator?: string | null;
+  thumbnail_url?: string | null;
+  category?: string;
+  source?: string;
 };
+
+// Personalization: track watched categories in localStorage
+function getWatchedCategories(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem("reels_cat_prefs") || "{}");
+  } catch { return {}; }
+}
+
+function trackCategory(category: string) {
+  const prefs = getWatchedCategories();
+  prefs[category] = (prefs[category] || 0) + 1;
+  localStorage.setItem("reels_cat_prefs", JSON.stringify(prefs));
+}
+
+function getPreferredCategories(): string[] {
+  const prefs = getWatchedCategories();
+  return Object.entries(prefs)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([k]) => k);
+}
 
 export default function Reels() {
   const { user, isLoading } = useAuth();
@@ -54,16 +78,14 @@ export default function Reels() {
   const lastTapRef = useRef<Record<string, number>>({});
   const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
+  const prevIndexRef = useRef(0);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [user, isLoading, navigate]);
 
-  // Mark reels as seen when entering
   useEffect(() => {
-    if (user) {
-      markReelsSeen(user.id);
-    }
+    if (user) markReelsSeen(user.id);
   }, [user]);
 
   // Fetch user-uploaded video posts
@@ -86,7 +108,7 @@ export default function Reels() {
     enabled: !!user,
   });
 
-  // Load first batch of external videos on mount
+  // Load external videos
   useEffect(() => {
     if (!user) return;
     loadMoreExternal();
@@ -96,7 +118,8 @@ export default function Reels() {
     if (extLoading || !extHasMore) return;
     setExtLoading(true);
     try {
-      const result = await getBangladeshExternalVideos(extPage, 8);
+      const preferred = getPreferredCategories();
+      const result = await getBangladeshExternalVideos(extPage, 10, preferred);
       setExtVideos(prev => {
         const existingIds = new Set(prev.map(v => v.id));
         const newOnes = result.videos.filter(v => !existingIds.has(v.id));
@@ -131,9 +154,23 @@ export default function Reels() {
       isExternal: true,
       externalTitle: v.title,
       externalCreator: v.creator,
+      thumbnail_url: v.thumbnail_url,
+      category: v.category,
+      source: v.source,
     }));
     return [...userReels, ...external];
   }, [reels, extVideos]);
+
+  // Track category when user watches a video for 3+ seconds
+  useEffect(() => {
+    const reel = allReels[currentIndex];
+    if (!reel?.isExternal || !reel.category) return;
+
+    const timer = setTimeout(() => {
+      trackCategory(reel.category!);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [currentIndex, allReels]);
 
   // Load user reactions
   useEffect(() => {
@@ -142,7 +179,7 @@ export default function Reels() {
     }
   }, [user, reels]);
 
-  // STRICT single-video playback controller
+  // STRICT single-video playback controller (only for native videos)
   useEffect(() => {
     if (allReels.length === 0) return;
     const currentReel = allReels[currentIndex];
@@ -150,25 +187,28 @@ export default function Reels() {
 
     activeVideoIdRef.current = currentReel.id;
 
-    // Pause and reset ALL videos
-    Object.entries(videoRefs.current).forEach(([id, video]) => {
+    // Pause ALL native videos
+    Object.entries(videoRefs.current).forEach(([, video]) => {
       if (!video) return;
       video.pause();
       video.muted = true;
       video.currentTime = 0;
     });
 
-    // Then play only the current one
-    const currentVideo = videoRefs.current[currentReel.id];
-    if (currentVideo) {
-      currentVideo.currentTime = 0;
-      currentVideo.muted = muted;
-      currentVideo.play().catch(() => {});
-      setPaused(null);
+    // Play current if native
+    if (!currentReel.isExternal) {
+      const currentVideo = videoRefs.current[currentReel.id];
+      if (currentVideo) {
+        currentVideo.currentTime = 0;
+        currentVideo.muted = muted;
+        currentVideo.play().catch(() => {});
+        setPaused(null);
+      }
     }
+
+    prevIndexRef.current = currentIndex;
   }, [currentIndex, allReels, muted]);
 
-  // Also add onPlay guard to prevent rogue plays
   const handleVideoPlay = useCallback((reelId: string) => {
     if (reelId !== activeVideoIdRef.current) {
       const video = videoRefs.current[reelId];
@@ -195,11 +235,10 @@ export default function Reels() {
 
     const items = container.querySelectorAll("[data-index]");
     items.forEach((item) => observer.observe(item));
-
     return () => observer.disconnect();
   }, [allReels]);
 
-  // Infinite scroll: load more external when near bottom
+  // Infinite scroll
   useEffect(() => {
     const sentinel = bottomSentinelRef.current;
     const container = containerRef.current;
@@ -263,39 +302,24 @@ export default function Reels() {
   const handleVideoTap = (postId: string) => {
     const now = Date.now();
     const last = lastTapRef.current[postId] || 0;
-
-    // Clear any pending single-tap timer
-    if (tapTimerRef.current[postId]) {
-      clearTimeout(tapTimerRef.current[postId]);
-    }
+    if (tapTimerRef.current[postId]) clearTimeout(tapTimerRef.current[postId]);
 
     if (now - last < 300) {
-      // Double tap = like
       lastTapRef.current[postId] = 0;
-      if (!userReactions[postId]) {
-        reactionMutation.mutate({ postId, type: "love" });
-      }
+      if (!userReactions[postId]) reactionMutation.mutate({ postId, type: "love" });
       setShowLoveAnim(postId);
       setTimeout(() => setShowLoveAnim(null), 1000);
     } else {
-      // Single tap = play/pause (with delay to detect double tap)
       lastTapRef.current[postId] = now;
-      tapTimerRef.current[postId] = setTimeout(() => {
-        togglePause(postId);
-      }, 300);
+      tapTimerRef.current[postId] = setTimeout(() => togglePause(postId), 300);
     }
   };
 
   const togglePause = (postId: string) => {
     const video = videoRefs.current[postId];
     if (!video) return;
-    if (video.paused) {
-      video.play();
-      setPaused(null);
-    } else {
-      video.pause();
-      setPaused(postId);
-    }
+    if (video.paused) { video.play(); setPaused(null); }
+    else { video.pause(); setPaused(postId); }
   };
 
   const sharePost = async (reel: ReelItem) => {
@@ -314,24 +338,18 @@ export default function Reels() {
       if (part.startsWith("@")) {
         const name = part.slice(1).trim();
         return (
-          <button
-            key={i}
-            onClick={async (e) => {
-              e.stopPropagation();
-              const { data: users } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
-              if (users && users.length > 0) navigate(`/user/${users[0].id}`);
-            }}
-            className="text-blue-500 font-bold hover:underline inline"
-          >
-            @{name}
-          </button>
+          <button key={i} onClick={async (e) => {
+            e.stopPropagation();
+            const { data: users } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
+            if (users && users.length > 0) navigate(`/user/${users[0].id}`);
+          }} className="text-blue-500 font-bold hover:underline inline">@{name}</button>
         );
       }
       return <span key={i}>{part}</span>;
     });
   };
 
-  // Cleanup on unmount — pause all
+  // Cleanup
   useEffect(() => {
     return () => {
       Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } });
@@ -356,74 +374,89 @@ export default function Reels() {
         </button>
       </div>
 
-      {reelsLoading ? (
+      {reelsLoading && extLoading ? (
         <div className="flex items-center justify-center h-full">
           <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin" />
         </div>
       ) : showEmpty ? (
         <div className="flex flex-col items-center justify-center h-full text-white/60 gap-3">
           <Play className="w-16 h-16" />
-          <p className="font-bold text-lg">কোনো Reels নেই</p>
-          <p className="text-sm">Feed থেকে ভিডিও পোস্ট করুন বা অপেক্ষা করুন!</p>
-          <button onClick={() => navigate("/feed")} className="mt-4 px-6 py-2 bg-primary rounded-full text-primary-foreground font-bold">
-            Feed এ যান
+          <p className="font-bold text-lg">ভিডিও লোড হচ্ছে...</p>
+          <button onClick={() => loadMoreExternal()} className="mt-4 px-6 py-2 bg-primary rounded-full text-primary-foreground font-bold">
+            আবার চেষ্টা করুন
           </button>
         </div>
       ) : (
         <div ref={containerRef} className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
           {allReels.map((reel, index) => {
             const myReaction = userReactions[reel.id];
+            const isActive = index === currentIndex;
             return (
               <div
                 key={reel.id}
                 data-index={index}
                 className="h-full w-full snap-start snap-always relative flex items-center justify-center"
               >
-                {/* Video */}
-                <video
-                  ref={(el) => { if (el) videoRefs.current[reel.id] = el; }}
-                  src={reel.video_url}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loop
-                  playsInline
-                  muted={muted}
-                  preload="metadata"
-                  onClick={() => handleVideoTap(reel.id)}
-                  onPlay={() => handleVideoPlay(reel.id)}
-                />
+                {/* Video: iframe for external, native for uploads */}
+                {reel.isExternal ? (
+                  <>
+                    {/* Thumbnail as background while iframe loads */}
+                    {reel.thumbnail_url && (
+                      <img src={reel.thumbnail_url} alt="" className="absolute inset-0 w-full h-full object-cover blur-sm" />
+                    )}
+                    {isActive && (
+                      <iframe
+                        src={reel.video_url}
+                        className="absolute inset-0 w-full h-full z-10"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        style={{ border: "none" }}
+                      />
+                    )}
+                    {!isActive && reel.thumbnail_url && (
+                      <img src={reel.thumbnail_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    )}
+                  </>
+                ) : (
+                  <video
+                    ref={(el) => { if (el) videoRefs.current[reel.id] = el; }}
+                    src={reel.video_url}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loop playsInline muted={muted} preload="metadata"
+                    onClick={() => handleVideoTap(reel.id)}
+                    onPlay={() => handleVideoPlay(reel.id)}
+                  />
+                )}
 
-                {/* Pause indicator */}
-                <AnimatePresence>
-                  {paused === reel.id && (
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0, opacity: 0 }}
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                      <div className="w-20 h-20 bg-black/40 rounded-full flex items-center justify-center">
-                        <Play className="w-10 h-10 text-white ml-1" />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/* Pause indicator (native only) */}
+                {!reel.isExternal && (
+                  <AnimatePresence>
+                    {paused === reel.id && (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0, opacity: 0 }}
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                        <div className="w-20 h-20 bg-black/40 rounded-full flex items-center justify-center">
+                          <Play className="w-10 h-10 text-white ml-1" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
 
                 {/* Love animation */}
                 <AnimatePresence>
                   {showLoveAnim === reel.id && (
-                    <motion.div
-                      initial={{ scale: 0, opacity: 1 }}
-                      animate={{ scale: 2, opacity: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.8 }}
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
-                    >
+                    <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 2, opacity: 0 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                       <span className="text-8xl">❤️</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 {/* Bottom gradient */}
-                <div className="absolute bottom-0 left-0 right-0 h-60 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                <div className="absolute bottom-0 left-0 right-0 h-60 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-10" />
 
                 {/* Bottom info */}
-                <div className="absolute bottom-4 left-4 right-16 z-10">
+                <div className="absolute bottom-4 left-4 right-16 z-20">
                   {reel.isExternal ? (
                     <>
                       <div className="flex items-center gap-2 mb-2">
@@ -431,12 +464,26 @@ export default function Reels() {
                           <Globe className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                          <span className="text-white font-bold text-sm drop-shadow-lg">{reel.externalCreator || "Internet Archive"}</span>
-                          <span className="block text-white/60 text-[10px] drop-shadow-lg">বাংলাদেশ ভিডিও</span>
+                          <span className="text-white font-bold text-sm drop-shadow-lg">{reel.externalCreator || "বাংলা ভিডিও"}</span>
+                          <span className="block text-white/60 text-[10px] drop-shadow-lg">
+                            {reel.category === "funny" && "😂 মজার ভিডিও"}
+                            {reel.category === "cartoon" && "🎨 কার্টুন"}
+                            {reel.category === "romantic" && "❤️ রোমান্টিক"}
+                            {reel.category === "natok" && "🎭 নাটক"}
+                            {reel.category === "viral" && "🔥 ভাইরাল"}
+                            {reel.category === "music" && "🎵 গান"}
+                            {reel.category === "comedy" && "😄 কমেডি"}
+                            {reel.category === "vlog" && "📹 ভ্লগ"}
+                            {reel.category === "tiktok" && "📱 টিকটক"}
+                            {reel.category === "movie" && "🎬 মুভি"}
+                            {reel.category === "song" && "🎶 বাংলা গান"}
+                            {reel.category === "shortfilm" && "🎥 শর্ট ফিল্ম"}
+                            {!reel.category && "বাংলাদেশ ভিডিও"}
+                          </span>
                         </div>
                       </div>
                       {reel.externalTitle && (
-                        <p className="text-white/90 text-[15px] line-clamp-2 drop-shadow-lg">{reel.externalTitle}</p>
+                        <p className="text-white/90 text-[14px] line-clamp-2 drop-shadow-lg">{reel.externalTitle}</p>
                       )}
                     </>
                   ) : (
@@ -449,44 +496,37 @@ export default function Reels() {
                         <span className="text-white font-bold text-sm drop-shadow-lg">{reel.user?.display_name || "User"}</span>
                       </button>
                       {reel.content && (
-                        <p className="text-white/90 text-[15px] line-clamp-2 drop-shadow-lg">{renderMentionText(reel.content)}</p>
+                        <p className="text-white/90 text-[14px] line-clamp-2 drop-shadow-lg">{renderMentionText(reel.content)}</p>
                       )}
                     </>
                   )}
                 </div>
 
                 {/* Right side actions */}
-                <div className="absolute right-3 bottom-24 z-10 flex flex-col items-center gap-5">
-                  {/* Like/React — only for user reels */}
+                <div className="absolute right-3 bottom-24 z-20 flex flex-col items-center gap-5">
                   {!reel.isExternal && (
-                  <button onClick={() => reactionMutation.mutate({ postId: reel.id, type: myReaction || "love" })}
-                    className="flex flex-col items-center gap-1">
-                    <motion.div whileTap={{ scale: 1.3 }}
-                      className={`w-12 h-12 rounded-full flex items-center justify-center ${myReaction ? "bg-[hsl(var(--pink))]/30" : "bg-white/20"}`}>
-                      {myReaction ? (
-                        <span className="text-2xl">{REACTION_EMOJIS[myReaction]}</span>
-                      ) : (
-                        <Heart className="w-6 h-6 text-white" />
-                      )}
-                    </motion.div>
-                    <span className="text-white text-sm font-bold drop-shadow-lg">{reel.likes_count > 0 ? reel.likes_count : ""}</span>
-                  </button>
+                    <button onClick={() => reactionMutation.mutate({ postId: reel.id, type: myReaction || "love" })}
+                      className="flex flex-col items-center gap-1">
+                      <motion.div whileTap={{ scale: 1.3 }}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center ${myReaction ? "bg-red-500/30" : "bg-white/20"}`}>
+                        {myReaction ? <span className="text-2xl">{REACTION_EMOJIS[myReaction]}</span> :
+                          <Heart className="w-6 h-6 text-white" />}
+                      </motion.div>
+                      <span className="text-white text-sm font-bold drop-shadow-lg">{reel.likes_count > 0 ? reel.likes_count : ""}</span>
+                    </button>
                   )}
 
-                  {/* Comment — only for user reels */}
                   {!reel.isExternal && (
-                  <button onClick={() => { setCommentingPostId(reel.id); loadComments(reel.id); }}
-                    className="flex flex-col items-center gap-1">
-                    <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                      <MessageCircle className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="text-white text-sm font-bold drop-shadow-lg">{reel.comments_count > 0 ? reel.comments_count : ""}</span>
-                  </button>
+                    <button onClick={() => { setCommentingPostId(reel.id); loadComments(reel.id); }}
+                      className="flex flex-col items-center gap-1">
+                      <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                        <MessageCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-white text-sm font-bold drop-shadow-lg">{reel.comments_count > 0 ? reel.comments_count : ""}</span>
+                    </button>
                   )}
 
-                  {/* Share */}
-                  <button onClick={() => sharePost(reel)}
-                    className="flex flex-col items-center gap-1">
+                  <button onClick={() => sharePost(reel)} className="flex flex-col items-center gap-1">
                     <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
                       <Share2 className="w-6 h-6 text-white" />
                     </div>
@@ -497,7 +537,7 @@ export default function Reels() {
             );
           })}
 
-          {/* Infinite scroll sentinel + loading */}
+          {/* Loading more */}
           {extHasMore && (
             <div ref={bottomSentinelRef} className="h-24 flex items-center justify-center">
               {extLoading && <Loader2 className="w-8 h-8 text-white animate-spin" />}
