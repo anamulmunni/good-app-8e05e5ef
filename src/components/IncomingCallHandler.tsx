@@ -47,6 +47,31 @@ export default function IncomingCallHandler() {
     document.querySelectorAll(".call-remote-audio").forEach((el) => el.remove());
   };
 
+  const endCall = (sendSignal = true) => {
+    stopRingtone();
+    clearInterval(durationTimerRef.current);
+    clearRemoteAudio();
+
+    if (peerRef.current) {
+      peerRef.current.close();
+      peerRef.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+
+    const currentIncomingCall = incomingCallRef.current;
+    if (sendSignal && user && currentIncomingCall) {
+      sendCallSignal(user.id, currentIncomingCall.callerId, "call-ended");
+    }
+
+    setCallActive(false);
+    setIsMuted(false);
+    setIncomingCall(null);
+  };
+
   useEffect(() => {
     if (!user) return;
 
@@ -73,10 +98,6 @@ export default function IncomingCallHandler() {
 
         if (signal.signal_type === "call-ended") {
           endCall(false);
-        }
-
-        if (signal.signal_type === "call-accepted") {
-          stopRingtone();
         }
 
         if (signal.signal_type === "ice-candidate" && peerRef.current && signal.signal_data) {
@@ -126,10 +147,7 @@ export default function IncomingCallHandler() {
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") {
-          setCallActive(true);
-        }
-        if (["failed", "disconnected", "closed"].includes(pc.connectionState)) {
+        if (["failed", "closed"].includes(pc.connectionState)) {
           endCall(false);
         }
       };
@@ -162,19 +180,6 @@ export default function IncomingCallHandler() {
       sendCallSignal(user.id, incomingCall.callerId, "call-rejected");
     }
     stopRingtone();
-    setIncomingCall(null);
-  };
-
-  const endCall = (sendSignal = true) => {
-    stopRingtone();
-    clearInterval(durationTimerRef.current);
-    clearRemoteAudio();
-    if (peerRef.current) { peerRef.current.close(); peerRef.current = null; }
-    if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
-    const currentIncomingCall = incomingCallRef.current;
-    if (sendSignal && user && currentIncomingCall) sendCallSignal(user.id, currentIncomingCall.callerId, "call-ended");
-    setCallActive(false);
-    setIsMuted(false);
     setIncomingCall(null);
   };
 
@@ -247,33 +252,5 @@ export default function IncomingCallHandler() {
         )}
       </div>
     </motion.div>
-  );
-}
-            <>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={rejectCall}
-                className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-xl shadow-destructive/30">
-                <PhoneOff className="w-7 h-7 text-destructive-foreground" />
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={acceptCall}
-                className="w-16 h-16 rounded-full bg-[hsl(var(--emerald))] flex items-center justify-center shadow-xl shadow-[hsl(var(--emerald))]/30"
-                animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
-                <Phone className="w-7 h-7 text-foreground" />
-              </motion.button>
-            </>
-          ) : (
-            <>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={toggleMute}
-                className={`w-14 h-14 rounded-full flex items-center justify-center ${isMuted ? "bg-destructive/20 text-destructive" : "bg-secondary text-foreground"}`}>
-                {isMuted ? <span className="text-xs font-bold">🔇</span> : <span className="text-xs font-bold">🔊</span>}
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={() => endCall()}
-                className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-xl">
-                <PhoneOff className="w-7 h-7 text-destructive-foreground" />
-              </motion.button>
-            </>
-          )}
-        </div>
-      </motion.div>
-    </AnimatePresence>
   );
 }
