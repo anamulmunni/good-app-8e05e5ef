@@ -60,6 +60,16 @@ export default function CallPage() {
         if (signal.caller_id !== targetUserId) return;
 
         switch (signal.signal_type) {
+          case "call-ringing":
+            if (["calling", "ringing"].includes(callStateRef.current)) {
+              setCallState("ringing");
+            }
+            break;
+          case "call-busy":
+            stopRingtone();
+            endCall(false);
+            toast({ title: "ইউজার এখন ব্যস্ত" });
+            break;
           case "call-accepted":
             stopRingtone();
             if (noAnswerTimerRef.current) {
@@ -112,6 +122,11 @@ export default function CallPage() {
               } else {
                 pendingIceCandidatesRef.current.push(signal.signal_data);
               }
+            }
+            break;
+          case "call-request":
+            if (["calling", "ringing", "connected"].includes(callStateRef.current)) {
+              sendCallSignal(user.id, targetUserId, "call-busy").catch(() => {});
             }
             break;
         }
@@ -215,7 +230,7 @@ export default function CallPage() {
 
       // Auto-end after 30 seconds if no answer
       noAnswerTimerRef.current = window.setTimeout(() => {
-        if (callStateRef.current === "calling") {
+        if (["calling", "ringing"].includes(callStateRef.current)) {
           endCall(true);
           toast({ title: "কোনো উত্তর নেই" });
         }
@@ -331,7 +346,7 @@ export default function CallPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {callState === "idle" && "কল করতে নিচে ট্যাপ করুন"}
             {callState === "calling" && "কল হচ্ছে..."}
-            {callState === "ringing" && "রিং হচ্ছে..."}
+              {callState === "ringing" && "Ringing..."}
             {callState === "connected" && formatDuration(callDuration)}
             {callState === "ended" && "কল শেষ"}
           </p>
