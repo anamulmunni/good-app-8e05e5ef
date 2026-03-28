@@ -340,7 +340,7 @@ export default function Reels() {
                         <Heart className="w-6 h-6 text-white" />
                       )}
                     </motion.div>
-                    <span className="text-white text-xs font-bold drop-shadow-lg">{reel.likes_count || ""}</span>
+                    <span className="text-white text-sm font-bold drop-shadow-lg">{reel.likes_count > 0 ? reel.likes_count : ""}</span>
                   </button>
 
                   {/* Comment */}
