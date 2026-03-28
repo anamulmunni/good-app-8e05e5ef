@@ -354,22 +354,14 @@ export default function Feed() {
   };
 
   const sharePost = async (post: Post) => {
-    const text = post.content || "দেখুন এই পোস্টটি!";
-    const shareUrl = window.location.origin;
-    if (navigator.share) {
-      const shareData: ShareData = { title: "Good App - পোস্ট শেয়ার", text, url: shareUrl };
-      if (post.image_url) {
-        try {
-          const response = await fetch(post.image_url);
-          const blob = await response.blob();
-          const file = new File([blob], "post-image.jpg", { type: blob.type });
-          if (navigator.canShare && navigator.canShare({ files: [file] })) shareData.files = [file];
-        } catch {}
-      }
-      try { await navigator.share(shareData); } catch {}
-    } else {
-      navigator.clipboard.writeText(`${text}\n${shareUrl}`);
-      toast({ title: "লিংক কপি করা হয়েছে!" });
+    if (!user) return;
+    try {
+      const shareContent = post.content ? `শেয়ার করেছে: "${post.content}"` : "একটি পোস্ট শেয়ার করেছে";
+      await createPost(user.id, shareContent, post.image_url || undefined, post.video_url || undefined);
+      queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
+      toast({ title: "আপনার প্রোফাইলে শেয়ার করা হয়েছে! ✅" });
+    } catch {
+      toast({ title: "শেয়ার করা যায়নি", variant: "destructive" });
     }
   };
 
