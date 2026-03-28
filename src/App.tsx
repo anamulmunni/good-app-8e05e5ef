@@ -48,6 +48,7 @@ function AppInner() {
         <Route path="/add-keys" element={<AddKeys />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/feed" element={<Feed />} />
+        <Route path="/reels" element={<Reels />} />
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/call/:userId" element={<CallPage />} />
         <Route path="/install" element={<Install />} />
