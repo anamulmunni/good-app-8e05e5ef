@@ -92,13 +92,13 @@ export async function sendMessage(conversationId: string, senderId: number, cont
 
   if (error) throw error;
 
-  void (supabase
+  await (supabase
     .from("conversations")
     .update({
       last_message: messageType === "text" ? content : (messageType === "image" ? "📷 ছবি" : "🎤 ভয়েস"),
       last_message_at: new Date().toISOString(),
     } as any)
-    .eq("id", conversationId) as any);
+    .eq("id", conversationId) as any).catch(() => {});
 
   return data;
 }
