@@ -372,6 +372,8 @@ export default function Feed() {
     if (commentingPostId === postId) { setCommentingPostId(null); setReplyingTo(null); return; }
     setCommentingPostId(postId);
     setReplyingTo(null);
+    setCommentText("");
+    setShowMentionSuggestions(false);
     loadComments(postId);
   };
 
