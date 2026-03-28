@@ -55,7 +55,7 @@ export default function Feed() {
 
   const { data: posts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["feed-posts", searchQuery],
-    queryFn: () => getFeedPosts(100, searchQuery),
+    queryFn: () => getFeedPosts(1000, searchQuery),
     enabled: !!user,
   });
 
