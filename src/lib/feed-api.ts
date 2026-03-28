@@ -89,6 +89,29 @@ function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
   return fallbackUrl || "";
 }
 
+function buildSearchVariants(searchQuery?: string): string[] {
+  const q = (searchQuery || "").trim();
+  if (!q) {
+    return [
+      "bangla natok",
+      "bangla song",
+      "hindi song",
+      "bangla cartoon",
+      "bangla funny video",
+      "trending music video",
+    ];
+  }
+
+  return [
+    q,
+    `${q} full video`,
+    `${q} official`,
+    `${q} song`,
+    `${q} natok`,
+    `${q} cartoon`,
+  ];
+}
+
 function normalizeExternalVideo(raw: any): ExternalReelVideo | null {
   const rawId = String(raw?.id || "");
   const cleanId = rawId.startsWith("dm-") ? rawId.replace("dm-", "") : (raw?.video_id || rawId);
@@ -116,25 +139,33 @@ async function fetchDailymotionFallback(
   searchQuery?: string,
   mode: "short" | "long" = "long",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const search = searchQuery?.trim() || "bangla video";
-  const limit = Math.max(rows * 2, 40);
-  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(search)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,owner.screenname,country&sort=relevance`;
-  const res = await fetch(dmUrl);
-  if (!res.ok) return { videos: [], hasMore: false };
+  const variants = buildSearchVariants(searchQuery);
+  const perQueryLimit = Math.max(Math.ceil((rows * 2) / variants.length) + 10, 12);
+  const responses = await Promise.all(
+    variants.map(async (q) => {
+      const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&limit=${perQueryLimit}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,owner.screenname,country&sort=relevance`;
+      const res = await fetch(dmUrl);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data?.list) ? data.list : [];
+    })
+  );
 
-  const data = await res.json();
-  const list = Array.isArray(data?.list) ? data.list : [];
+  const list = responses.flat();
   const queryWords = (searchQuery || "").toLowerCase().split(/\s+/).filter((x) => x.length >= 2);
+  const seen = new Set<string>();
 
   const filtered = list
     .map((v: any) => {
       const duration = Number(v?.duration || 0);
       const durationOk = duration >= 3;
       if (!v?.id || !durationOk) return null;
+      if (seen.has(v.id)) return null;
+      seen.add(v.id);
 
       const title = String(v?.title || "বাংলা ভিডিও");
-      const country = String(v?.country || "").toUpperCase();
       const score = scoreFallbackVideo(title, queryWords)
+        + (duration >= 300 ? 2 : 0)
         + (duration >= 60 ? 1 : 0);
 
       return {
@@ -148,7 +179,7 @@ async function fetchDailymotionFallback(
         video_id: v.id,
         duration,
         category: detectExternalCategory(title),
-        country,
+        country: String(v?.country || "").toUpperCase() || null,
         _score: score,
       };
     })
@@ -157,7 +188,7 @@ async function fetchDailymotionFallback(
     .slice(0, rows)
     .map(({ _score, ...rest }: any) => rest);
 
-  return { videos: filtered, hasMore: list.length >= limit / 2 };
+  return { videos: filtered, hasMore: filtered.length >= Math.min(rows, 10) };
 }
 
 export async function getBangladeshExternalVideos(
@@ -236,16 +267,13 @@ export async function getFeedPosts(limit = 30, searchQuery?: string): Promise<Po
   const { data: posts } = await query;
   if (!posts || posts.length === 0) return [];
 
-  // Filter out video-only posts (those go to Reels)
-  const feedPosts = posts.filter((p: any) => !p.video_url);
-
-  const userIds = [...new Set(feedPosts.map((p: any) => p.user_id))];
+  const userIds = [...new Set(posts.map((p: any) => p.user_id))];
   const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id") as any).in("id", userIds);
 
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
-  let result = feedPosts.map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
+  let result = posts.map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
 
   // Client-side search filter
   if (searchQuery && searchQuery.trim()) {
