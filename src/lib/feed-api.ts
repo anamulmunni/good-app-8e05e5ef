@@ -42,6 +42,15 @@ export type Reaction = {
   created_at: string | null;
 };
 
+export type ExternalReelVideo = {
+  id: string;
+  title: string;
+  video_url: string;
+  source: "internet_archive";
+  creator?: string | null;
+  thumbnail_url?: string | null;
+};
+
 export const REACTION_EMOJIS: Record<string, string> = {
   like: "👍",
   love: "❤️",
@@ -50,6 +59,84 @@ export const REACTION_EMOJIS: Record<string, string> = {
   sad: "😢",
   angry: "😡",
 };
+
+const ARCHIVE_BD_QUERY = "(title:(Bangladesh OR Bangla OR Dhaka) OR description:(Bangladesh OR Bangla OR Dhaka)) AND mediatype:(movies)";
+const ARCHIVE_VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v", ".mov"];
+
+const isArchivePlayableVideo = (name?: string) => {
+  if (!name || typeof name !== "string") return false;
+  const lower = name.toLowerCase();
+  return ARCHIVE_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+};
+
+const buildArchiveDownloadUrl = (identifier: string, fileName: string) => {
+  const encodedIdentifier = encodeURIComponent(identifier);
+  const encodedPath = fileName.split("/").map((part) => encodeURIComponent(part)).join("/");
+  return `https://archive.org/download/${encodedIdentifier}/${encodedPath}`;
+};
+
+export async function getBangladeshExternalVideos(
+  page = 1,
+  rows = 8,
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
+  try {
+    const params = new URLSearchParams();
+    params.set("q", ARCHIVE_BD_QUERY);
+    params.append("fl[]", "identifier");
+    params.append("fl[]", "title");
+    params.append("fl[]", "creator");
+    params.set("rows", String(rows));
+    params.set("page", String(page));
+    params.set("output", "json");
+
+    const searchRes = await fetch(`https://archive.org/advancedsearch.php?${params.toString()}`);
+    if (!searchRes.ok) return { videos: [], hasMore: false };
+
+    const searchJson = await searchRes.json();
+    const docs = Array.isArray(searchJson?.response?.docs) ? searchJson.response.docs : [];
+    const numFound = Number(searchJson?.response?.numFound || 0);
+
+    const metadataResults = await Promise.allSettled(
+      docs.map(async (doc: any) => {
+        const identifier = String(doc?.identifier || "").trim();
+        if (!identifier) return null;
+
+        const metadataRes = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`);
+        if (!metadataRes.ok) return null;
+
+        const metadataJson = await metadataRes.json();
+        const files = Array.isArray(metadataJson?.files) ? metadataJson.files : [];
+        const videoFile = files.find((f: any) => isArchivePlayableVideo(f?.name));
+        if (!videoFile?.name) return null;
+
+        const title = String(doc?.title || metadataJson?.metadata?.title || "Bangla Video").trim();
+        const creator = String(doc?.creator || metadataJson?.metadata?.creator || "").trim() || null;
+        const thumbnail = `https://archive.org/services/img/${encodeURIComponent(identifier)}`;
+
+        return {
+          id: `ext-${identifier}-${videoFile.name}`,
+          title,
+          creator,
+          source: "internet_archive" as const,
+          thumbnail_url: thumbnail,
+          video_url: buildArchiveDownloadUrl(identifier, videoFile.name),
+        };
+      }),
+    );
+
+    const videos = metadataResults
+      .filter((r): r is PromiseFulfilledResult<ExternalReelVideo | null> => r.status === "fulfilled")
+      .map((r) => r.value)
+      .filter((v): v is ExternalReelVideo => !!v);
+
+    return {
+      videos,
+      hasMore: page * rows < numFound,
+    };
+  } catch {
+    return { videos: [], hasMore: false };
+  }
+}
 
 // Check if user has posted at least once
 export async function hasUserPosted(userId: number): Promise<boolean> {
