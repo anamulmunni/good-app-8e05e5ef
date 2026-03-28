@@ -19,7 +19,17 @@ import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import { useOnlineHeartbeat } from "@/hooks/use-online";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      retry: 1,
+    },
+  },
+});
 
 function AppInner() {
   useOnlineHeartbeat();
