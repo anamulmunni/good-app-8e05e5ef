@@ -1,18 +1,32 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   toggleReaction, getUserReactions, getPostComments, addComment,
-  REACTION_EMOJIS, type Post, type PostComment, markReelsSeen
+  REACTION_EMOJIS, type Post, type PostComment, markReelsSeen,
+  getBangladeshExternalVideos, type ExternalReelVideo,
 } from "@/lib/feed-api";
 import {
-  ArrowLeft, Heart, MessageCircle, Send, X, User,
-  Share2, Volume2, VolumeX, Play
+  ArrowLeft, Heart, MessageCircle, Send, X, User, Loader2,
+  Share2, Volume2, VolumeX, Play, Globe
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+
+type ReelItem = {
+  id: string;
+  video_url: string;
+  content: string | null;
+  likes_count: number;
+  comments_count: number;
+  user_id: number;
+  user?: { display_name: string | null; avatar_url: string | null; guest_id: string } | null;
+  isExternal?: boolean;
+  externalTitle?: string;
+  externalCreator?: string | null;
+};
 
 export default function Reels() {
   const { user, isLoading } = useAuth();
@@ -29,11 +43,17 @@ export default function Reels() {
   const [loadingComments, setLoadingComments] = useState(false);
   const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState<string | null>(null);
+  const [extPage, setExtPage] = useState(1);
+  const [extVideos, setExtVideos] = useState<ExternalReelVideo[]>([]);
+  const [extHasMore, setExtHasMore] = useState(true);
+  const [extLoading, setExtLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
+  const activeVideoIdRef = useRef<string | null>(null);
   const lastTapRef = useRef<Record<string, number>>({});
   const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -46,7 +66,7 @@ export default function Reels() {
     }
   }, [user]);
 
-  // Fetch video posts only
+  // Fetch user-uploaded video posts
   const { data: reels = [], isLoading: reelsLoading } = useQuery({
     queryKey: ["reels-posts"],
     queryFn: async () => {
@@ -66,6 +86,55 @@ export default function Reels() {
     enabled: !!user,
   });
 
+  // Load first batch of external videos on mount
+  useEffect(() => {
+    if (!user) return;
+    loadMoreExternal();
+  }, [user]);
+
+  const loadMoreExternal = useCallback(async () => {
+    if (extLoading || !extHasMore) return;
+    setExtLoading(true);
+    try {
+      const result = await getBangladeshExternalVideos(extPage, 8);
+      setExtVideos(prev => {
+        const existingIds = new Set(prev.map(v => v.id));
+        const newOnes = result.videos.filter(v => !existingIds.has(v.id));
+        return [...prev, ...newOnes];
+      });
+      setExtHasMore(result.hasMore);
+      setExtPage(p => p + 1);
+    } catch {}
+    setExtLoading(false);
+  }, [extPage, extLoading, extHasMore]);
+
+  // Combined feed: user reels first, then external
+  const allReels = useMemo<ReelItem[]>(() => {
+    const userReels: ReelItem[] = reels.map(r => ({
+      id: r.id,
+      video_url: r.video_url!,
+      content: r.content,
+      likes_count: r.likes_count,
+      comments_count: r.comments_count,
+      user_id: r.user_id,
+      user: r.user,
+      isExternal: false,
+    }));
+    const external: ReelItem[] = extVideos.map(v => ({
+      id: v.id,
+      video_url: v.video_url,
+      content: v.title,
+      likes_count: 0,
+      comments_count: 0,
+      user_id: 0,
+      user: null,
+      isExternal: true,
+      externalTitle: v.title,
+      externalCreator: v.creator,
+    }));
+    return [...userReels, ...external];
+  }, [reels, extVideos]);
+
   // Load user reactions
   useEffect(() => {
     if (user && reels.length > 0) {
@@ -73,17 +142,20 @@ export default function Reels() {
     }
   }, [user, reels]);
 
-  // Auto-play current video, pause ALL others
+  // STRICT single-video playback controller
   useEffect(() => {
-    if (reels.length === 0) return;
-    const currentReel = reels[currentIndex];
+    if (allReels.length === 0) return;
+    const currentReel = allReels[currentIndex];
     if (!currentReel) return;
 
-    // First pause ALL videos
+    activeVideoIdRef.current = currentReel.id;
+
+    // Pause and reset ALL videos
     Object.entries(videoRefs.current).forEach(([id, video]) => {
       if (!video) return;
       video.pause();
       video.muted = true;
+      video.currentTime = 0;
     });
 
     // Then play only the current one
@@ -94,7 +166,15 @@ export default function Reels() {
       currentVideo.play().catch(() => {});
       setPaused(null);
     }
-  }, [currentIndex, reels, muted]);
+  }, [currentIndex, allReels, muted]);
+
+  // Also add onPlay guard to prevent rogue plays
+  const handleVideoPlay = useCallback((reelId: string) => {
+    if (reelId !== activeVideoIdRef.current) {
+      const video = videoRefs.current[reelId];
+      if (video) { video.pause(); video.muted = true; }
+    }
+  }, []);
 
   // Scroll snap observer
   useEffect(() => {
@@ -117,7 +197,25 @@ export default function Reels() {
     items.forEach((item) => observer.observe(item));
 
     return () => observer.disconnect();
-  }, [reels]);
+  }, [allReels]);
+
+  // Infinite scroll: load more external when near bottom
+  useEffect(() => {
+    const sentinel = bottomSentinelRef.current;
+    const container = containerRef.current;
+    if (!sentinel || !container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && extHasMore && !extLoading) {
+          loadMoreExternal();
+        }
+      },
+      { root: container, threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [extHasMore, extLoading, loadMoreExternal, allReels]);
 
   const reactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: string; type: string }) => {
@@ -200,8 +298,8 @@ export default function Reels() {
     }
   };
 
-  const sharePost = async (post: Post) => {
-    const text = post.content || "দেখুন এই ভিডিও!";
+  const sharePost = async (reel: ReelItem) => {
+    const text = reel.content || "দেখুন এই ভিডিও!";
     if (navigator.share) {
       try { await navigator.share({ title: "Good App Reels", text, url: window.location.origin }); } catch {}
     } else {
@@ -233,7 +331,17 @@ export default function Reels() {
     });
   };
 
+  // Cleanup on unmount — pause all
+  useEffect(() => {
+    return () => {
+      Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } });
+    };
+  }, []);
+
   if (isLoading || !user) return null;
+
+  const totalReels = allReels.length;
+  const showEmpty = !reelsLoading && totalReels === 0 && !extLoading;
 
   return (
     <div className="fixed inset-0 bg-black z-50">
@@ -252,18 +360,18 @@ export default function Reels() {
         <div className="flex items-center justify-center h-full">
           <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : reels.length === 0 ? (
+      ) : showEmpty ? (
         <div className="flex flex-col items-center justify-center h-full text-white/60 gap-3">
           <Play className="w-16 h-16" />
           <p className="font-bold text-lg">কোনো Reels নেই</p>
-          <p className="text-sm">Feed থেকে ভিডিও পোস্ট করুন!</p>
+          <p className="text-sm">Feed থেকে ভিডিও পোস্ট করুন বা অপেক্ষা করুন!</p>
           <button onClick={() => navigate("/feed")} className="mt-4 px-6 py-2 bg-primary rounded-full text-primary-foreground font-bold">
             Feed এ যান
           </button>
         </div>
       ) : (
         <div ref={containerRef} className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
-          {reels.map((reel, index) => {
+          {allReels.map((reel, index) => {
             const myReaction = userReactions[reel.id];
             return (
               <div
@@ -274,13 +382,14 @@ export default function Reels() {
                 {/* Video */}
                 <video
                   ref={(el) => { if (el) videoRefs.current[reel.id] = el; }}
-                  src={reel.video_url!}
+                  src={reel.video_url}
                   className="absolute inset-0 w-full h-full object-cover"
                   loop
                   playsInline
                   muted={muted}
+                  preload="metadata"
                   onClick={() => handleVideoTap(reel.id)}
-                  onTouchEnd={() => {}} // keep touch events
+                  onPlay={() => handleVideoPlay(reel.id)}
                 />
 
                 {/* Pause indicator */}
@@ -315,21 +424,41 @@ export default function Reels() {
 
                 {/* Bottom info */}
                 <div className="absolute bottom-4 left-4 right-16 z-10">
-                  <button onClick={() => navigate(`/user/${reel.user_id}`)} className="flex items-center gap-2 mb-2">
-                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/50 bg-white/20 flex items-center justify-center">
-                      {reel.user?.avatar_url ? <img src={reel.user.avatar_url} className="w-full h-full object-cover" /> :
-                        <User className="w-5 h-5 text-white" />}
-                    </div>
-                    <span className="text-white font-bold text-sm drop-shadow-lg">{reel.user?.display_name || "User"}</span>
-                  </button>
-                {reel.content && (
-                    <p className="text-white/90 text-[15px] line-clamp-2 drop-shadow-lg">{renderMentionText(reel.content)}</p>
+                  {reel.isExternal ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/50 bg-white/20 flex items-center justify-center">
+                          <Globe className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <span className="text-white font-bold text-sm drop-shadow-lg">{reel.externalCreator || "Internet Archive"}</span>
+                          <span className="block text-white/60 text-[10px] drop-shadow-lg">বাংলাদেশ ভিডিও</span>
+                        </div>
+                      </div>
+                      {reel.externalTitle && (
+                        <p className="text-white/90 text-[15px] line-clamp-2 drop-shadow-lg">{reel.externalTitle}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => navigate(`/user/${reel.user_id}`)} className="flex items-center gap-2 mb-2">
+                        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/50 bg-white/20 flex items-center justify-center">
+                          {reel.user?.avatar_url ? <img src={reel.user.avatar_url} className="w-full h-full object-cover" /> :
+                            <User className="w-5 h-5 text-white" />}
+                        </div>
+                        <span className="text-white font-bold text-sm drop-shadow-lg">{reel.user?.display_name || "User"}</span>
+                      </button>
+                      {reel.content && (
+                        <p className="text-white/90 text-[15px] line-clamp-2 drop-shadow-lg">{renderMentionText(reel.content)}</p>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {/* Right side actions */}
                 <div className="absolute right-3 bottom-24 z-10 flex flex-col items-center gap-5">
-                  {/* Like/React */}
+                  {/* Like/React — only for user reels */}
+                  {!reel.isExternal && (
                   <button onClick={() => reactionMutation.mutate({ postId: reel.id, type: myReaction || "love" })}
                     className="flex flex-col items-center gap-1">
                     <motion.div whileTap={{ scale: 1.3 }}
@@ -342,8 +471,10 @@ export default function Reels() {
                     </motion.div>
                     <span className="text-white text-sm font-bold drop-shadow-lg">{reel.likes_count > 0 ? reel.likes_count : ""}</span>
                   </button>
+                  )}
 
-                  {/* Comment */}
+                  {/* Comment — only for user reels */}
+                  {!reel.isExternal && (
                   <button onClick={() => { setCommentingPostId(reel.id); loadComments(reel.id); }}
                     className="flex flex-col items-center gap-1">
                     <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
@@ -351,6 +482,7 @@ export default function Reels() {
                     </div>
                     <span className="text-white text-sm font-bold drop-shadow-lg">{reel.comments_count > 0 ? reel.comments_count : ""}</span>
                   </button>
+                  )}
 
                   {/* Share */}
                   <button onClick={() => sharePost(reel)}
@@ -364,6 +496,13 @@ export default function Reels() {
               </div>
             );
           })}
+
+          {/* Infinite scroll sentinel + loading */}
+          {extHasMore && (
+            <div ref={bottomSentinelRef} className="h-24 flex items-center justify-center">
+              {extLoading && <Loader2 className="w-8 h-8 text-white animate-spin" />}
+            </div>
+          )}
         </div>
       )}
 
