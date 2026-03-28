@@ -1,8 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Type, Music, Check, Search, Loader2, Palette, AlignCenter } from "lucide-react";
+import { X, Type, Music, Check, Search, Loader2, Palette, AlignCenter, Pause, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Sample music list (simulating Facebook's music library)
+// Free royalty-free audio samples for preview/playback
+const AUDIO_SAMPLES: Record<string, string> = {
+  Bollywood: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  Pop: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  Romance: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  English: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+  EDM: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+  Bangla: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+};
+
 const MUSIC_LIBRARY = [
   { id: "1", title: "Tum Hi Ho", artist: "Arijit Singh", genre: "Bollywood" },
   { id: "2", title: "Kesariya", artist: "Arijit Singh", genre: "Bollywood" },
@@ -30,6 +39,13 @@ const MUSIC_LIBRARY = [
   { id: "24", title: "Tumi Jake Bhalobasho", artist: "Anupam Roy", genre: "Bangla" },
 ];
 
+export function getAudioUrlForMusic(musicName: string | null | undefined): string | null {
+  if (!musicName) return null;
+  const song = MUSIC_LIBRARY.find(m => musicName.includes(m.title));
+  if (song) return AUDIO_SAMPLES[song.genre] || AUDIO_SAMPLES.Bollywood;
+  return AUDIO_SAMPLES.Bollywood;
+}
+
 const TEXT_COLORS = [
   "#FFFFFF", "#000000", "#FF0000", "#00FF00", "#0000FF",
   "#FFFF00", "#FF69B4", "#00FFFF", "#FF6600", "#9900FF",
@@ -50,15 +66,16 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
   const [overlayText, setOverlayText] = useState("");
   const [textColor, setTextColor] = useState("#FFFFFF");
   const [fontSize, setFontSize] = useState(36);
-  const [textPosition, setTextPosition] = useState({ x: 0.5, y: 0.5 }); // normalized
+  const [textPosition, setTextPosition] = useState({ x: 0.5, y: 0.5 });
   const [showTextEditor, setShowTextEditor] = useState(false);
   const [showMusicPicker, setShowMusicPicker] = useState(false);
   const [musicQuery, setMusicQuery] = useState("");
   const [selectedMusic, setSelectedMusic] = useState<typeof MUSIC_LIBRARY[0] | null>(null);
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const url = URL.createObjectURL(imageFile);
@@ -69,11 +86,49 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   const filteredMusic = MUSIC_LIBRARY.filter(m =>
     m.title.toLowerCase().includes(musicQuery.toLowerCase()) ||
     m.artist.toLowerCase().includes(musicQuery.toLowerCase()) ||
     m.genre.toLowerCase().includes(musicQuery.toLowerCase())
   );
+
+  const playPreview = (song: typeof MUSIC_LIBRARY[0]) => {
+    // Stop current audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    const audioUrl = AUDIO_SAMPLES[song.genre] || AUDIO_SAMPLES.Bollywood;
+    const audio = new Audio(audioUrl);
+    audio.volume = 0.5;
+    audioRef.current = audio;
+    audio.play().then(() => setIsPlaying(true)).catch(() => {});
+    audio.onended = () => setIsPlaying(false);
+  };
+
+  const stopPreview = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
+  };
+
+  const selectMusic = (song: typeof MUSIC_LIBRARY[0]) => {
+    setSelectedMusic(song);
+    playPreview(song);
+    setShowMusicPicker(false);
+  };
 
   const handleTextDrag = useCallback((e: React.TouchEvent | React.MouseEvent) => {
     if (!isDragging || !containerRef.current) return;
@@ -87,6 +142,7 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
 
   const publishStory = async () => {
     if (!imgRef.current) return;
+    stopPreview();
     const img = imgRef.current;
     const canvas = document.createElement("canvas");
     canvas.width = img.naturalWidth;
@@ -95,13 +151,12 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
     ctx.drawImage(img, 0, 0);
 
     if (overlayText.trim()) {
-      const scale = img.naturalWidth / 400; // relative to preview width
+      const scale = img.naturalWidth / 400;
       const drawFontSize = fontSize * scale;
       ctx.font = `bold ${drawFontSize}px sans-serif`;
       ctx.fillStyle = textColor;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      // Shadow for readability
       ctx.shadowColor = "rgba(0,0,0,0.7)";
       ctx.shadowBlur = drawFontSize * 0.15;
       ctx.shadowOffsetX = 2;
@@ -109,8 +164,6 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
 
       const x = textPosition.x * canvas.width;
       const y = textPosition.y * canvas.height;
-
-      // Word wrap
       const maxWidth = canvas.width * 0.85;
       const words = overlayText.split(" ");
       const lines: string[] = [];
@@ -136,7 +189,8 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], "story.jpg", { type: "image/jpeg" });
-      onPublish(file, selectedMusic?.title ? `${selectedMusic.title} - ${selectedMusic.artist}` : undefined);
+      const musicLabel = selectedMusic ? `${selectedMusic.title} - ${selectedMusic.artist}` : undefined;
+      onPublish(file, musicLabel);
     }, "image/jpeg", 0.9);
   };
 
@@ -145,7 +199,7 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
       className="fixed inset-0 z-[300] bg-black flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-black/80">
-        <button onClick={onClose} className="p-2 text-white">
+        <button onClick={() => { stopPreview(); onClose(); }} className="p-2 text-white">
           <X className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2">
@@ -174,10 +228,8 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
         {imageUrl && (
           <img src={imageUrl} alt="" className="max-w-full max-h-full object-contain" />
         )}
-        {/* Text overlay preview */}
         {overlayText && (
-          <div
-            className="absolute cursor-move select-none"
+          <div className="absolute cursor-move select-none"
             style={{
               left: `${textPosition.x * 100}%`,
               top: `${textPosition.y * 100}%`,
@@ -205,7 +257,11 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
           <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 bg-black/60 rounded-full px-3 py-2">
             <Music className="w-4 h-4 text-white shrink-0" />
             <p className="text-white text-xs truncate flex-1">{selectedMusic.title} - {selectedMusic.artist}</p>
-            <button onClick={() => setSelectedMusic(null)} className="text-white/60 hover:text-white">
+            <button onClick={() => isPlaying ? stopPreview() : playPreview(selectedMusic)}
+              className="text-white/80 hover:text-white p-1">
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </button>
+            <button onClick={() => { stopPreview(); setSelectedMusic(null); }} className="text-white/60 hover:text-white">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -224,7 +280,6 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
               className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm border-none outline-none placeholder:text-gray-500"
               autoFocus
             />
-            {/* Color picker */}
             <div className="flex items-center gap-2">
               <Palette className="w-4 h-4 text-gray-400 shrink-0" />
               <div className="flex gap-2 overflow-x-auto">
@@ -235,7 +290,6 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
                 ))}
               </div>
             </div>
-            {/* Font size */}
             <div className="flex items-center gap-2">
               <AlignCenter className="w-4 h-4 text-gray-400 shrink-0" />
               <div className="flex gap-2">
@@ -268,7 +322,7 @@ export default function StoryEditor({ imageFile, onClose, onPublish, isPending }
             </div>
             <div className="overflow-y-auto flex-1 px-2 py-2 space-y-0.5">
               {filteredMusic.map(song => (
-                <button key={song.id} onClick={() => { setSelectedMusic(song); setShowMusicPicker(false); }}
+                <button key={song.id} onClick={() => selectMusic(song)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
                     selectedMusic?.id === song.id ? "bg-blue-600/20" : "hover:bg-gray-800"
                   }`}>
