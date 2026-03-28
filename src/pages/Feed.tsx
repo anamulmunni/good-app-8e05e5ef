@@ -865,7 +865,7 @@ export default function Feed() {
               </span>
             )}
           </button>
-          <button onClick={() => navigate("/reels")}
+          <button onClick={() => { if (user) { markReelsSeen(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["new-reels-count"] })); } navigate("/reels"); }}
             className="relative flex-1 py-2.5 flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground">
             <Play className="w-5 h-5" />
             {newReelsCount > 0 && (
