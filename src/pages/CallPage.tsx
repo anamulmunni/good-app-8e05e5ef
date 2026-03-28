@@ -108,15 +108,27 @@ export default function CallPage() {
       // Add audio tracks
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-      // Handle remote audio - properly attach to DOM for mobile
+      // Handle remote audio - create persistent audio element
       pc.ontrack = (event) => {
+        // Remove any existing call audio elements
+        document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
         const audio = document.createElement("audio");
+        audio.className = "call-remote-audio";
         audio.autoplay = true;
+        audio.volume = 1.0;
         (audio as any).playsInline = true;
         audio.setAttribute("playsinline", "true");
         audio.srcObject = event.streams[0];
         document.body.appendChild(audio);
-        audio.play().catch(() => {});
+        // Force play with user interaction context
+        const playPromise = audio.play();
+        if (playPromise) {
+          playPromise.catch(() => {
+            // Retry play on user interaction
+            const handler = () => { audio.play().catch(() => {}); document.removeEventListener("click", handler); };
+            document.addEventListener("click", handler);
+          });
+        }
       };
 
       // ICE candidates
@@ -155,6 +167,9 @@ export default function CallPage() {
     ringtoneRef.current = null;
     clearInterval(durationTimerRef.current);
 
+    // Clean up remote audio elements
+    document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
+
     if (peerRef.current) {
       peerRef.current.close();
       peerRef.current = null;
@@ -187,6 +202,7 @@ export default function CallPage() {
     return () => {
       ringtoneRef.current?.stop();
       clearInterval(durationTimerRef.current);
+      document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
       if (peerRef.current) peerRef.current.close();
       if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
     };

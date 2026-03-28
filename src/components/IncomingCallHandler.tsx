@@ -73,13 +73,22 @@ export default function IncomingCallHandler() {
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
+        document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
         const audio = document.createElement("audio");
+        audio.className = "call-remote-audio";
         audio.autoplay = true;
+        audio.volume = 1.0;
         (audio as any).playsInline = true;
         audio.setAttribute("playsinline", "true");
         audio.srcObject = event.streams[0];
         document.body.appendChild(audio);
-        audio.play().catch(() => {});
+        const playPromise = audio.play();
+        if (playPromise) {
+          playPromise.catch(() => {
+            const handler = () => { audio.play().catch(() => {}); document.removeEventListener("click", handler); };
+            document.addEventListener("click", handler);
+          });
+        }
       };
 
       pc.onicecandidate = (event) => {
@@ -117,6 +126,7 @@ export default function IncomingCallHandler() {
     ringtoneRef.current?.stop();
     ringtoneRef.current = null;
     clearInterval(durationTimerRef.current);
+    document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
     if (peerRef.current) { peerRef.current.close(); peerRef.current = null; }
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
     if (sendSignal && user && incomingCall) sendCallSignal(user.id, incomingCall.callerId, "call-ended");
