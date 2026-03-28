@@ -106,16 +106,38 @@ export default function Reels() {
     if (extLoadingRef.current) return;
     extLoadingRef.current = true;
     setExtLoading(true);
+
+    const preferred = getPreferredCategories();
+    const cacheKey = `${CACHE_KEY_PREFIX}:${activeSearch || "all"}:${preferred.join("|") || "none"}:${extPage}`;
+
     try {
-      const preferred = getPreferredCategories();
-      const result = await getBangladeshExternalVideos(extPage, 12, preferred, activeSearch || undefined);
-      setExtVideos(prev => {
-        const ids = new Set(prev.map(v => v.id));
-        return [...prev, ...result.videos.filter(v => !ids.has(v.id))];
+      const cachedRaw = localStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw) as { ts: number; result: { videos: ExternalReelVideo[]; hasMore: boolean } };
+        if (Date.now() - cached.ts < CACHE_TTL_MS) {
+          setExtVideos((prev) => {
+            const ids = new Set(prev.map((v) => v.id));
+            return [...prev, ...cached.result.videos.filter((v) => !ids.has(v.id))];
+          });
+          setExtHasMore(cached.result.hasMore);
+          setExtPage((p) => p + 1);
+          extLoadingRef.current = false;
+          setExtLoading(false);
+          return;
+        }
+      }
+
+      const result = await getBangladeshExternalVideos(extPage, 10, preferred, activeSearch || undefined);
+      setExtVideos((prev) => {
+        const ids = new Set(prev.map((v) => v.id));
+        return [...prev, ...result.videos.filter((v) => !ids.has(v.id))];
       });
       setExtHasMore(result.hasMore);
-      setExtPage(p => p + 1);
+      setExtPage((p) => p + 1);
+
+      localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), result: { videos: result.videos, hasMore: result.hasMore } }));
     } catch {}
+
     extLoadingRef.current = false;
     setExtLoading(false);
   }, [extPage, activeSearch]);
