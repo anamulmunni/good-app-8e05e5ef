@@ -3,6 +3,28 @@ import { supabase } from "@/integrations/supabase/client";
 const CALL_REMOTE_AUDIO_CLASS = "call-remote-audio";
 let activeRingtoneStop: (() => void) | null = null;
 
+// Send notification via Service Worker (works in background PWA)
+export function showCallNotification(title: string, body: string, tag = "incoming-call", url = "/") {
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: "SHOW_NOTIFICATION",
+      title,
+      body,
+      tag,
+      url,
+      icon: "/icon-192.png",
+    });
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    const n = new Notification(title, { body, tag, icon: "/icon-192.png" });
+    n.onclick = () => { window.focus(); n.close(); };
+  }
+}
+
+export function showMessageNotification(senderName: string, preview: string) {
+  if (document.visibilityState === "visible") return;
+  showCallNotification(senderName, preview, "new-message", "/chat");
+}
+
 export type CallSignal = {
   id: string;
   caller_id: number;
@@ -32,8 +54,10 @@ export async function cleanupCallSignals(userId1: number, userId2: number) {
     .or(`and(caller_id.eq.${userId1},receiver_id.eq.${userId2}),and(caller_id.eq.${userId2},receiver_id.eq.${userId1})`);
 }
 
-// Ringtone using Web Audio API - with proper AudioContext resume for PWA/standalone
-export function playRingtone(): { stop: () => void } {
+// Two distinct ringtone patterns
+// "outgoing" = caller hears a long ring-back tone
+// "incoming" = receiver hears a short alert ringtone
+export function playRingtone(type: "outgoing" | "incoming" = "incoming"): { stop: () => void } {
   if (activeRingtoneStop) {
     activeRingtoneStop();
     activeRingtoneStop = null;
@@ -53,10 +77,10 @@ export function playRingtone(): { stop: () => void } {
     osc.connect(gain);
     gain.connect(audioCtx.destination);
 
-    osc.type = "sine";
+    osc.type = type === "outgoing" ? "sine" : "triangle";
     osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.55, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.02, audioCtx.currentTime + duration);
+    gain.gain.setValueAtTime(type === "outgoing" ? 0.35 : 0.55, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
 
     osc.start();
     osc.stop(audioCtx.currentTime + duration);
@@ -66,16 +90,25 @@ export function playRingtone(): { stop: () => void } {
     if (stopped || !audioCtx || audioCtx.state === "closed") return;
 
     try {
-      playBeep(720, 0.34);
-      toneTimer1 = window.setTimeout(() => {
-        if (stopped) return;
-        playBeep(860, 0.34);
-      }, 420);
-
-      toneTimer2 = window.setTimeout(() => {
-        if (stopped) return;
+      if (type === "outgoing") {
+        // Long ring-back tone (like phone ringing on the other end)
+        playBeep(440, 1.0);
+        toneTimer1 = window.setTimeout(() => {
+          if (stopped) return;
+          playBeep(480, 1.0);
+        }, 1100);
+      } else {
+        // Short alert bursts (incoming call alert)
         playBeep(720, 0.34);
-      }, 840);
+        toneTimer1 = window.setTimeout(() => {
+          if (stopped) return;
+          playBeep(860, 0.34);
+        }, 420);
+        toneTimer2 = window.setTimeout(() => {
+          if (stopped) return;
+          playBeep(720, 0.34);
+        }, 840);
+      }
     } catch {
       // no-op
     }
@@ -88,7 +121,7 @@ export function playRingtone(): { stop: () => void } {
       await audioCtx.resume();
     }
     playRingCycle();
-    loopTimer = window.setInterval(playRingCycle, 2400);
+    loopTimer = window.setInterval(playRingCycle, type === "outgoing" ? 3500 : 2400);
   };
 
   init().catch(() => {
