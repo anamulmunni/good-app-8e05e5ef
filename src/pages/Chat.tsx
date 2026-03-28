@@ -334,6 +334,8 @@ export default function Chat() {
           {messages.map((msg, i) => {
             const isMine = msg.sender_id === user.id;
             const showAvatar = !isMine && (i === messages.length - 1 || messages[i + 1]?.sender_id !== msg.sender_id);
+            const isLastMyMsg = isMine && (i === messages.length - 1 || messages[i + 1]?.sender_id !== msg.sender_id);
+            const isLastMsgOverall = i === messages.length - 1;
             return (
               <div key={msg.id} className={`flex items-end gap-1.5 ${isMine ? "justify-end" : "justify-start"}`}>
                 {!isMine && (
@@ -369,6 +371,23 @@ export default function Chat() {
                   <p className={`text-[10px] mt-0.5 px-1 ${isMine ? "text-right text-gray-500" : "text-gray-400"}`}>
                     {msg.created_at ? new Date(msg.created_at).toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit" }) : ""}
                   </p>
+                  {/* Seen indicator - Messenger style */}
+                  {isMine && isLastMyMsg && isLastMsgOverall && msg.is_read && (
+                    <div className="flex justify-end px-1">
+                      <div className="flex items-center gap-0.5">
+                        {otherUser?.avatar_url ? (
+                          <img src={otherUser.avatar_url} className="w-3.5 h-3.5 rounded-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center">
+                            <span className="text-[6px] text-white font-bold">✓</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {isMine && isLastMyMsg && isLastMsgOverall && !msg.is_read && (
+                    <p className="text-[9px] text-right text-gray-400 px-1">Sent</p>
+                  )}
                 </div>
               </div>
             );
