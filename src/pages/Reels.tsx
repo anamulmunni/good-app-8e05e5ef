@@ -243,7 +243,7 @@ export default function Reels() {
                   loop
                   playsInline
                   muted={muted}
-                  onClick={() => handleDoubleTap(reel.id)}
+                  onClick={() => handleVideoTap(reel.id)}
                   onTouchEnd={() => {}} // keep touch events
                 />
 
