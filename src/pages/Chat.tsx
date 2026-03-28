@@ -13,6 +13,8 @@ import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import EmojiPicker from "@/components/EmojiPicker";
+import { showMessageNotification } from "@/lib/call-api";
 
 type PendingMedia = {
   id: string;
@@ -36,6 +38,7 @@ export default function Chat() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
@@ -98,12 +101,19 @@ export default function Chat() {
     if (!user) return;
     const channel = supabase
       .channel(`all-messages-${user.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
         queryClient.invalidateQueries({ queryKey: ["conversations", user.id] });
+        // Show notification for messages from others when page is hidden
+        const msg = payload.new;
+        if (msg && msg.sender_id !== user.id) {
+          const sender = userCache[msg.sender_id];
+          const preview = msg.message_type === "text" ? (msg.content || "") : (msg.message_type === "image" ? "📷 ছবি" : "🎤 ভয়েস");
+          showMessageNotification(sender?.display_name || "New Message", preview);
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id, queryClient]);
+  }, [user?.id, queryClient, userCache]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
