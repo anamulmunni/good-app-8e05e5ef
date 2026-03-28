@@ -111,8 +111,12 @@ function isBanglaSongTitle(title: string): boolean {
 
 function isBanglaDefaultSuggestion(title: string, country?: string | null): boolean {
   const lower = title.toLowerCase();
-  const isNonBanglaMarker = /(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower);
-  return isBanglaSongTitle(title) && !isNonBanglaMarker;
+  const fromBangladesh = String(country || "").toUpperCase() === "BD";
+  const hasBanglaMarker = /(bangla|বাংলা|bengali|dhallywood|baul|nazrul|rabindra|bd song|deshi song)/i.test(lower);
+  const hasSongMarker = /(song|music|audio|lyrics|গান|gaan|gan|gana|album|official)/i.test(lower);
+  const hasNonBanglaMarker = /(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower);
+  const hasNonMusicMarker = /(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower);
+  return (fromBangladesh || hasBanglaMarker) && hasSongMarker && !hasNonBanglaMarker && !hasNonMusicMarker;
 }
 
 function getQueryCoverage(queryWords: string[], normalizedTitle: string): number {
@@ -327,9 +331,6 @@ async function fetchDailymotionFallback(
         }
       } else if (!isBanglaDefault) {
         return null;
-      } else {
-        if (!hasFreshMarker(title)) return null;
-        if (!hasQualityMarker(title)) return null;
       }
 
       let score = scoreFallbackVideo(title, queryWords, canonicalQuery)
@@ -366,6 +367,43 @@ async function fetchDailymotionFallback(
     .sort((a: any, b: any) => b._score - a._score)
     .slice(0, rows)
     .map(({ _score, ...rest }: any) => rest);
+
+  if (!canonicalQuery && filtered.length === 0) {
+    const relaxedSeen = new Set<string>();
+    const relaxed = list
+      .map((v: any) => {
+        const duration = Number(v?.duration || 0);
+        if (!v?.id || duration < 3) return null;
+        if (relaxedSeen.has(v.id)) return null;
+        relaxedSeen.add(v.id);
+
+        const title = String(v?.title || "বাংলা ভিডিও");
+        const lower = title.toLowerCase();
+        if (/(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower)) return null;
+        if (/(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower)) return null;
+
+        return {
+          id: `dm-${v.id}`,
+          title,
+          source: "dailymotion" as const,
+          video_url: `https://www.dailymotion.com/embed/video/${v.id}`,
+          watch_url: `https://www.dailymotion.com/video/${v.id}`,
+          creator: v["owner.screenname"] || null,
+          thumbnail_url: v.thumbnail_1080_url || v.thumbnail_720_url || v.thumbnail_480_url || v.thumbnail_360_url || v.thumbnail_url || null,
+          video_id: v.id,
+          duration,
+          category: detectExternalCategory(title),
+          country: String(v?.country || "").toUpperCase() || null,
+        };
+      })
+      .filter(Boolean)
+      .slice(0, rows);
+
+    return {
+      videos: relaxed as ExternalReelVideo[],
+      hasMore: responses.some((r) => r.length >= perQueryLimit) || list.length > rows,
+    };
+  }
 
   return {
     videos: filtered,
@@ -427,14 +465,14 @@ export async function getUploadedLongVideos(
 
   const strictDefaultVideos = searchQuery?.trim()
     ? videos
-    : videos.filter((video) =>
-      isBanglaDefaultSuggestion(video.title, video.country)
-      && hasFreshMarker(video.title)
-      && hasQualityMarker(video.title)
-    );
+    : videos.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
+
+  const safeDefaultVideos = searchQuery?.trim()
+    ? strictDefaultVideos
+    : (strictDefaultVideos.length > 0 ? strictDefaultVideos : videos);
 
   return {
-    videos: strictDefaultVideos,
+    videos: safeDefaultVideos,
     hasMore: typeof count === "number" ? from + videos.length < count : videos.length === rows,
   };
 }
@@ -489,7 +527,10 @@ export async function getBangladeshExternalVideos(
 
     const normalizedForMode = searchQuery?.trim()
       ? normalized
-      : normalized.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
+      : (() => {
+          const strict = normalized.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
+          return strict.length > 0 ? strict : normalized;
+        })();
 
     if (normalizedForMode.length === 0) {
       return direct;

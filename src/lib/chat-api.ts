@@ -20,6 +20,10 @@ export type Message = {
   created_at: string | null;
 };
 
+type MessageHidden = {
+  message_id: string;
+};
+
 const conversationActivityTs = (convo: Conversation) => {
   const base = convo.last_message_at || convo.created_at;
   if (!base) return 0;
@@ -83,15 +87,89 @@ export async function getUserConversations(userId: number): Promise<Conversation
 }
 
 // Get messages for a conversation
-export async function getMessages(conversationId: string, limit = 50): Promise<Message[]> {
+export async function getMessages(conversationId: string, userId?: number, limit = 50): Promise<Message[]> {
   const { data } = await (supabase
     .from("messages")
     .select("*") as any)
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true })
-    .limit(limit);
+    .limit(Math.max(limit * 3, limit));
 
-  return data || [];
+  const messages = (data || []) as Message[];
+  if (!userId || messages.length === 0) {
+    return messages.slice(-limit);
+  }
+
+  const messageIds = messages.map((msg) => msg.id);
+  const { data: hiddenRows } = await (supabase
+    .from("message_hidden")
+    .select("message_id") as any)
+    .eq("user_id", userId)
+    .in("message_id", messageIds);
+
+  const hiddenSet = new Set(((hiddenRows || []) as MessageHidden[]).map((row) => row.message_id));
+  return messages.filter((msg) => !hiddenSet.has(msg.id)).slice(-limit);
+}
+
+export async function deleteMessageForMe(messageId: string, userId: number): Promise<void> {
+  const { error } = await (supabase
+    .from("message_hidden")
+    .upsert(
+      {
+        message_id: messageId,
+        user_id: userId,
+      } as any,
+      { onConflict: "message_id,user_id" }
+    ) as any);
+
+  if (error) throw error;
+}
+
+export async function deleteMessageForEveryone(messageId: string, senderId: number): Promise<void> {
+  const { data: target, error: targetError } = await (supabase
+    .from("messages")
+    .select("id, conversation_id, sender_id") as any)
+    .eq("id", messageId)
+    .single();
+
+  if (targetError) throw targetError;
+  if (!target || target.sender_id !== senderId) {
+    throw new Error("You can only delete your own message for everyone");
+  }
+
+  const conversationId = target.conversation_id as string;
+
+  const { error } = await (supabase
+    .from("messages")
+    .delete()
+    .eq("id", messageId)
+    .eq("sender_id", senderId) as any);
+
+  if (error) throw error;
+
+  const { data: latestRows } = await (supabase
+    .from("messages")
+    .select("content, message_type, created_at") as any)
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const latest = (latestRows || [])[0];
+  const latestPreview = latest
+    ? (latest.message_type === "text"
+      ? (latest.content || "")
+      : latest.message_type === "image"
+        ? "📷 ছবি"
+        : "🎤 ভয়েস")
+    : null;
+
+  await (supabase
+    .from("conversations")
+    .update({
+      last_message: latestPreview,
+      last_message_at: latest?.created_at || null,
+    } as any)
+    .eq("id", conversationId) as any);
 }
 
 // Send a text message
@@ -164,14 +242,24 @@ export async function getUnreadCount(userId: number): Promise<number> {
   if (convos.length === 0) return 0;
 
   const convoIds = convos.map(c => c.id);
-  const { count } = await (supabase
+  const { data: rows } = await (supabase
     .from("messages")
-    .select("id", { count: "exact", head: true }) as any)
+    .select("id") as any)
     .in("conversation_id", convoIds)
     .eq("is_read", false)
     .neq("sender_id", userId);
 
-  return count || 0;
+  const messageIds = (rows || []).map((r: any) => r.id);
+  if (messageIds.length === 0) return 0;
+
+  const { data: hidden } = await (supabase
+    .from("message_hidden")
+    .select("message_id") as any)
+    .eq("user_id", userId)
+    .in("message_id", messageIds);
+
+  const hiddenSet = new Set((hidden || []).map((r: any) => r.message_id));
+  return messageIds.filter((id: string) => !hiddenSet.has(id)).length;
 }
 
 // Get unread count per conversation
@@ -180,13 +268,27 @@ export async function getUnreadCountsPerConversation(userId: number, conversatio
 
   const { data } = await (supabase
     .from("messages")
-    .select("conversation_id") as any)
+    .select("id, conversation_id") as any)
     .in("conversation_id", conversationIds)
     .eq("is_read", false)
     .neq("sender_id", userId);
 
+  const messageIds = (data || []).map((m: any) => m.id);
+  const hiddenSet = new Set<string>();
+
+  if (messageIds.length > 0) {
+    const { data: hiddenRows } = await (supabase
+      .from("message_hidden")
+      .select("message_id") as any)
+      .eq("user_id", userId)
+      .in("message_id", messageIds);
+
+    (hiddenRows || []).forEach((row: any) => hiddenSet.add(row.message_id));
+  }
+
   const counts: Record<string, number> = {};
   (data || []).forEach((m: any) => {
+    if (hiddenSet.has(m.id)) return;
     counts[m.conversation_id] = (counts[m.conversation_id] || 0) + 1;
   });
   return counts;

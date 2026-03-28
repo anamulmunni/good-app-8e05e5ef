@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   getUserConversations, getMessages, sendMessage, getOrCreateConversation,
   searchUsers, uploadChatMedia, markMessagesRead, getUnreadCountsPerConversation,
+  deleteMessageForEveryone, deleteMessageForMe,
   type Conversation, type Message
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
@@ -39,12 +40,14 @@ export default function Chat() {
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [messageActionTarget, setMessageActionTarget] = useState<Message | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
   const recordingSecondsRef = useRef(0);
   const recordingDurationAtStopRef = useRef(0);
   const shouldSendRecordingRef = useRef(true);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,7 +64,7 @@ export default function Chat() {
 
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", activeConversation?.id],
-    queryFn: () => getMessages(activeConversation!.id, 200),
+    queryFn: () => getMessages(activeConversation!.id, user?.id, 200),
     enabled: !!activeConversation,
     refetchInterval: 1200,
   });
@@ -126,6 +129,14 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingMedia]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (activeConversation && user) markMessagesRead(activeConversation.id, user.id);
@@ -232,6 +243,42 @@ export default function Chat() {
         old.map((m) => (m.id === ctx.tempId ? saved : m))
       );
       queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
+    },
+  });
+
+  const deleteForMeMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      if (!user) throw new Error("Login required");
+      await deleteMessageForMe(messageId, user.id);
+    },
+    onSuccess: () => {
+      if (activeConversation) {
+        queryClient.invalidateQueries({ queryKey: ["messages", activeConversation.id] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["unread-counts-per-convo"] });
+      setMessageActionTarget(null);
+    },
+    onError: () => {
+      toast({ title: "ডিলিট করা যায়নি", variant: "destructive" });
+    },
+  });
+
+  const deleteForEveryoneMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      if (!user) throw new Error("Login required");
+      await deleteMessageForEveryone(messageId, user.id);
+    },
+    onSuccess: () => {
+      if (activeConversation) {
+        queryClient.invalidateQueries({ queryKey: ["messages", activeConversation.id] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["unread-counts-per-convo"] });
+      setMessageActionTarget(null);
+    },
+    onError: () => {
+      toast({ title: "সবাইর জন্য ডিলিট করা যায়নি", variant: "destructive" });
     },
   });
 
@@ -379,6 +426,20 @@ export default function Chat() {
     });
   };
 
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const startLongPress = (msg: Message) => {
+    cancelLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      setMessageActionTarget(msg);
+    }, 450);
+  };
+
   const lastSeenAgo = (onlineAt: string | null) => {
     if (!onlineAt) return "কিছুক্ষণ আগে";
     const diffMs = Date.now() - new Date(onlineAt).getTime();
@@ -463,7 +524,19 @@ export default function Chat() {
                     ) : null}
                   </div>
                 )}
-                <div className={`max-w-[70%] ${isMine ? "" : ""}`}>
+                <div
+                  className={`max-w-[70%] ${isMine ? "" : ""}`}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMessageActionTarget(msg);
+                  }}
+                  onMouseDown={() => startLongPress(msg)}
+                  onMouseUp={cancelLongPress}
+                  onMouseLeave={cancelLongPress}
+                  onTouchStart={() => startLongPress(msg)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchCancel={cancelLongPress}
+                >
                   {msg.message_type === "text" && (
                     <div className={`px-3 py-2 rounded-2xl ${
                       isMine
@@ -598,6 +671,50 @@ export default function Chat() {
           onClose={() => setShowEmoji(false)}
           onSelect={(emoji) => setMessageText(prev => prev + emoji)}
         />
+
+        {/* Message action sheet */}
+        <AnimatePresence>
+          {messageActionTarget && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[210] bg-black/40"
+              onClick={() => setMessageActionTarget(null)}
+            >
+              <motion.div
+                initial={{ y: 80 }}
+                animate={{ y: 0 }}
+                exit={{ y: 80 }}
+                className="absolute bottom-0 left-0 right-0 rounded-t-2xl bg-card border-t border-border p-3 space-y-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => deleteForMeMutation.mutate(messageActionTarget.id)}
+                  className="w-full h-11 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                >
+                  Delete for you
+                </button>
+
+                {messageActionTarget.sender_id === user.id && (
+                  <button
+                    onClick={() => deleteForEveryoneMutation.mutate(messageActionTarget.id)}
+                    className="w-full h-11 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold"
+                  >
+                    Delete for everyone
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setMessageActionTarget(null)}
+                  className="w-full h-11 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium"
+                >
+                  Cancel
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Image viewer */}
         <AnimatePresence>

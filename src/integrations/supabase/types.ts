@@ -151,6 +151,42 @@ export type Database = {
         }
         Relationships: []
       }
+      message_hidden: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          user_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          user_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_hidden_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_hidden_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string | null
