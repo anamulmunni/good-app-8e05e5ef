@@ -150,9 +150,9 @@ export default function Profile() {
         {/* Avatar & Name Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl overflow-hidden">
           {/* Cover Photo */}
-          <div className="h-32 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative overflow-hidden group">
+          <div className="h-24 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative overflow-hidden group">
             {(user as any).cover_url && (
-              <img src={(user as any).cover_url} alt="Cover" className="w-full h-full object-cover" />
+              <img src={(user as any).cover_url} alt="Cover" className="w-full h-full object-cover object-center" />
             )}
             <button onClick={() => coverInputRef.current?.click()}
               className="absolute bottom-2 right-2 bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
