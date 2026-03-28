@@ -51,7 +51,6 @@ export default function IncomingCallHandler() {
       const notification = new Notification(`${callerName} is calling`, {
         body: "Open the app to receive the call",
         tag: "incoming-call",
-        renotify: true,
         icon: "/icon-192.png",
       });
       notification.onclick = () => window.focus();
