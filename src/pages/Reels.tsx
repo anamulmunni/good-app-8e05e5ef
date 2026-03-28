@@ -282,7 +282,7 @@ export default function Reels() {
   return (
     <div className="fixed inset-0 bg-black z-50">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-[60] flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto">
         <button onClick={() => navigate(-1)} className="text-white p-1"><ArrowLeft size={22} /></button>
         <h1 className="text-white font-black text-lg">
           {activeSearch ? `🔍 ${activeSearch}` : "Reels"}
