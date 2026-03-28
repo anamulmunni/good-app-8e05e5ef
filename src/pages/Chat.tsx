@@ -321,7 +321,7 @@ export default function Chat() {
     setRecordingTime(0);
   };
 
-  const handleHoldToRecordStart = async (e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleHoldToRecordStart = async (e: React.TouchEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
     if (messageText.trim()) return;
     e.preventDefault();
 
@@ -330,23 +330,16 @@ export default function Chat() {
     holdRecordingActiveRef.current = true;
     shouldSendRecordingRef.current = true;
 
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // no-op
-    }
-
     await startRecording();
   };
 
-  const handleHoldToRecordEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleHoldToRecordEnd = (e: React.TouchEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (!holdRecordingActiveRef.current && !isRecording) return;
     stopRecording(true);
   };
 
-  const handleHoldToRecordCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.preventDefault();
+  const handleHoldToRecordCancel = () => {
     if (!holdRecordingActiveRef.current && !isRecording) return;
     stopRecording(false);
   };
@@ -555,11 +548,14 @@ export default function Chat() {
             ) : (
               <>
                 <button
-                  onPointerDown={handleHoldToRecordStart}
-                  onPointerUp={handleHoldToRecordEnd}
-                  onPointerCancel={handleHoldToRecordCancel}
+                  onTouchStart={handleHoldToRecordStart}
+                  onTouchEnd={handleHoldToRecordEnd}
+                  onTouchCancel={() => handleHoldToRecordCancel()}
+                  onMouseDown={handleHoldToRecordStart}
+                  onMouseUp={handleHoldToRecordEnd}
+                  onMouseLeave={() => { if (isRecording) handleHoldToRecordCancel(); }}
                   onContextMenu={(e) => e.preventDefault()}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isRecording ? "bg-destructive text-destructive-foreground" : "text-blue-600 hover:bg-blue-50"}`}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors select-none touch-none ${isRecording ? "bg-destructive text-destructive-foreground" : "text-blue-600 hover:bg-blue-50"}`}
                 >
                   <Mic size={22} />
                 </button>

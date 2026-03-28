@@ -69,13 +69,16 @@ export async function getFeedPosts(limit = 30, searchQuery?: string): Promise<Po
   const { data: posts } = await query;
   if (!posts || posts.length === 0) return [];
 
-  const userIds = [...new Set(posts.map((p: any) => p.user_id))];
+  // Filter out video-only posts (those go to Reels)
+  const feedPosts = posts.filter((p: any) => !p.video_url);
+
+  const userIds = [...new Set(feedPosts.map((p: any) => p.user_id))];
   const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id") as any).in("id", userIds);
 
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
-  let result = posts.map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
+  let result = feedPosts.map((p: any) => ({ ...p, user: userMap[p.user_id] || null }));
 
   // Client-side search filter
   if (searchQuery && searchQuery.trim()) {
@@ -214,18 +217,23 @@ export async function addComment(postId: string, userId: number, content: string
   } catch {}
 
   // Parse @mentions and create notifications
-  const mentions = content.match(/@(\w[\w\s]*?\w|\w)/g);
+  const mentions = content.match(/@([\w\s]+?)(?=\s@|\s*$|[.,!?])/g);
   if (mentions) {
     for (const mention of mentions) {
       const name = mention.slice(1).trim();
-      const { data: mentioned } = await (supabase.from("users").select("id") as any).ilike("display_name", name).limit(1).single();
+      if (!name) continue;
+      const { data: mentionedUsers } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
+      const mentioned = mentionedUsers && mentionedUsers.length > 0 ? mentionedUsers[0] : null;
       if (mentioned && mentioned.id !== userId) {
+        // Get sender name for notification
+        const { data: senderData } = await (supabase.from("users").select("display_name").eq("id", userId).single() as any);
+        const senderName = senderData?.display_name || "কেউ";
         await (supabase.from("notifications").insert({
           user_id: mentioned.id,
           from_user_id: userId,
           type: "mention",
           reference_id: postId,
-          content: content.slice(0, 100),
+          content: `${senderName} আপনাকে একটি মন্তব্যে মেন্টশন করেছে: "${content.slice(0, 80)}"`,
         } as any) as any);
       }
     }

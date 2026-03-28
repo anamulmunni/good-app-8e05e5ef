@@ -73,19 +73,22 @@ export default function Reels() {
     }
   }, [user, reels]);
 
-  // Auto-play current video, pause others
+  // Auto-play current video, pause ALL others
   useEffect(() => {
     if (reels.length === 0) return;
     const currentReel = reels[currentIndex];
     if (!currentReel) return;
 
     Object.entries(videoRefs.current).forEach(([id, video]) => {
+      if (!video) return;
       if (id === currentReel.id) {
         video.currentTime = 0;
         video.muted = muted;
         video.play().catch(() => {});
+        setPaused(null);
       } else {
         video.pause();
+        video.currentTime = 0;
       }
     });
   }, [currentIndex, reels, muted]);
@@ -202,6 +205,29 @@ export default function Reels() {
       navigator.clipboard.writeText(`${text}\n${window.location.origin}`);
       toast({ title: "লিংক কপি হয়েছে!" });
     }
+  };
+
+  const renderMentionText = (text: string) => {
+    const parts = text.split(/(@[\w\s]+?)(?=\s@|\s*$|[.,!?])/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("@")) {
+        const name = part.slice(1).trim();
+        return (
+          <button
+            key={i}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const { data: users } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
+              if (users && users.length > 0) navigate(`/user/${users[0].id}`);
+            }}
+            className="text-blue-500 font-bold hover:underline inline"
+          >
+            @{name}
+          </button>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
   };
 
   if (isLoading || !user) return null;
@@ -362,7 +388,7 @@ export default function Reels() {
                     </div>
                     <div className="bg-secondary/60 rounded-2xl px-3 py-2 flex-1">
                       <p className="text-xs font-bold text-foreground">{c.user?.display_name || "User"}</p>
-                      <p className="text-xs text-foreground/80">{c.content}</p>
+                      <p className="text-xs text-foreground/80">{renderMentionText(c.content)}</p>
                     </div>
                   </div>
                 ))
