@@ -662,39 +662,40 @@ export default function Feed() {
                       </button>
                       <p className="text-[10px] text-muted-foreground">{timeAgo(post.created_at)}</p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {post.user_id !== user.id && (
-                        <>
-                          <button onClick={() => startChatWith(post.user_id)}
-                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-primary">
-                            <MessageCircle className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => navigate(`/call/${post.user_id}`)}
-                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-[hsl(var(--emerald))]">
-                            <Phone className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {/* 3-dot menu for own posts */}
-                      {post.user_id === user.id && (
-                        <div className="relative">
-                          <button onClick={() => setShowPostMenu(showPostMenu === post.id ? null : post.id)}
-                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                          <AnimatePresence>
-                            {showPostMenu === post.id && (
-                              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                                className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[140px]">
-                                <button onClick={() => deletePostMutation.mutate(post.id)}
-                                  className="w-full flex items-center gap-2 px-4 py-3 text-destructive hover:bg-destructive/10 text-sm font-bold transition-colors">
-                                  <Trash2 className="w-4 h-4" /> পোস্ট মুছুন
+                    {/* 3-dot menu for all posts - Facebook Lite style */}
+                    <div className="relative">
+                      <button onClick={() => setShowPostMenu(showPostMenu === post.id ? null : post.id)}
+                        className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                      <AnimatePresence>
+                        {showPostMenu === post.id && (
+                          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                            className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[160px]">
+                            {post.user_id === user.id ? (
+                              <button onClick={() => deletePostMutation.mutate(post.id)}
+                                className="w-full flex items-center gap-2 px-4 py-3 text-destructive hover:bg-destructive/10 text-sm font-bold transition-colors">
+                                <Trash2 className="w-4 h-4" /> পোস্ট মুছুন
+                              </button>
+                            ) : (
+                              <>
+                                <button onClick={() => { navigate(`/user/${post.user_id}`); setShowPostMenu(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-foreground hover:bg-secondary text-sm transition-colors">
+                                  <User className="w-4 h-4" /> প্রোফাইল দেখুন
                                 </button>
-                              </motion.div>
+                                <button onClick={() => { startChatWith(post.user_id); setShowPostMenu(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-foreground hover:bg-secondary text-sm transition-colors">
+                                  <MessageCircle className="w-4 h-4" /> মেসেজ পাঠান
+                                </button>
+                                <button onClick={() => { navigate(`/call/${post.user_id}`); setShowPostMenu(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-foreground hover:bg-secondary text-sm transition-colors">
+                                  <Phone className="w-4 h-4" /> কল করুন
+                                </button>
+                              </>
                             )}
-                          </AnimatePresence>
-                        </div>
-                      )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
 
