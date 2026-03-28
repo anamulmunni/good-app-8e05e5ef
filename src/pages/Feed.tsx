@@ -14,7 +14,7 @@ import { getOrCreateConversation, getUnreadCount } from "@/lib/chat-api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import {
   Heart, MessageCircle, Send, Image, X, ArrowLeft,
-  Plus, User, Search, Phone, Share2, Loader2, MoreVertical, Trash2, ZoomIn
+  Plus, User, Search, Phone, Share2, Loader2, MoreVertical, Trash2, ZoomIn, Play
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
