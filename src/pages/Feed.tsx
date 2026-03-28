@@ -136,7 +136,7 @@ export default function Feed() {
   const { data: mentionResults = [] } = useQuery({
     queryKey: ["mention-search", mentionQuery],
     queryFn: () => searchFeedUsers(mentionQuery),
-    enabled: showMentionSuggestions && mentionQuery.length >= 2,
+    enabled: showMentionSuggestions && mentionQuery.length >= 1,
   });
 
   const { data: suggestedPeople = [] } = useQuery({
