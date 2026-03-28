@@ -88,9 +88,17 @@ function canonicalizeSearchQuery(searchQuery?: string): string {
 }
 
 function getQueryWords(searchQuery?: string): string[] {
-  return normalizeForMatch(searchQuery || "")
+  return canonicalizeSearchQuery(searchQuery || "")
     .split(" ")
     .filter((word) => word.length >= 2 && !SONG_STOP_WORDS.has(word));
+}
+
+function isBanglaDefaultSuggestion(title: string, country?: string | null): boolean {
+  const lower = title.toLowerCase();
+  const isBanglaMarker = /(bangla|বাংলা|bengali|dhallywood|baul|nazrul|rabindra|bd song|deshi song)/i.test(lower);
+  const isNonBanglaMarker = /(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower);
+  const fromBangladesh = String(country || "").toUpperCase() === "BD";
+  return (fromBangladesh || isBanglaMarker) && !isNonBanglaMarker;
 }
 
 function getQueryCoverage(queryWords: string[], normalizedTitle: string): number {
@@ -178,13 +186,11 @@ function buildSearchVariants(searchQuery?: string): string[] {
 
   if (!canonical) {
     return [
-      "bangla new song official 2025",
-      "bangla slowed reverb song",
-      "hindi latest song official",
-      "bhojpuri latest song",
-      "trending music video 2025",
-      "bangla romantic song",
-      "hindi sad song slowed reverb",
+      "bangla new song full hd 2026",
+      "bangla latest song official video",
+      "bangla new music video hd",
+      "bangla romantic song full hd",
+      "বাংলা নতুন গান hd",
     ];
   }
 
@@ -277,17 +283,20 @@ async function fetchDailymotionFallback(
       const coverage = getQueryCoverage(queryWords, normalizedTitle);
       const hasMusicMarker = /(song|music|audio|lyrics|গান|mp3|album|official|bhojpuri)/i.test(title);
       const hasNonMusicMarker = /(natok|drama|movie|serial|episode|cartoon)/i.test(title);
+      const isBanglaDefault = isBanglaDefaultSuggestion(title, v?.country);
 
       if (canonicalQuery) {
         const exactPhrase = normalizedQuery.length > 3 && normalizedTitle.includes(normalizedQuery);
-        const strictCoverage = queryWords.length <= 2 ? 0.6 : 0.45;
+        const allWordsMatch = queryWords.length === 0 || queryWords.every((word) => normalizedTitle.includes(word));
 
         if (isMusicSearch) {
-          if (!exactPhrase && coverage < strictCoverage) return null;
+          if (!exactPhrase && !allWordsMatch) return null;
           if (hasNonMusicMarker && !hasMusicMarker && !exactPhrase) return null;
         } else {
-          if (!exactPhrase && coverage < strictCoverage) return null;
+          if (!exactPhrase && !allWordsMatch) return null;
         }
+      } else if (!isBanglaDefault) {
+        return null;
       }
 
       let score = scoreFallbackVideo(title, queryWords, canonicalQuery)
@@ -295,6 +304,11 @@ async function fetchDailymotionFallback(
         + (duration >= 300 ? 2 : 0)
         + (duration >= 60 ? 1 : 0)
         + ((v.thumbnail_1080_url || v.thumbnail_720_url) ? 2 : 0);
+
+      if (!canonicalQuery) {
+        if (/(\bnew\b|\blatest\b|202[4-9]|নতুন)/i.test(title)) score += 12;
+        if (/(full\s*hd|1080|4k|hd)/i.test(title)) score += 10;
+      }
 
       if (!canonicalQuery && hasNonMusicMarker && !hasMusicMarker) {
         score -= 15;
@@ -392,7 +406,7 @@ export async function getBangladeshExternalVideos(
   mode: "short" | "long" = "long",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode);
-  if (direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
+  if ((searchQuery && searchQuery.trim()) || direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
     return direct;
   }
 
@@ -431,12 +445,16 @@ export async function getBangladeshExternalVideos(
       ? data.videos.map(normalizeExternalVideo).filter(Boolean) as ExternalReelVideo[]
       : [];
 
-    if (normalized.length === 0) {
+    const normalizedForMode = searchQuery?.trim()
+      ? normalized
+      : normalized.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
+
+    if (normalizedForMode.length === 0) {
       return direct;
     }
 
     return {
-      videos: normalized,
+      videos: normalizedForMode,
       hasMore: !!data.hasMore,
       categories: data.categories,
     };

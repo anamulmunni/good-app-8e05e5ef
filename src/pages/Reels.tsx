@@ -24,9 +24,9 @@ type VideoItem = {
 
 const CHIPS = [
   "All",
-  "Music",
+  "New Bangla",
   "Bangla Song",
-  "Hindi Song",
+  "Bangla Hits",
   "Slowed Reverb",
   "Live",
   "Romantic",
@@ -63,7 +63,7 @@ function isEmbed(url: string) {
 
 function buildExternalPlayerUrl(url: string, autoplay = false) {
   const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}autoplay=${autoplay ? 1 : 0}&quality=1080&mute=0&sharing-enable=false&ui-start-screen-info=false`;
+  return `${url}${separator}autoplay=${autoplay ? 1 : 0}&quality=1080&mute=0&sharing-enable=false&ui-start-screen-info=false&start=0`;
 }
 
 function viewCount() {
@@ -205,11 +205,6 @@ export default function Reels() {
     video.src = objectUrl;
     video.onloadedmetadata = () => {
       const duration = Math.floor(video.duration || 0);
-      if (duration < 120) {
-        URL.revokeObjectURL(objectUrl);
-        alert("এখানে ২ মিনিট থেকে ১ ঘণ্টার মধ্যে ভিডিও আপলোড করুন।");
-        return;
-      }
       if (duration > 3600) {
         URL.revokeObjectURL(objectUrl);
         alert("সর্বোচ্চ ১ ঘণ্টার ভিডিও আপলোড করা যাবে।");
@@ -402,7 +397,7 @@ export default function Reels() {
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
                 key={selectedVideo.id}
-                src={buildExternalPlayerUrl(selectedVideo.video_url, false)}
+                src={buildExternalPlayerUrl(selectedVideo.video_url, true)}
                 title={selectedVideo.title}
                 className="w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
@@ -595,7 +590,7 @@ export default function Reels() {
               >
                 <div className="flex flex-col items-center gap-2 text-sm">
                   <Video className="w-5 h-5" />
-                  <span>Long ভিডিও সিলেক্ট করুন (2 মিনিট+)</span>
+                  <span>Long ভিডিও সিলেক্ট করুন (সর্বোচ্চ ১ ঘণ্টা)</span>
                 </div>
               </button>
             )}
