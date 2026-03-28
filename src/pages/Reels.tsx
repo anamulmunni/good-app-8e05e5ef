@@ -73,19 +73,22 @@ export default function Reels() {
     }
   }, [user, reels]);
 
-  // Auto-play current video, pause others
+  // Auto-play current video, pause ALL others
   useEffect(() => {
     if (reels.length === 0) return;
     const currentReel = reels[currentIndex];
     if (!currentReel) return;
 
     Object.entries(videoRefs.current).forEach(([id, video]) => {
+      if (!video) return;
       if (id === currentReel.id) {
         video.currentTime = 0;
         video.muted = muted;
         video.play().catch(() => {});
+        setPaused(null);
       } else {
         video.pause();
+        video.currentTime = 0;
       }
     });
   }, [currentIndex, reels, muted]);
