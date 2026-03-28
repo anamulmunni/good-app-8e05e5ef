@@ -51,6 +51,9 @@ export default function Feed() {
   const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
   const [storyEditorFile, setStoryEditorFile] = useState<File | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [page, setPage] = useState(1);
   const POSTS_PER_PAGE = 50;
 
