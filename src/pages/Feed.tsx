@@ -1038,6 +1038,17 @@ export default function Feed() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Story Editor */}
+      <AnimatePresence>
+        {storyEditorFile && (
+          <StoryEditor
+            imageFile={storyEditorFile}
+            onClose={() => setStoryEditorFile(null)}
+            onPublish={handleStoryPublish}
+            isPending={storyMutation.isPending}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
