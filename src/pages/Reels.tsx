@@ -349,7 +349,7 @@ export default function Reels() {
                     <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
                       <MessageCircle className="w-6 h-6 text-white" />
                     </div>
-                    <span className="text-white text-xs font-bold drop-shadow-lg">{reel.comments_count || ""}</span>
+                    <span className="text-white text-sm font-bold drop-shadow-lg">{reel.comments_count > 0 ? reel.comments_count : ""}</span>
                   </button>
 
                   {/* Share */}
