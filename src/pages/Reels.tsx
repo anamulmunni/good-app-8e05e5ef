@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
 import {
@@ -61,13 +61,12 @@ function isEmbed(url: string) {
   return url.includes("/embed/");
 }
 
-function buildExternalPlayerUrl(url: string) {
+function buildExternalPlayerUrl(url: string, autoplay = false) {
   const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}autoplay=1&quality=1080&mute=0&sharing-enable=false`;
+  return `${url}${separator}autoplay=${autoplay ? 1 : 0}&quality=1080&mute=0&sharing-enable=false&ui-start-screen-info=false`;
 }
 
 function viewCount() {
-  // Simulated view count for display
   const n = Math.floor(Math.random() * 500000) + 1000;
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M views`;
   if (n >= 1000) return `${(n / 1000).toFixed(0)}K views`;
@@ -89,6 +88,7 @@ export default function Reels() {
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [viewCounts] = useState<Record<string, string>>({});
   const [miniPlayer, setMiniPlayer] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [longTitle, setLongTitle] = useState("");
@@ -99,6 +99,8 @@ export default function Reels() {
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const playerShellRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -121,7 +123,7 @@ export default function Reels() {
     if (!reset && !hasMore) return;
     loadingRef.current = true;
     setLoading(true);
-    const p = reset ? 1 : page;
+    const p = reset ? (activeQuery ? 1 : Math.floor(Math.random() * 5) + 1) : page;
     try {
       const [externalResult, localResult] = await Promise.all([
         getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long"),
@@ -151,21 +153,22 @@ export default function Reels() {
       loadingRef.current = true;
       setLoading(true);
       try {
+        const externalStartPage = activeQuery ? 1 : Math.floor(Math.random() * 5) + 1;
         const [externalResult, localResult] = await Promise.all([
-          getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long"),
+          getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long"),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
         const merged = [...localResult.videos, ...externalResult.videos];
         setExtVideos(merged);
         setHasMore(localResult.hasMore || externalResult.hasMore);
-        setPage(2);
+        setPage(externalStartPage + 1);
       } finally {
         loadingRef.current = false;
         setLoading(false);
       }
     };
     run();
-  }, [user, activeQuery]);
+  }, [user, activeQuery, refreshTick]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -245,7 +248,7 @@ export default function Reels() {
     }
     setSelectedVideo((prev) => {
       if (prev && allVideos.some((v) => v.id === prev.id)) return prev;
-      return null; // Don't auto-play first video — let user choose
+      return null;
     });
   }, [allVideos]);
 
@@ -280,11 +283,42 @@ export default function Reels() {
     setTimeout(() => searchRef.current?.focus(), 100);
   }, []);
 
+  const handleRefreshFeed = useCallback(() => {
+    setSelectedVideo(null);
+    setMiniPlayer(false);
+    setRefreshTick((prev) => prev + 1);
+    mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const requestFullscreen = useCallback(async () => {
+    const shell = playerShellRef.current;
+    if (!shell) return;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      if (shell.requestFullscreen) {
+        await shell.requestFullscreen();
+        return;
+      }
+
+      const videoElement = shell.querySelector("video") as HTMLVideoElement | null;
+      const webkitVideo = videoElement as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+      if (webkitVideo?.webkitEnterFullscreen) {
+        webkitVideo.webkitEnterFullscreen();
+      }
+    } catch (error) {
+      console.warn("Fullscreen request failed", error);
+    }
+  }, []);
+
   if (isLoading || !user) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#0f0f0f", color: "#fff" }}>
-      {/* ─── YouTube-style Top Bar ─── */}
       <header className="sticky top-0 z-20" style={{ background: "#0f0f0f" }}>
         {searchMode ? (
           <div className="flex items-center gap-2 px-2 py-2">
@@ -328,6 +362,9 @@ export default function Reels() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <button onClick={handleRefreshFeed} className="h-10 w-10 grid place-items-center rounded-full">
+                <RefreshCcw className="w-5 h-5" style={{ color: "#fff" }} />
+              </button>
               <button className="h-10 w-10 grid place-items-center rounded-full">
                 <Cast className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
@@ -341,7 +378,6 @@ export default function Reels() {
           </div>
         )}
 
-        {/* ─── Chips ─── */}
         <div className="flex gap-2 px-3 pb-2 overflow-x-auto scrollbar-hide">
           {CHIPS.map((chip) => (
             <button
@@ -360,14 +396,13 @@ export default function Reels() {
         </div>
       </header>
 
-      {/* ─── Player (OUTSIDE scroll area, stays fixed) ─── */}
       {selectedVideo && !miniPlayer && (
         <div ref={playerRef} className="shrink-0 z-10" style={{ background: "#000" }}>
-          <div className="w-full aspect-video" style={{ background: "#000" }}>
+          <div ref={playerShellRef} className="w-full aspect-video relative" style={{ background: "#000" }}>
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
                 key={selectedVideo.id}
-                src={buildExternalPlayerUrl(selectedVideo.video_url)}
+                src={buildExternalPlayerUrl(selectedVideo.video_url, false)}
                 title={selectedVideo.title}
                 className="w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
@@ -383,6 +418,13 @@ export default function Reels() {
                 className="w-full h-full object-contain"
               />
             )}
+            <button
+              onClick={requestFullscreen}
+              className="absolute top-2 right-2 w-9 h-9 rounded-full grid place-items-center"
+              style={{ background: "rgba(0,0,0,0.7)" }}
+            >
+              <Maximize className="w-4 h-4" style={{ color: "#fff" }} />
+            </button>
           </div>
           <button
             onClick={() => setMiniPlayer(true)}
@@ -406,7 +448,6 @@ export default function Reels() {
         </div>
       )}
 
-      {/* ─── Mini Player (floating) ─── */}
       {selectedVideo && miniPlayer && (
         <div
           className="fixed bottom-20 right-3 w-[180px] rounded-lg overflow-hidden shadow-2xl cursor-pointer z-50"
@@ -417,7 +458,7 @@ export default function Reels() {
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
                 key={`mini-${selectedVideo.id}`}
-                src={buildExternalPlayerUrl(selectedVideo.video_url)}
+                src={buildExternalPlayerUrl(selectedVideo.video_url, true)}
                 title={selectedVideo.title}
                 className="w-full h-full pointer-events-none"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
@@ -443,8 +484,7 @@ export default function Reels() {
         </div>
       )}
 
-      {/* ─── Main Content (scrollable) ─── */}
-      <main className="flex-1 overflow-y-auto">
+      <main ref={mainRef} className="flex-1 overflow-y-auto">
         <div className="pb-20">
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
@@ -459,7 +499,6 @@ export default function Reels() {
               className="w-full text-left"
             >
               {selectedVideo ? (
-                /* ── Compact row when a video is playing (YouTube "Up next" style) ── */
                 <div className="flex gap-2.5 px-3 py-2">
                   <div className="w-[168px] h-[94px] shrink-0 rounded-lg overflow-hidden relative" style={{ background: "#1a1a1a" }}>
                     {video.thumbnail_url ? (
@@ -482,7 +521,6 @@ export default function Reels() {
                   </div>
                 </div>
               ) : (
-                /* ── Full card when no video is playing (YouTube home feed style) ── */
                 <>
                   <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
                     {video.thumbnail_url ? (
@@ -523,7 +561,6 @@ export default function Reels() {
         </div>
       </main>
 
-      {/* ─── Floating Create/Upload Button (YouTube-style) ─── */}
       <button
         onClick={() => setShowUpload(true)}
         className="fixed bottom-6 right-4 z-30 w-14 h-14 rounded-full shadow-lg grid place-items-center"
