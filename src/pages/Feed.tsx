@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import StoryEditor from "@/components/StoryEditor";
 
 export default function Feed() {
   const { user, isLoading } = useAuth();
@@ -48,6 +49,7 @@ export default function Feed() {
   const [activeTab, setActiveTab] = useState<"home" | "friends" | "chat" | "reels" | "notif">("home");
   const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
+  const [storyEditorFile, setStoryEditorFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
   const POSTS_PER_PAGE = 50;
 
@@ -311,7 +313,13 @@ export default function Feed() {
 
   const handleStorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) storyMutation.mutate(file);
+    if (file) setStoryEditorFile(file);
+    if (e.target) e.target.value = "";
+  };
+
+  const handleStoryPublish = (editedFile: File, musicName?: string) => {
+    storyMutation.mutate(editedFile);
+    setStoryEditorFile(null);
   };
 
   const handleImageTap = (postId: string, imageUrl: string) => {
@@ -1028,6 +1036,17 @@ export default function Feed() {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Story Editor */}
+      <AnimatePresence>
+        {storyEditorFile && (
+          <StoryEditor
+            imageFile={storyEditorFile}
+            onClose={() => setStoryEditorFile(null)}
+            onPublish={handleStoryPublish}
+            isPending={storyMutation.isPending}
+          />
         )}
       </AnimatePresence>
     </div>
