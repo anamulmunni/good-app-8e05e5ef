@@ -337,6 +337,10 @@ export default function Feed() {
             </h1>
           </div>
           <div className="flex items-center gap-1">
+            {/* Reels button */}
+            <button onClick={() => navigate("/reels")} className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors">
+              <Play size={20} />
+            </button>
             <button onClick={() => setShowSearch(!showSearch)} className={`p-2 rounded-full transition-colors ${showSearch ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
               <Search size={20} />
             </button>
