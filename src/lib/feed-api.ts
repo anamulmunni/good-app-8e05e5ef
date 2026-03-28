@@ -174,8 +174,6 @@ export async function getPostComments(postId: string): Promise<PostComment[]> {
 export async function addComment(postId: string, userId: number, content: string): Promise<PostComment> {
   const { data, error } = await (supabase.from("post_comments").insert({ post_id: postId, user_id: userId, content } as any).select().single() as any);
   if (error) throw error;
-  const { count } = await (supabase.from("post_comments").select("id", { count: "exact", head: true }) as any).eq("post_id", postId);
-  await (supabase.from("posts").update({ comments_count: count || 0 } as any).eq("id", postId) as any);
   return data;
 }
 
