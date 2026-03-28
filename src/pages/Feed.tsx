@@ -59,6 +59,7 @@ export default function Feed() {
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [page, setPage] = useState(1);
+  const [newPostsAvailable, setNewPostsAvailable] = useState(false);
   const POSTS_PER_PAGE = 50;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -760,42 +761,42 @@ export default function Feed() {
         </div>
       </header>
 
-      {/* ===== Tab Bar ===== */}
-      <nav className="sticky top-[52px] z-40 bg-card/95 border-b border-border/40 backdrop-blur-sm">
-        <div className="max-w-lg mx-auto px-2 py-2 grid grid-cols-5 gap-1.5">
+      {/* ===== Facebook-style Tab Bar ===== */}
+      <nav className="sticky top-[52px] z-40 bg-white dark:bg-card border-b border-gray-200 dark:border-border/40">
+        <div className="max-w-lg mx-auto flex items-center justify-around h-[44px]">
           <button
             onClick={() => { setActiveTab("home"); setShowFriendRequests(false); }}
-            className={`relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              activeTab === "home" ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-muted-foreground hover:text-foreground"
+            className={`relative flex-1 h-full flex items-center justify-center border-b-[3px] transition-colors ${
+              activeTab === "home" ? "border-blue-600 text-blue-600 dark:border-primary dark:text-primary" : "border-transparent text-gray-500 dark:text-muted-foreground"
             }`}
           >
-            <Home className="w-4.5 h-4.5" />
-            <span className="text-[10px] font-semibold">Home</span>
+            <Home className="w-6 h-6" />
+            {newPostsAvailable && activeTab !== "home" && (
+              <span className="absolute top-1 right-[calc(50%-18px)] w-2.5 h-2.5 bg-red-500 rounded-full" />
+            )}
           </button>
 
           <button
             onClick={() => setActiveTab("friends")}
-            className={`relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              activeTab === "friends" ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-muted-foreground hover:text-foreground"
+            className={`relative flex-1 h-full flex items-center justify-center border-b-[3px] transition-colors ${
+              activeTab === "friends" ? "border-blue-600 text-blue-600 dark:border-primary dark:text-primary" : "border-transparent text-gray-500 dark:text-muted-foreground"
             }`}
           >
-            <Users className="w-4.5 h-4.5" />
-            <span className="text-[10px] font-semibold">Friends</span>
+            <Users className="w-6 h-6" />
             {friendRequestCount > 0 && (
-              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                {friendRequestCount}
+              <span className="absolute top-0.5 right-[calc(50%-20px)] min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                {friendRequestCount > 99 ? "99+" : friendRequestCount}
               </span>
             )}
           </button>
 
           <button
             onClick={() => navigate("/chat")}
-            className="relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors bg-secondary/70 text-muted-foreground hover:text-foreground"
+            className="relative flex-1 h-full flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground"
           >
-            <MessageCircle className="w-4.5 h-4.5" />
-            <span className="text-[10px] font-semibold">Messenger</span>
+            <MessageCircle className="w-6 h-6" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute top-0.5 right-[calc(50%-20px)] min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -803,12 +804,11 @@ export default function Feed() {
 
           <button
             onClick={() => { if (user) { markReelsSeen(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["new-reels-count"] })); } navigate("/reels"); }}
-            className="relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors bg-secondary/70 text-muted-foreground hover:text-foreground"
+            className="relative flex-1 h-full flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground"
           >
-            <Play className="w-4.5 h-4.5" />
-            <span className="text-[10px] font-semibold">Video</span>
+            <Play className="w-6 h-6" />
             {newReelsCount > 0 && (
-              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute top-0.5 right-[calc(50%-20px)] min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {newReelsCount > 99 ? "99+" : newReelsCount}
               </span>
             )}
@@ -816,17 +816,23 @@ export default function Feed() {
 
           <button
             onClick={() => { setActiveTab("notif"); if (user) markNotificationsRead(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["notif-count"] })); }}
-            className={`relative rounded-xl py-2 flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              activeTab === "notif" ? "bg-primary text-primary-foreground" : "bg-secondary/70 text-muted-foreground hover:text-foreground"
+            className={`relative flex-1 h-full flex items-center justify-center border-b-[3px] transition-colors ${
+              activeTab === "notif" ? "border-blue-600 text-blue-600 dark:border-primary dark:text-primary" : "border-transparent text-gray-500 dark:text-muted-foreground"
             }`}
           >
-            <Bell className="w-4.5 h-4.5" />
-            <span className="text-[10px] font-semibold">Notification</span>
+            <Bell className="w-6 h-6" />
             {notifCount > 0 && (
-              <span className="absolute -top-1 right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute top-0.5 right-[calc(50%-20px)] min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {notifCount > 99 ? "99+" : notifCount}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="relative flex-1 h-full flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground"
+          >
+            <Menu className="w-6 h-6" />
           </button>
         </div>
       </nav>
