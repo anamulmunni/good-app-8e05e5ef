@@ -225,11 +225,11 @@ export default function UserProfile() {
           {/* Action Buttons */}
           {!isOwnProfile ? (
             <div className="flex gap-2 mt-3">
-              {friendshipStatus === "friends" ? (
+              {friendshipStatus?.status === "accepted" ? (
                 <button className="flex-1 py-2 bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground rounded-md text-[13px] font-semibold flex items-center justify-center gap-1.5">
                   <UserPlus className="w-4 h-4" /> বন্ধু
                 </button>
-              ) : friendshipStatus === "pending" ? (
+              ) : friendshipStatus?.status === "pending" ? (
                 <button className="flex-1 py-2 bg-gray-200 dark:bg-secondary text-gray-600 rounded-md text-[13px] font-semibold">
                   রিকুয়েস্ট পাঠানো হয়েছে
                 </button>
