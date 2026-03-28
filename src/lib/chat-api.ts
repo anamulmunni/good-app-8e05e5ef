@@ -85,8 +85,7 @@ export async function sendMessage(conversationId: string, senderId: number, cont
 
   if (error) throw error;
 
-  // Update conversation last message
-  await (supabase
+  void (supabase
     .from("conversations")
     .update({
       last_message: messageType === "text" ? content : (messageType === "image" ? "📷 ছবি" : "🎤 ভয়েস"),

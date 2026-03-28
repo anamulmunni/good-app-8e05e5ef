@@ -213,7 +213,9 @@ export default function Feed() {
       });
       setShowReactionPicker(null);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["feed-posts"] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["feed-posts", searchQuery] });
+    },
   });
 
   const commentMutation = useMutation({
@@ -232,7 +234,7 @@ export default function Feed() {
     },
     onSuccess: () => {
       if (commentingPostId) loadComments(commentingPostId);
-      queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["feed-posts", searchQuery] });
     },
   });
 

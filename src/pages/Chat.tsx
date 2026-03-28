@@ -10,7 +10,7 @@ import {
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
-import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Video, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
+import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,14 +50,14 @@ export default function Chat() {
     queryKey: ["conversations", user?.id],
     queryFn: () => getUserConversations(user!.id),
     enabled: !!user,
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", activeConversation?.id],
     queryFn: () => getMessages(activeConversation!.id, 200),
     enabled: !!activeConversation,
-    refetchInterval: 3000,
+    refetchInterval: 1200,
   });
 
   const { data: searchResults = [] } = useQuery({
@@ -153,16 +153,47 @@ export default function Chat() {
       if (!activeConversation || !user) throw new Error("No conversation");
       return sendMessage(activeConversation.id, user.id, content, type, mediaUrl);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["messages", activeConversation?.id] });
+    onMutate: async ({ type, content, mediaUrl }) => {
+      if (!activeConversation || !user) return null;
+      const tempId = `temp-msg-${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        conversation_id: activeConversation.id,
+        sender_id: user.id,
+        content: content || null,
+        message_type: type,
+        media_url: mediaUrl || null,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData(["messages", activeConversation.id], (old: Message[] = []) => [
+        ...old,
+        optimisticMessage,
+      ]);
+
+      return { tempId, conversationId: activeConversation.id };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (!ctx) return;
+      queryClient.setQueryData(["messages", ctx.conversationId], (old: Message[] = []) =>
+        old.filter((m) => m.id !== ctx.tempId)
+      );
+    },
+    onSuccess: (saved, _vars, ctx) => {
+      if (!ctx) return;
+      queryClient.setQueryData(["messages", ctx.conversationId], (old: Message[] = []) =>
+        old.map((m) => (m.id === ctx.tempId ? saved : m))
+      );
       queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
     },
   });
 
   const handleSendText = () => {
-    if (!messageText.trim()) return;
-    sendMutation.mutate({ type: "text", content: messageText.trim() });
+    const text = messageText.trim();
+    if (!text) return;
     setMessageText("");
+    sendMutation.mutate({ type: "text", content: text });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,9 +297,6 @@ export default function Chat() {
           <button onClick={() => navigate(`/call/${otherUser.id}`)}
             className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 dark:text-primary hover:bg-blue-50 dark:hover:bg-primary/10">
             <Phone size={20} />
-          </button>
-          <button className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 dark:text-primary hover:bg-blue-50 dark:hover:bg-primary/10">
-            <Video size={20} />
           </button>
         </div>
 

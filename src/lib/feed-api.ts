@@ -111,20 +111,15 @@ export async function toggleReaction(postId: string, userId: number, reactionTyp
 
   if (existing) {
     if (existing.reaction_type === reactionType) {
-      // Remove reaction (same type = toggle off)
       await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
-      await updatePostLikesCount(postId);
       return { reacted: false, type: reactionType };
     } else {
-      // Change reaction type - delete old and insert new to avoid update issues
       await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
       await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
       return { reacted: true, type: reactionType };
     }
   } else {
-    // Add new reaction
     await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
-    await updatePostLikesCount(postId);
     return { reacted: true, type: reactionType };
   }
 }
@@ -135,10 +130,7 @@ export async function toggleLike(postId: string, userId: number): Promise<boolea
   return result.reacted;
 }
 
-async function updatePostLikesCount(postId: string) {
-  const { count } = await (supabase.from("post_reactions").select("id", { count: "exact", head: true }) as any).eq("post_id", postId);
-  await (supabase.from("posts").update({ likes_count: count || 0 } as any).eq("id", postId) as any);
-}
+// likes_count is recalculated by feed refresh / server-side processes to keep interactions snappy
 
 // Get user reactions for posts
 export async function getUserReactions(userId: number, postIds: string[]): Promise<Record<string, string>> {
@@ -182,8 +174,6 @@ export async function getPostComments(postId: string): Promise<PostComment[]> {
 export async function addComment(postId: string, userId: number, content: string): Promise<PostComment> {
   const { data, error } = await (supabase.from("post_comments").insert({ post_id: postId, user_id: userId, content } as any).select().single() as any);
   if (error) throw error;
-  const { count } = await (supabase.from("post_comments").select("id", { count: "exact", head: true }) as any).eq("post_id", postId);
-  await (supabase.from("posts").update({ comments_count: count || 0 } as any).eq("id", postId) as any);
   return data;
 }
 

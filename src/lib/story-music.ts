@@ -58,7 +58,7 @@ export const STORY_MUSIC_LIBRARY: StoryMusicTrack[] = BASE_LIBRARY.map((track, i
 }));
 
 export function buildStoredMusicValue(track: StoryMusicTrack): string {
-  return `track:${track.id}|${track.title} - ${track.artist}`;
+  return `track:${track.id}|${track.title} - ${track.artist}|url:${encodeURIComponent(track.audioUrl)}`;
 }
 
 export function resolveStoryMusic(storedValue: string | null | undefined): {
@@ -71,16 +71,28 @@ export function resolveStoryMusic(storedValue: string | null | undefined): {
   }
 
   if (storedValue.startsWith("track:")) {
-    const [idPart, labelPart] = storedValue.split("|");
+    const parts = storedValue.split("|");
+    const idPart = parts[0] || "";
+    const labelPart = parts[1] || null;
+    const urlPart = parts.find((p) => p.startsWith("url:"));
+
     const trackId = idPart.replace("track:", "").trim();
     const track = STORY_MUSIC_LIBRARY.find((m) => m.id === trackId) || null;
-    if (track) {
-      return {
-        track,
-        label: labelPart || `${track.title} - ${track.artist}`,
-        audioUrl: track.audioUrl,
-      };
+
+    let decodedUrl: string | null = null;
+    if (urlPart) {
+      try {
+        decodedUrl = decodeURIComponent(urlPart.replace("url:", ""));
+      } catch {
+        decodedUrl = null;
+      }
     }
+
+    return {
+      track,
+      label: labelPart || (track ? `${track.title} - ${track.artist}` : storedValue),
+      audioUrl: decodedUrl || track?.audioUrl || null,
+    };
   }
 
   const legacyTrack = STORY_MUSIC_LIBRARY.find(
