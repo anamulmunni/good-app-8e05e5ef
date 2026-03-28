@@ -24,6 +24,8 @@ export default function IncomingCallHandler() {
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const incomingCallRef = useRef(incomingCall);
   const callActiveRef = useRef(callActive);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const remoteDescriptionSetRef = useRef(false);
 
   useEffect(() => {
     incomingCallRef.current = incomingCall;
@@ -82,10 +84,15 @@ export default function IncomingCallHandler() {
         filter: `receiver_id=eq.${user.id}`,
       }, async (payload: any) => {
         const signal = payload.new;
+        const activeCall = incomingCallRef.current;
+        const isSameCaller = !!activeCall && activeCall.callerId === signal.caller_id;
 
         if (signal.signal_type === "call-request" && !callActiveRef.current && !incomingCallRef.current) {
+          pendingIceCandidatesRef.current = [];
+          remoteDescriptionSetRef.current = false;
           const caller = await getUser(signal.caller_id);
           if (caller) {
+            stopRingtone();
             setIncomingCall({
               callerId: signal.caller_id,
               callerName: caller.display_name || "User",
@@ -96,12 +103,16 @@ export default function IncomingCallHandler() {
           }
         }
 
-        if (signal.signal_type === "call-ended") {
+        if (signal.signal_type === "call-ended" && isSameCaller) {
           endCall(false);
         }
 
-        if (signal.signal_type === "ice-candidate" && peerRef.current && signal.signal_data) {
-          try { await peerRef.current.addIceCandidate(new RTCIceCandidate(signal.signal_data)); } catch {}
+        if (signal.signal_type === "ice-candidate" && signal.signal_data && isSameCaller) {
+          if (peerRef.current && remoteDescriptionSetRef.current) {
+            try { await peerRef.current.addIceCandidate(new RTCIceCandidate(signal.signal_data)); } catch {}
+          } else {
+            pendingIceCandidatesRef.current.push(signal.signal_data);
+          }
         }
       })
       .subscribe();
@@ -138,6 +149,8 @@ export default function IncomingCallHandler() {
 
       const pc = new RTCPeerConnection(rtcConfig);
       peerRef.current = pc;
+      pendingIceCandidatesRef.current = [];
+      remoteDescriptionSetRef.current = false;
 
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
@@ -160,6 +173,19 @@ export default function IncomingCallHandler() {
 
       if (incomingCall.offer) {
         await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
+        remoteDescriptionSetRef.current = true;
+
+        if (pendingIceCandidatesRef.current.length > 0) {
+          for (const candidate of pendingIceCandidatesRef.current) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch {
+              // no-op
+            }
+          }
+          pendingIceCandidatesRef.current = [];
+        }
+
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         await sendCallSignal(user.id, incomingCall.callerId, "answer", answer);
@@ -180,6 +206,8 @@ export default function IncomingCallHandler() {
       sendCallSignal(user.id, incomingCall.callerId, "call-rejected");
     }
     stopRingtone();
+    pendingIceCandidatesRef.current = [];
+    remoteDescriptionSetRef.current = false;
     setIncomingCall(null);
   };
 
