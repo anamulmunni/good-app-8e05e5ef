@@ -360,78 +360,92 @@ export default function Reels() {
         </div>
       </header>
 
-      {/* ─── Main Content ─── */}
-      <main className="flex-1 overflow-y-auto flex flex-col">
-        {/* Player */}
-        {selectedVideo && (
-          <div
-            ref={playerRef}
-            className={`shrink-0 z-10 transition-all duration-300 ${
-              miniPlayer
-                ? "fixed bottom-20 right-3 w-[180px] rounded-lg overflow-hidden shadow-2xl cursor-pointer"
-                : "sticky top-0 w-full"
-            }`}
-            style={{ background: "#000" }}
-            onClick={miniPlayer ? () => setMiniPlayer(false) : undefined}
-          >
-            <div className="w-full aspect-video" style={{ background: "#000" }}>
-              {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
-                <iframe
-                  key={selectedVideo.id}
-                  src={buildExternalPlayerUrl(selectedVideo.video_url)}
-                  title={selectedVideo.title}
-                  className="w-full h-full"
-                  allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
-                  allowFullScreen
-                />
-              ) : (
-                <video
-                  key={selectedVideo.id}
-                  src={selectedVideo.video_url}
-                  controls
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
-              )}
-            </div>
-            {miniPlayer && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setSelectedVideo(null); setMiniPlayer(false); }}
-                className="absolute top-1 right-1 w-6 h-6 rounded-full grid place-items-center"
-                style={{ background: "rgba(0,0,0,0.7)" }}
-              >
-                <X className="w-3.5 h-3.5" style={{ color: "#fff" }} />
-              </button>
-            )}
-            {!miniPlayer && (
-              <>
-                <button
-                  onClick={() => setMiniPlayer(true)}
-                  className="w-full flex items-center justify-center py-1.5"
-                  style={{ background: "#0f0f0f" }}
-                >
-                  <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
-                </button>
-                <div className="px-3 py-3" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
-                  <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
-                    {selectedVideo.title}
-                  </h2>
-                  <p className="text-[12px] mt-1.5" style={{ color: "#aaa" }}>
-                    {selectedVideo.creator || "Unknown"} • {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
-                  </p>
-                </div>
-                <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
-                  <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
-                  <span className="text-[12px]" style={{ color: "#aaa" }}>• suggested for you</span>
-                </div>
-              </>
+      {/* ─── Player (OUTSIDE scroll area, stays fixed) ─── */}
+      {selectedVideo && !miniPlayer && (
+        <div ref={playerRef} className="shrink-0 z-10" style={{ background: "#000" }}>
+          <div className="w-full aspect-video" style={{ background: "#000" }}>
+            {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
+              <iframe
+                key={selectedVideo.id}
+                src={buildExternalPlayerUrl(selectedVideo.video_url)}
+                title={selectedVideo.title}
+                className="w-full h-full"
+                allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
+                allowFullScreen
+              />
+            ) : (
+              <video
+                key={selectedVideo.id}
+                src={selectedVideo.video_url}
+                controls
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain"
+              />
             )}
           </div>
-        )}
+          <button
+            onClick={() => setMiniPlayer(true)}
+            className="w-full flex items-center justify-center py-1.5"
+            style={{ background: "#0f0f0f" }}
+          >
+            <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
+          </button>
+          <div className="px-3 py-3" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
+            <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
+              {selectedVideo.title}
+            </h2>
+            <p className="text-[12px] mt-1.5" style={{ color: "#aaa" }}>
+              {selectedVideo.creator || "Unknown"} • {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
+            </p>
+          </div>
+          <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
+            <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
+            <span className="text-[12px]" style={{ color: "#aaa" }}>• suggested for you</span>
+          </div>
+        </div>
+      )}
 
-        {/* Video List */}
-        <div className="pb-20 flex-1">
+      {/* ─── Mini Player (floating) ─── */}
+      {selectedVideo && miniPlayer && (
+        <div
+          className="fixed bottom-20 right-3 w-[180px] rounded-lg overflow-hidden shadow-2xl cursor-pointer z-50"
+          style={{ background: "#000" }}
+          onClick={() => setMiniPlayer(false)}
+        >
+          <div className="w-full aspect-video">
+            {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
+              <iframe
+                key={`mini-${selectedVideo.id}`}
+                src={buildExternalPlayerUrl(selectedVideo.video_url)}
+                title={selectedVideo.title}
+                className="w-full h-full pointer-events-none"
+                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                allowFullScreen
+              />
+            ) : (
+              <video
+                key={`mini-${selectedVideo.id}`}
+                src={selectedVideo.video_url}
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain pointer-events-none"
+              />
+            )}
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setSelectedVideo(null); setMiniPlayer(false); }}
+            className="absolute top-1 right-1 w-6 h-6 rounded-full grid place-items-center"
+            style={{ background: "rgba(0,0,0,0.7)" }}
+          >
+            <X className="w-3.5 h-3.5" style={{ color: "#fff" }} />
+          </button>
+        </div>
+      )}
+
+      {/* ─── Main Content (scrollable) ─── */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="pb-20">
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
               {activeQuery ? `No results for "${activeQuery}"` : "Loading videos..."}
