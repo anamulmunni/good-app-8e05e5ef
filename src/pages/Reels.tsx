@@ -25,17 +25,17 @@ type VideoItem = {
 const CHIPS = [
   "All",
   "Music",
-  "Bangla Natok",
   "Bangla Song",
   "Hindi Song",
+  "Slowed Reverb",
   "Live",
+  "Romantic",
   "Comedy",
-  "Cartoon",
+  "Sad Song",
   "Gaming",
-  "Movie",
-  "Drama",
   "Trending",
-  "Recently uploaded",
+  "Bangla Natok",
+  "Movie",
 ];
 
 function fmt(sec?: number) {
@@ -310,12 +310,15 @@ export default function Reels() {
               <button onClick={() => navigate(-1)} className="h-10 w-10 shrink-0 grid place-items-center">
                 <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
-              <img
-                src={goodAppLogo}
-                alt="good-app logo"
-                className="h-7 w-auto object-contain rounded-sm"
-                loading="lazy"
-              />
+              <div className="flex items-center gap-1.5">
+                <img
+                  src={goodAppLogo}
+                  alt="good-app logo"
+                  className="h-7 w-7 object-cover rounded-sm"
+                  loading="lazy"
+                />
+                <span className="font-bold text-[17px] tracking-tight" style={{ color: "#fff" }}>good-app</span>
+              </div>
             </div>
             <div className="flex items-center gap-1">
               <button className="h-10 w-10 grid place-items-center rounded-full">
@@ -385,72 +388,84 @@ export default function Reels() {
                 {selectedVideo.creator || "Unknown"} • {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
               </p>
             </div>
+            {/* Up Next header */}
+            <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #272727" }}>
+              <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
+              <span className="text-[12px]" style={{ color: "#aaa" }}>• suggested for you</span>
+            </div>
           </div>
         )}
 
         {/* Video List */}
-        <div className="pb-20">
+        <div className={`pb-20 ${selectedVideo ? "" : ""}`}>
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
               {activeQuery ? `No results for "${activeQuery}"` : "Loading videos..."}
             </div>
           )}
 
-          {allVideos.map((video) => (
+          {allVideos.filter((v) => v.id !== selectedVideo?.id).map((video) => (
             <button
               key={video.id}
               onClick={() => playVideo(video)}
               className="w-full text-left"
             >
-              {/* Thumbnail — full width, no rounded corners, YouTube style */}
-              <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
-                {video.thumbnail_url ? (
-                  <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="w-full h-full grid place-items-center" style={{ color: "#555" }}>
-                    <Play className="w-12 h-12" />
+              {selectedVideo ? (
+                /* ── Compact row when a video is playing (YouTube "Up next" style) ── */
+                <div className="flex gap-2.5 px-3 py-2">
+                  <div className="w-[168px] h-[94px] shrink-0 rounded-lg overflow-hidden relative" style={{ background: "#1a1a1a" }}>
+                    {video.thumbnail_url ? (
+                      <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full grid place-items-center" style={{ color: "#555" }}>
+                        <Play className="w-8 h-8" />
+                      </div>
+                    )}
+                    {video.duration ? (
+                      <span className="absolute right-1 bottom-1 text-[10px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
+                        {fmt(video.duration)}
+                      </span>
+                    ) : null}
                   </div>
-                )}
-                {video.duration ? (
-                  <span
-                    className="absolute right-1 bottom-1 text-[11px] font-medium px-1 py-0.5 rounded"
-                    style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}
-                  >
-                    {fmt(video.duration)}
-                  </span>
-                ) : null}
-                {/* Now playing indicator */}
-                {selectedVideo?.id === video.id && (
-                  <div className="absolute inset-0 grid place-items-center" style={{ background: "rgba(255,0,0,0.15)" }}>
-                    <span
-                      className="text-[11px] font-bold px-2.5 py-1 rounded"
-                      style={{ background: "#ff0000", color: "#fff" }}
-                    >
-                      ▶ NOW PLAYING
-                    </span>
+                  <div className="min-w-0 flex-1 py-0.5">
+                    <p className="text-[13px] font-medium line-clamp-2 leading-[18px]" style={{ color: "#f1f1f1" }}>{video.title}</p>
+                    <p className="text-[11px] mt-1 line-clamp-1" style={{ color: "#aaa" }}>{video.creator || "Unknown"}</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: "#aaa" }}>{getViewCount(video.id)}</p>
                   </div>
-                )}
-              </div>
-              {/* Info row — channel avatar + title + meta */}
-              <div className="flex gap-3 px-3 py-3">
-                <div
-                  className="w-9 h-9 rounded-full grid place-items-center shrink-0 text-xs font-bold"
-                  style={{ background: "#272727", color: "#aaa" }}
-                >
-                  {(video.creator || "?")[0]?.toUpperCase()}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-medium line-clamp-2 leading-[20px]" style={{ color: "#f1f1f1" }}>
-                    {video.title}
-                  </p>
-                  <p className="text-[12px] mt-0.5 line-clamp-1" style={{ color: "#aaa" }}>
-                    {video.creator || "Unknown"} • {getViewCount(video.id)}{video.duration ? ` • ${fmt(video.duration)}` : ""}
-                  </p>
-                  {!video.isExternal && (
-                    <p className="text-[11px] mt-0.5 text-primary">good-app long upload</p>
-                  )}
-                </div>
-              </div>
+              ) : (
+                /* ── Full card when no video is playing (YouTube home feed style) ── */
+                <>
+                  <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
+                    {video.thumbnail_url ? (
+                      <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full grid place-items-center" style={{ color: "#555" }}>
+                        <Play className="w-12 h-12" />
+                      </div>
+                    )}
+                    {video.duration ? (
+                      <span className="absolute right-1 bottom-1 text-[11px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
+                        {fmt(video.duration)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex gap-3 px-3 py-3">
+                    <div className="w-9 h-9 rounded-full grid place-items-center shrink-0 text-xs font-bold" style={{ background: "#272727", color: "#aaa" }}>
+                      {(video.creator || "?")[0]?.toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-medium line-clamp-2 leading-[20px]" style={{ color: "#f1f1f1" }}>{video.title}</p>
+                      <p className="text-[12px] mt-0.5 line-clamp-1" style={{ color: "#aaa" }}>
+                        {video.creator || "Unknown"} • {getViewCount(video.id)}{video.duration ? ` • ${fmt(video.duration)}` : ""}
+                      </p>
+                      {!video.isExternal && (
+                        <p className="text-[11px] mt-0.5 text-primary">good-app upload</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </button>
           ))}
 
