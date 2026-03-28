@@ -704,14 +704,8 @@ export default function Feed() {
 
                   {/* Image - clickable to zoom + double tap to love */}
                   {post.image_url && (
-                    <div className="border-y border-border/20 relative cursor-pointer" onClick={() => handleDoubleTap(post.id)}>
-                      <img src={post.image_url} alt="" className="w-full max-h-[400px] object-cover" onClick={(e) => {
-                        // Single tap opens zoom after a delay
-                      }} />
-                      <button onClick={(e) => { e.stopPropagation(); setViewingImage(post.image_url); }}
-                        className="absolute bottom-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white/80 hover:text-white">
-                        <ZoomIn className="w-4 h-4" />
-                      </button>
+                    <div className="border-y border-border/20 relative cursor-pointer" onClick={() => handleImageTap(post.id, post.image_url!)}>
+                      <img src={post.image_url} alt="" className="w-full max-h-[400px] object-cover" />
                       {/* Love animation on double tap */}
                       <AnimatePresence>
                         {showLoveAnimation === post.id && (
