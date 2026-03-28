@@ -442,7 +442,8 @@ export default function Chat() {
               className="w-9 h-9 rounded-full bg-gray-100 dark:bg-secondary flex items-center justify-center text-gray-700 dark:text-foreground">
               {showSearch ? <X size={18} /> : <Search size={18} />}
             </button>
-            <button className="w-9 h-9 rounded-full bg-gray-100 dark:bg-secondary flex items-center justify-center text-gray-700 dark:text-foreground">
+            <button onClick={() => setShowSearch(!showSearch)}
+              className="w-9 h-9 rounded-full bg-gray-100 dark:bg-secondary flex items-center justify-center text-gray-700 dark:text-foreground">
               <Edit3 size={18} />
             </button>
           </div>
