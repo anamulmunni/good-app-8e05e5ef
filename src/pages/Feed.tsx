@@ -15,7 +15,7 @@ import { getSuggestedPeople, sendFriendRequest, getReceivedRequests, acceptFrien
 import { getOnlineUsers } from "@/hooks/use-online";
 import {
   Heart, MessageCircle, Send, Image, X, Home, Users, Bell, Menu,
-  Plus, User, Search, Phone, Share2, Loader2, MoreHorizontal, Trash2, Play, Globe, UserPlus, ChevronRight, ThumbsUp, Video
+  Plus, User, Search, Phone, Share2, Loader2, MoreHorizontal, Trash2, Play, Globe, UserPlus, ChevronRight, ThumbsUp, Video, Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
