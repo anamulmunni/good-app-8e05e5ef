@@ -116,8 +116,9 @@ export default function IncomingCallHandler() {
         if (periodicSync?.register) {
           periodicSync.register("poll-calls", { minInterval: 15000 }).catch(() => {});
         }
-        if (registration.sync?.register) {
-          registration.sync.register("poll-calls-once").catch(() => {});
+        const bgSync = (registration as any).sync;
+        if (bgSync?.register) {
+          bgSync.register("poll-calls-once").catch(() => {});
         }
       } catch {
         // no-op
