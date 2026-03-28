@@ -328,7 +328,7 @@ export default function Chat() {
                 <div className="w-full h-full flex items-center justify-center"><span className="text-2xl font-bold text-gray-400">{otherUser.display_name?.[0]?.toUpperCase() || "?"}</span></div>}
             </div>
             <p className="font-bold text-gray-900 text-[15px]">{otherUser.display_name || "User"}</p>
-            <p className="text-[12px] text-gray-500">Facebook Lite</p>
+            <p className="text-[12px] text-gray-500">Good App</p>
           </div>
 
           {messages.map((msg, i) => {
@@ -462,9 +462,9 @@ export default function Chat() {
                     className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50">
                     <Mic size={22} />
                   </button>
-                  <button onClick={() => sendMutation.mutate({ type: "text", content: "👍" })}
+                  <button onClick={() => sendMutation.mutate({ type: "text", content: "❤️" })}
                     className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50">
-                    <ThumbsUp size={22} />
+                    <span className="text-[22px]">❤️</span>
                   </button>
                 </>
               )}
