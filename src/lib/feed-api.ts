@@ -130,10 +130,7 @@ export async function toggleLike(postId: string, userId: number): Promise<boolea
   return result.reacted;
 }
 
-async function updatePostLikesCount(postId: string) {
-  const { count } = await (supabase.from("post_reactions").select("id", { count: "exact", head: true }) as any).eq("post_id", postId);
-  await (supabase.from("posts").update({ likes_count: count || 0 } as any).eq("id", postId) as any);
-}
+// likes_count is recalculated by feed refresh / server-side processes to keep interactions snappy
 
 // Get user reactions for posts
 export async function getUserReactions(userId: number, postIds: string[]): Promise<Record<string, string>> {
