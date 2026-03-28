@@ -20,6 +20,10 @@ export type Message = {
   created_at: string | null;
 };
 
+type MessageHidden = {
+  message_id: string;
+};
+
 const conversationActivityTs = (convo: Conversation) => {
   const base = convo.last_message_at || convo.created_at;
   if (!base) return 0;
@@ -83,15 +87,75 @@ export async function getUserConversations(userId: number): Promise<Conversation
 }
 
 // Get messages for a conversation
-export async function getMessages(conversationId: string, limit = 50): Promise<Message[]> {
+export async function getMessages(conversationId: string, userId?: number, limit = 50): Promise<Message[]> {
   const { data } = await (supabase
     .from("messages")
     .select("*") as any)
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true })
-    .limit(limit);
+    .limit(Math.max(limit * 3, limit));
 
-  return data || [];
+  const messages = (data || []) as Message[];
+  if (!userId || messages.length === 0) {
+    return messages.slice(-limit);
+  }
+
+  const messageIds = messages.map((msg) => msg.id);
+  const { data: hiddenRows } = await (supabase
+    .from("message_hidden")
+    .select("message_id") as any)
+    .eq("user_id", userId)
+    .in("message_id", messageIds);
+
+  const hiddenSet = new Set(((hiddenRows || []) as MessageHidden[]).map((row) => row.message_id));
+  return messages.filter((msg) => !hiddenSet.has(msg.id)).slice(-limit);
+}
+
+export async function deleteMessageForMe(messageId: string, userId: number): Promise<void> {
+  const { error } = await (supabase
+    .from("message_hidden")
+    .upsert(
+      {
+        message_id: messageId,
+        user_id: userId,
+      } as any,
+      { onConflict: "message_id,user_id" }
+    ) as any);
+
+  if (error) throw error;
+}
+
+export async function deleteMessageForEveryone(messageId: string, senderId: number): Promise<void> {
+  const { error } = await (supabase
+    .from("messages")
+    .delete()
+    .eq("id", messageId)
+    .eq("sender_id", senderId) as any);
+
+  if (error) throw error;
+
+  const { data: latest } = await (supabase
+    .from("messages")
+    .select("conversation_id, content, message_type, created_at") as any)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const top = (latest || [])[0];
+  if (!top?.conversation_id) return;
+
+  const latestPreview = top.message_type === "text"
+    ? (top.content || "")
+    : top.message_type === "image"
+      ? "📷 ছবি"
+      : "🎤 ভয়েস";
+
+  await (supabase
+    .from("conversations")
+    .update({
+      last_message: latestPreview,
+      last_message_at: top.created_at || new Date().toISOString(),
+    } as any)
+    .eq("id", top.conversation_id) as any);
 }
 
 // Send a text message
