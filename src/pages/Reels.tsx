@@ -48,6 +48,28 @@ function fmt(sec?: number) {
     : `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function normalizeTitleKey(value: string): string {
+  return (value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0980-\u09ff\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function dedupeVideos(items: ExternalReelVideo[]): ExternalReelVideo[] {
+  const seenId = new Set<string>();
+  const seenTitleCreator = new Set<string>();
+  return items.filter((video) => {
+    if (seenId.has(video.id)) return false;
+    seenId.add(video.id);
+    const key = `${normalizeTitleKey(video.title)}::${normalizeTitleKey(video.creator || "")}`;
+    if (!key || key === "::") return true;
+    if (seenTitleCreator.has(key)) return false;
+    seenTitleCreator.add(key);
+    return true;
+  });
+}
+
 function timeAgo(sec?: number) {
   if (!sec) return "";
   if (sec < 60) return `${sec}s ago`;
@@ -123,17 +145,17 @@ export default function Reels() {
     if (!reset && !hasMore) return;
     loadingRef.current = true;
     setLoading(true);
-    const p = reset ? (activeQuery ? 1 : Math.floor(Math.random() * 5) + 1) : page;
+    const p = reset ? (activeQuery ? 1 : Math.floor(Math.random() * 80) + 1) : page;
     try {
       const [externalResult, localResult] = await Promise.all([
-        getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long"),
+        getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long", refreshTick),
         getUploadedLongVideos(p, 12, activeQuery || undefined),
       ]);
-      const merged = [...localResult.videos, ...externalResult.videos];
+      const merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
       setExtVideos((prev) => {
         const base = reset ? [] : prev;
         const seen = new Set(base.map((v) => v.id));
-        return [...base, ...merged.filter((v) => !seen.has(v.id))];
+        return dedupeVideos([...base, ...merged.filter((v) => !seen.has(v.id))]);
       });
       setHasMore(localResult.hasMore || externalResult.hasMore);
       setPage(p + 1);
@@ -141,7 +163,7 @@ export default function Reels() {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [hasMore, page, activeQuery]);
+  }, [hasMore, page, activeQuery, refreshTick]);
 
   useEffect(() => {
     if (!user) return;
@@ -153,12 +175,12 @@ export default function Reels() {
       loadingRef.current = true;
       setLoading(true);
       try {
-        const externalStartPage = activeQuery ? 1 : Math.floor(Math.random() * 5) + 1;
+        const externalStartPage = activeQuery ? 1 : Math.floor(Math.random() * 80) + 1;
         const [externalResult, localResult] = await Promise.all([
-          getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long"),
+          getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
-        const merged = [...localResult.videos, ...externalResult.videos];
+        const merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
         setExtVideos(merged);
         setHasMore(localResult.hasMore || externalResult.hasMore);
         setPage(externalStartPage + 1);
@@ -281,6 +303,10 @@ export default function Reels() {
   const handleRefreshFeed = useCallback(() => {
     setSelectedVideo(null);
     setMiniPlayer(false);
+    loadingRef.current = false;
+    setPage(1);
+    setHasMore(true);
+    setExtVideos([]);
     setRefreshTick((prev) => prev + 1);
     mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
