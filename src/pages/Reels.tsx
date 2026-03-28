@@ -365,7 +365,7 @@ export default function Reels() {
                     </div>
                     <div className="bg-secondary/60 rounded-2xl px-3 py-2 flex-1">
                       <p className="text-xs font-bold text-foreground">{c.user?.display_name || "User"}</p>
-                      <p className="text-xs text-foreground/80">{c.content}</p>
+                      <p className="text-xs text-foreground/80">{renderMentionText(c.content)}</p>
                     </div>
                   </div>
                 ))
