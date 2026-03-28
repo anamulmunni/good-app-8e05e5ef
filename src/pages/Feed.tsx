@@ -20,6 +20,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import StoryEditor, { getAudioUrlForMusic } from "@/components/StoryEditor";
+import StoryViewer from "@/components/StoryViewer";
 
 export default function Feed() {
   const { user, isLoading } = useAuth();
