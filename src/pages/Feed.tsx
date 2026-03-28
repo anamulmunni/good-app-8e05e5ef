@@ -59,6 +59,7 @@ export default function Feed() {
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [page, setPage] = useState(1);
+  const [newPostsAvailable, setNewPostsAvailable] = useState(false);
   const POSTS_PER_PAGE = 50;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
