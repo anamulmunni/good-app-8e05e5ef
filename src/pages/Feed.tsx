@@ -10,6 +10,10 @@ import {
   deletePost, deleteStory,
   REACTION_EMOJIS, type Post, type PostComment, type Story
 } from "@/lib/feed-api";
+import {
+  deleteComment, toggleCommentLike, getUnreadNotificationCount,
+  getNotifications, markNotificationsRead, getNewReelsCount, markReelsSeen
+} from "@/lib/feed-api";
 import { getOrCreateConversation, getUnreadCount } from "@/lib/chat-api";
 import { getSuggestedPeople, sendFriendRequest, getReceivedRequests, acceptFriendRequest, rejectFriendRequest, getFriendRequestCount, getAllUsersWithStatus } from "@/lib/friend-api";
 import { getOnlineUsers } from "@/hooks/use-online";
@@ -51,6 +55,9 @@ export default function Feed() {
   const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
   const [storyEditorFile, setStoryEditorFile] = useState<File | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [page, setPage] = useState(1);
   const POSTS_PER_PAGE = 50;
 
@@ -104,6 +111,32 @@ export default function Feed() {
     queryFn: () => getFriendRequestCount(user!.id),
     enabled: !!user,
     refetchInterval: 15000,
+  });
+
+  const { data: notifCount = 0 } = useQuery({
+    queryKey: ["notif-count", user?.id],
+    queryFn: () => getUnreadNotificationCount(user!.id),
+    enabled: !!user,
+    refetchInterval: 10000,
+  });
+
+  const { data: newReelsCount = 0 } = useQuery({
+    queryKey: ["new-reels-count", user?.id],
+    queryFn: () => getNewReelsCount(user!.id),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const { data: notificationsList = [] } = useQuery({
+    queryKey: ["notifications-list", user?.id],
+    queryFn: () => getNotifications(user!.id),
+    enabled: !!user && activeTab === "notif",
+  });
+
+  const { data: mentionResults = [] } = useQuery({
+    queryKey: ["mention-search", mentionQuery],
+    queryFn: () => searchFeedUsers(mentionQuery),
+    enabled: showMentionSuggestions && mentionQuery.length >= 2,
   });
 
   const { data: suggestedPeople = [] } = useQuery({
@@ -222,16 +255,25 @@ export default function Feed() {
   const commentMutation = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
       if (!user || !commentingPostId) throw new Error("Error");
-      return addComment(commentingPostId, user.id, text);
+      return addComment(commentingPostId, user.id, text, replyingTo?.id);
     },
     onMutate: async ({ text }) => {
       if (!user || !commentingPostId) return;
-      setComments(prev => [...prev, {
-        id: `temp-${Date.now()}`, post_id: commentingPostId, user_id: user.id,
+      const tc: PostComment = {
+        id: `temp-${Date.now()}`,
+        post_id: commentingPostId,
+        user_id: user.id,
         content: text, created_at: new Date().toISOString(),
+        parent_comment_id: replyingTo?.id || null,
         user: { display_name: user.display_name, avatar_url: user.avatar_url, guest_id: user.guest_id },
-      }]);
+      };
+      if (replyingTo) {
+        setComments(prev => prev.map(c => c.id === replyingTo.id ? { ...c, replies: [...(c.replies || []), tc] } : c));
+      } else {
+        setComments(prev => [...prev, tc]);
+      }
       setCommentText("");
+      setReplyingTo(null);
     },
     onSuccess: (_data, _vars) => {
       if (commentingPostId) loadComments(commentingPostId);
@@ -241,6 +283,34 @@ export default function Feed() {
       if (commentingPostId) loadComments(commentingPostId);
     },
   });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => { if (!user) throw new Error("Login"); await deleteComment(commentId, user.id); },
+    onSuccess: () => { if (commentingPostId) loadComments(commentingPostId); queryClient.invalidateQueries({ queryKey: ["feed-posts", searchQuery] }); },
+  });
+
+  const commentLikeMutation = useMutation({
+    mutationFn: async (commentId: string) => { if (!user) throw new Error("Login"); return toggleCommentLike(commentId, user.id); },
+    onMutate: async (commentId) => {
+      setComments(prev => prev.map(c => {
+        if (c.id === commentId) return { ...c, liked_by_me: !c.liked_by_me, likes_count: (c.likes_count || 0) + (c.liked_by_me ? -1 : 1) };
+        if (c.replies) return { ...c, replies: c.replies.map(r => r.id === commentId ? { ...r, liked_by_me: !r.liked_by_me, likes_count: (r.likes_count || 0) + (r.liked_by_me ? -1 : 1) } : r) };
+        return c;
+      }));
+    },
+  });
+
+  const handleCommentInputChange = (val: string) => {
+    setCommentText(val);
+    const atMatch = val.match(/@(\w{2,})$/);
+    if (atMatch) { setMentionQuery(atMatch[1]); setShowMentionSuggestions(true); }
+    else { setShowMentionSuggestions(false); }
+  };
+
+  const insertMention = (name: string) => {
+    setCommentText(commentText.replace(/@\w*$/, `@${name} `));
+    setShowMentionSuggestions(false);
+  };
 
   const storyMutation = useMutation({
     mutationFn: async ({ file, musicName }: { file: File; musicName?: string }) => {
@@ -289,13 +359,14 @@ export default function Feed() {
 
   const loadComments = async (postId: string) => {
     setLoadingComments(true);
-    setComments(await getPostComments(postId));
+    setComments(await getPostComments(postId, user?.id));
     setLoadingComments(false);
   };
 
   const openComments = (postId: string) => {
-    if (commentingPostId === postId) { setCommentingPostId(null); return; }
+    if (commentingPostId === postId) { setCommentingPostId(null); setReplyingTo(null); return; }
     setCommentingPostId(postId);
+    setReplyingTo(null);
     loadComments(postId);
   };
 
@@ -650,26 +721,88 @@ export default function Feed() {
                     comments.length === 0 ? <p className="text-xs text-gray-500 text-center py-2">কোনো মন্তব্য নেই</p> : (
                       <div className="space-y-2.5 max-h-72 overflow-y-auto" ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
                         {comments.map((c) => (
-                          <div key={c.id} className="flex gap-2">
+                          <div key={c.id} className="space-y-1.5">
+                          <div className="flex gap-2">
                             <button onClick={() => navigate(`/user/${c.user_id}`)} className="w-8 h-8 rounded-full bg-gray-200 dark:bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
                               {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
                                 <span className="text-[10px] text-blue-600 font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
                             </button>
-                            <div className="bg-gray-100 dark:bg-secondary rounded-2xl px-3 py-2.5 flex-1 min-w-0">
+                            <div className="flex-1 min-w-0">
+                            <div className="bg-gray-100 dark:bg-secondary rounded-2xl px-3 py-2.5">
                               <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-[13px] font-bold text-gray-900 dark:text-foreground hover:underline block">
                                 {c.user?.display_name || "User"}
                               </button>
                               <p className="text-[15px] leading-5 text-gray-900 dark:text-foreground mt-0.5 break-words whitespace-pre-wrap">{c.content}</p>
-                              <p className="text-[11px] text-gray-500 dark:text-muted-foreground mt-1">{timeAgo(c.created_at)}</p>
                             </div>
+                            <div className="flex items-center gap-3 px-1 mt-0.5">
+                              <span className="text-[11px] text-gray-500">{timeAgo(c.created_at)}</span>
+                              <button onClick={() => commentLikeMutation.mutate(c.id)} className={`text-[11px] font-bold ${c.liked_by_me ? "text-blue-600" : "text-gray-500"}`}>
+                                পছন্দ {(c.likes_count || 0) > 0 ? `(${c.likes_count})` : ""}
+                              </button>
+                              <button onClick={() => { setReplyingTo({ id: c.id, name: c.user?.display_name || "User" }); }} className="text-[11px] font-bold text-gray-500">
+                                Reply
+                              </button>
+                              {c.user_id === user.id && (
+                                <button onClick={() => deleteCommentMutation.mutate(c.id)} className="text-[11px] font-bold text-red-500">
+                                  মুছুন
+                                </button>
+                              )}
+                            </div>
+                            {/* Replies */}
+                            {c.replies && c.replies.length > 0 && (
+                              <div className="ml-4 mt-1.5 space-y-1.5 border-l-2 border-gray-200 dark:border-border/30 pl-2">
+                                {c.replies.map((r) => (
+                                  <div key={r.id} className="flex gap-1.5">
+                                    <button onClick={() => navigate(`/user/${r.user_id}`)} className="w-6 h-6 rounded-full bg-gray-200 dark:bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
+                                      {r.user?.avatar_url ? <img src={r.user.avatar_url} className="w-full h-full object-cover" /> :
+                                        <span className="text-[8px] text-blue-600 font-bold">{r.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-1.5">
+                                        <button onClick={() => navigate(`/user/${r.user_id}`)} className="text-[11px] font-bold text-gray-900 dark:text-foreground">{r.user?.display_name || "User"}</button>
+                                        <p className="text-[13px] leading-4 text-gray-900 dark:text-foreground break-words">{r.content}</p>
+                                      </div>
+                                      <div className="flex items-center gap-3 px-1 mt-0.5">
+                                        <span className="text-[10px] text-gray-500">{timeAgo(r.created_at)}</span>
+                                        <button onClick={() => commentLikeMutation.mutate(r.id)} className={`text-[10px] font-bold ${r.liked_by_me ? "text-blue-600" : "text-gray-500"}`}>পছন্দ {(r.likes_count || 0) > 0 ? `(${r.likes_count})` : ""}</button>
+                                        {r.user_id === user.id && <button onClick={() => deleteCommentMutation.mutate(r.id)} className="text-[10px] font-bold text-red-500">মুছুন</button>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            </div>
+                          </div>
                           </div>
                         ))}
                       </div>
                     )}
+                  {/* Reply indicator */}
+                  {replyingTo && (
+                    <div className="flex items-center gap-2 px-1 py-1 bg-blue-50 dark:bg-primary/10 rounded-lg text-[12px]">
+                      <span className="text-gray-600 dark:text-muted-foreground">↩️ {replyingTo.name}-কে রিপ্লাই</span>
+                      <button onClick={() => setReplyingTo(null)} className="text-red-500 font-bold">✕</button>
+                    </div>
+                  )}
+                  {/* Mention suggestions */}
+                  {showMentionSuggestions && mentionResults.length > 0 && (
+                    <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-xl shadow-lg max-h-32 overflow-y-auto">
+                      {mentionResults.filter((u: any) => u.id !== user.id).slice(0, 5).map((u: any) => (
+                        <button key={u.id} onClick={() => insertMention(u.display_name || u.guest_id)}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-secondary flex items-center gap-2 text-[13px]">
+                          <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                            {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[9px] font-bold text-blue-600">{u.display_name?.[0] || "?"}</span>}
+                          </div>
+                          <span className="font-semibold text-gray-900 dark:text-foreground">{u.display_name || u.guest_id}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
-                    <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
+                    <input value={commentText} onChange={(e) => handleCommentInputChange(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && commentText.trim() && commentMutation.mutate({ text: commentText.trim() })}
-                      placeholder="মন্তব্য লিখুন..."
+                      placeholder={replyingTo ? `${replyingTo.name}-কে রিপ্লাই...` : "মন্তব্য লিখুন... (@mention)"}
                       className="flex-1 bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-full px-4 py-2 text-sm border-none outline-none placeholder:text-gray-400 dark:placeholder:text-muted-foreground" />
                     <button onClick={() => commentText.trim() && commentMutation.mutate({ text: commentText.trim() })}
                       disabled={!commentText.trim() || commentMutation.isPending}
@@ -733,12 +866,22 @@ export default function Feed() {
             )}
           </button>
           <button onClick={() => navigate("/reels")}
-            className="flex-1 py-2.5 flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground">
+            className="relative flex-1 py-2.5 flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground">
             <Play className="w-5 h-5" />
+            {newReelsCount > 0 && (
+              <span className="absolute top-1 right-1/4 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                {newReelsCount > 99 ? "99+" : newReelsCount}
+              </span>
+            )}
           </button>
-          <button onClick={() => setActiveTab("notif")}
-            className={`flex-1 py-2.5 flex items-center justify-center border-b-[3px] ${activeTab === "notif" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 dark:text-muted-foreground"}`}>
+          <button onClick={() => { setActiveTab("notif"); if (user) markNotificationsRead(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["notif-count"] })); }}
+            className={`relative flex-1 py-2.5 flex items-center justify-center border-b-[3px] ${activeTab === "notif" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 dark:text-muted-foreground"}`}>
             <Bell className="w-5 h-5" />
+            {notifCount > 0 && (
+              <span className="absolute top-1 right-1/4 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                {notifCount > 99 ? "99+" : notifCount}
+              </span>
+            )}
           </button>
         </div>
       </nav>
