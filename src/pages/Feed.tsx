@@ -59,6 +59,7 @@ export default function Feed() {
   const storyInputRef = useRef<HTMLInputElement>(null);
   const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const feedVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -331,6 +332,32 @@ export default function Feed() {
     setStoryEditorFile(null);
   };
 
+  const handleFeedVideoPlay = (activePostId: string) => {
+    Object.entries(feedVideoRefs.current).forEach(([postId, videoEl]) => {
+      if (!videoEl || postId === activePostId) return;
+      if (!videoEl.paused) {
+        videoEl.pause();
+      }
+      videoEl.muted = true;
+    });
+
+    const activeVideo = feedVideoRefs.current[activePostId];
+    if (activeVideo) {
+      activeVideo.muted = false;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      Object.values(feedVideoRefs.current).forEach((videoEl) => {
+        if (videoEl && !videoEl.paused) {
+          videoEl.pause();
+        }
+      });
+      feedVideoRefs.current = {};
+    };
+  }, []);
+
   const handleImageTap = (postId: string, imageUrl: string) => {
     const now = Date.now();
     const lastTap = doubleTapTimer[postId] || 0;
@@ -518,7 +545,19 @@ export default function Feed() {
           {/* Video - Facebook Lite style with controls */}
           {post.video_url && (
             <div className="relative bg-black">
-              <video src={post.video_url} controls playsInline preload="metadata"
+              <video
+                ref={(el) => {
+                  feedVideoRefs.current[post.id] = el;
+                }}
+                onPlay={() => handleFeedVideoPlay(post.id)}
+                onEnded={() => {
+                  const videoEl = feedVideoRefs.current[post.id];
+                  if (videoEl) videoEl.muted = false;
+                }}
+                src={post.video_url}
+                controls
+                playsInline
+                preload="metadata"
                 className="w-full max-h-[500px] object-contain" />
             </div>
           )}
