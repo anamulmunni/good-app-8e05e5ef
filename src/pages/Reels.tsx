@@ -10,10 +10,11 @@ import {
 } from "@/lib/feed-api";
 import {
   ArrowLeft, Heart, MessageCircle, Send, X, User, Loader2,
-  Share2, Volume2, VolumeX, Play, Pause, Globe, Search
+  Share2, Volume2, VolumeX, Play, Globe, Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import Hls from "hls.js";
 
 type ReelItem = {
   id: string;
@@ -56,7 +57,6 @@ export default function Reels() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
-  const [showLoveAnim, setShowLoveAnim] = useState<string | null>(null);
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -74,12 +74,10 @@ export default function Reels() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
-  const iframeRefs = useRef<Record<string, HTMLIFrameElement>>({});
+  const hlsRefs = useRef<Record<string, Hls>>({});
+  const videoRefSetters = useRef<Record<string, (el: HTMLVideoElement | null) => void>>({});
   const activeIdRef = useRef<string | null>(null);
-  const lastTapRef = useRef<Record<string, number>>({});
-  const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const extLoadingRef = useRef(false);
-  const scrollingRef = useRef(false);
 
   useEffect(() => { if (!isLoading && !user) navigate("/"); }, [user, isLoading, navigate]);
   useEffect(() => { if (user) markReelsSeen(user.id); }, [user]);
