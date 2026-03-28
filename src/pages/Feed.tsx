@@ -576,10 +576,10 @@ export default function Feed() {
                 <span className="text-blue-600 dark:text-primary font-bold text-sm">{post.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
             </button>
             <div className="flex-1 min-w-0">
-              <button onClick={() => navigate(`/user/${post.user_id}`)} className="font-bold text-[14px] text-gray-900 dark:text-foreground hover:underline block">
+              <button onClick={() => navigate(`/user/${post.user_id}`)} className="font-bold text-[15px] text-gray-900 dark:text-foreground hover:underline block">
                 {post.user?.display_name || "User"}
               </button>
-              <div className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-muted-foreground">
+              <div className="flex items-center gap-1 text-[12px] text-gray-500 dark:text-muted-foreground">
                 <span>{timeAgo(post.created_at)}</span>
                 <span>·</span>
                 <Globe className="w-3 h-3" />
