@@ -106,14 +106,13 @@ export default function Chat() {
         // Show notification for messages from others when page is hidden
         const msg = payload.new;
         if (msg && msg.sender_id !== user.id) {
-          const sender = userCache[msg.sender_id];
           const preview = msg.message_type === "text" ? (msg.content || "") : (msg.message_type === "image" ? "📷 ছবি" : "🎤 ভয়েস");
-          showMessageNotification(sender?.display_name || "New Message", preview);
+          showMessageNotification("New Message", preview);
         }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id, queryClient, userCache]);
+  }, [user?.id, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
