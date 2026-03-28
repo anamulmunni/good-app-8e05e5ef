@@ -88,6 +88,7 @@ export default function Reels() {
   const [extVideos, setExtVideos] = useState<ExternalReelVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [viewCounts] = useState<Record<string, string>>({});
+  const [miniPlayer, setMiniPlayer] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [longTitle, setLongTitle] = useState("");
@@ -270,6 +271,7 @@ export default function Reels() {
 
   const playVideo = useCallback((v: VideoItem) => {
     setSelectedVideo(v);
+    setMiniPlayer(false);
     setTimeout(() => playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }, []);
 
@@ -362,7 +364,16 @@ export default function Reels() {
       <main className="flex-1 overflow-y-auto flex flex-col">
         {/* Player */}
         {selectedVideo && (
-          <div ref={playerRef} className="shrink-0 sticky top-0 z-10" style={{ background: "#0f0f0f" }}>
+          <div
+            ref={playerRef}
+            className={`shrink-0 z-10 transition-all duration-300 ${
+              miniPlayer
+                ? "fixed bottom-20 right-3 w-[180px] rounded-lg overflow-hidden shadow-2xl cursor-pointer"
+                : "sticky top-0 w-full"
+            }`}
+            style={{ background: "#000" }}
+            onClick={miniPlayer ? () => setMiniPlayer(false) : undefined}
+          >
             <div className="w-full aspect-video" style={{ background: "#000" }}>
               {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
                 <iframe
@@ -384,20 +395,38 @@ export default function Reels() {
                 />
               )}
             </div>
-            {/* Video info below player */}
-            <div className="px-3 py-3" style={{ borderBottom: "1px solid #272727" }}>
-              <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
-                {selectedVideo.title}
-              </h2>
-              <p className="text-[12px] mt-1.5" style={{ color: "#aaa" }}>
-                {selectedVideo.creator || "Unknown"} • {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
-              </p>
-            </div>
-            {/* Up Next header */}
-            <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #272727" }}>
-              <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
-              <span className="text-[12px]" style={{ color: "#aaa" }}>• suggested for you</span>
-            </div>
+            {miniPlayer && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedVideo(null); setMiniPlayer(false); }}
+                className="absolute top-1 right-1 w-6 h-6 rounded-full grid place-items-center"
+                style={{ background: "rgba(0,0,0,0.7)" }}
+              >
+                <X className="w-3.5 h-3.5" style={{ color: "#fff" }} />
+              </button>
+            )}
+            {!miniPlayer && (
+              <>
+                <button
+                  onClick={() => setMiniPlayer(true)}
+                  className="w-full flex items-center justify-center py-1.5"
+                  style={{ background: "#0f0f0f" }}
+                >
+                  <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
+                </button>
+                <div className="px-3 py-3" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
+                  <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
+                    {selectedVideo.title}
+                  </h2>
+                  <p className="text-[12px] mt-1.5" style={{ color: "#aaa" }}>
+                    {selectedVideo.creator || "Unknown"} • {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
+                  </p>
+                </div>
+                <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
+                  <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
+                  <span className="text-[12px]" style={{ color: "#aaa" }}>• suggested for you</span>
+                </div>
+              </>
+            )}
           </div>
         )}
 
