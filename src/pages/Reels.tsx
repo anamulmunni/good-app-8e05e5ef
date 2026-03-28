@@ -139,19 +139,14 @@ export default function Reels() {
   }, [activeSearch, extVideos.length, extHasMore, user, initialLoaded, loadMoreExternal]);
 
   const allReels = useMemo<ReelItem[]>(() => {
-    const ur: ReelItem[] = activeSearch ? [] : reels.map(r => ({
-      id: r.id, video_url: r.video_url!, content: r.content,
-      likes_count: r.likes_count, comments_count: r.comments_count,
-      user_id: r.user_id, user: r.user, isExternal: false,
-    }));
     const ext: ReelItem[] = extVideos.map(v => ({
       id: v.id, video_url: v.video_url, content: v.title,
       likes_count: 0, comments_count: 0, user_id: 0, user: null,
       isExternal: true, externalTitle: v.title, externalCreator: v.creator,
       thumbnail_url: v.thumbnail_url, category: v.category,
     }));
-    return [...ur, ...ext];
-  }, [reels, extVideos, activeSearch]);
+    return ext;
+  }, [extVideos]);
 
   // Track category preference
   useEffect(() => {
