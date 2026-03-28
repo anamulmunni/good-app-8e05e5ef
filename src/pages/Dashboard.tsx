@@ -807,16 +807,8 @@ export default function Dashboard() {
           <Newspaper className="w-6 h-6 text-foreground" />
         </motion.button>
 
-        {/* Chat Button */}
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate("/chat")}
-          className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] shadow-lg shadow-[hsl(var(--cyan))]/40 flex items-center justify-center"
-        >
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] animate-pulse opacity-40" />
-          <MessageCircle className="w-6 h-6 text-foreground relative z-10 fill-foreground/20" />
-        </motion.button>
+        {/* Chat Button with unread badge */}
+        <ChatButtonWithBadge userId={user?.id} navigate={navigate} />
       </div>
     </div>
   );
