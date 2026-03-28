@@ -10,6 +10,10 @@ import {
   deletePost, deleteStory,
   REACTION_EMOJIS, type Post, type PostComment, type Story
 } from "@/lib/feed-api";
+import {
+  deleteComment, toggleCommentLike, getUnreadNotificationCount,
+  getNotifications, markNotificationsRead, getNewReelsCount, markReelsSeen
+} from "@/lib/feed-api";
 import { getOrCreateConversation, getUnreadCount } from "@/lib/chat-api";
 import { getSuggestedPeople, sendFriendRequest, getReceivedRequests, acceptFriendRequest, rejectFriendRequest, getFriendRequestCount, getAllUsersWithStatus } from "@/lib/friend-api";
 import { getOnlineUsers } from "@/hooks/use-online";
