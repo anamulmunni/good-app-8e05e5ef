@@ -153,6 +153,9 @@ export default function Chat() {
       if (!activeConversation || !user) throw new Error("No conversation");
       return sendMessage(activeConversation.id, user.id, content, type, mediaUrl);
     },
+    onMutate: async () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", activeConversation?.id] });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["messages", activeConversation?.id] });
       queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
@@ -160,9 +163,10 @@ export default function Chat() {
   });
 
   const handleSendText = () => {
-    if (!messageText.trim()) return;
-    sendMutation.mutate({ type: "text", content: messageText.trim() });
+    const text = messageText.trim();
+    if (!text) return;
     setMessageText("");
+    sendMutation.mutate({ type: "text", content: text });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
