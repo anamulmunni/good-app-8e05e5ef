@@ -49,6 +49,7 @@ export default function Feed() {
   const [activeTab, setActiveTab] = useState<"home" | "friends" | "chat" | "reels" | "notif">("home");
   const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
+  const [storyEditorFile, setStoryEditorFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
   const POSTS_PER_PAGE = 50;
 
