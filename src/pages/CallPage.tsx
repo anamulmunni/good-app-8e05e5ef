@@ -112,7 +112,7 @@ export default function CallPage() {
       pc.ontrack = (event) => {
         const audio = document.createElement("audio");
         audio.autoplay = true;
-        audio.playsInline = true;
+        (audio as any).playsInline = true;
         audio.setAttribute("playsinline", "true");
         audio.srcObject = event.streams[0];
         document.body.appendChild(audio);
