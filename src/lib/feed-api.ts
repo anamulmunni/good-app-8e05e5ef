@@ -95,26 +95,20 @@ function buildSearchVariants(searchQuery?: string): string[] {
   const q = (searchQuery || "").trim();
   if (!q) {
     return [
-      "bangla full natok",
+      "bangla natok 2025",
       "bangla song official",
-      "hindi song",
-      "bangla cartoon",
-      "bangla funny video",
+      "hindi song latest",
       "trending music video",
-      "bangla drama",
-      "live music",
+      "bangla funny video viral",
+      "bangla movie full",
     ];
   }
 
+  // Only add closely related variants — don't pollute with unrelated categories
   return [
     q,
-    `${q} full video`,
     `${q} official`,
-    `${q} live`,
-    `${q} song`,
-    `${q} natok`,
-    `${q} cartoon`,
-    `${q} drama`,
+    `${q} full`,
   ];
 }
 
