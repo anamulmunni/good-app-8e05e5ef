@@ -306,8 +306,9 @@ export default function Feed() {
 
   const handleCommentInputChange = (val: string) => {
     setCommentText(val);
-    const atMatch = val.match(/@(\w{2,})$/);
-    if (atMatch) { setMentionQuery(atMatch[1]); setShowMentionSuggestions(true); }
+    const atMatch = val.match(/@(\w*)$/);
+    if (atMatch && atMatch[1].length >= 1) { setMentionQuery(atMatch[1]); setShowMentionSuggestions(true); }
+    else if (val.endsWith("@")) { setMentionQuery(""); setShowMentionSuggestions(true); }
     else { setShowMentionSuggestions(false); }
   };
 
