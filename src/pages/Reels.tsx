@@ -165,13 +165,60 @@ export default function Reels() {
     if (user && reels.length > 0) getUserReactions(user.id, reels.map(r => r.id)).then(setUserReactions);
   }, [user, reels]);
 
-  // Helper: send command to Dailymotion iframe
-  const sendIframeCmd = useCallback((reelId: string, cmd: string) => {
-    const iframe = iframeRefs.current[reelId];
-    if (iframe?.contentWindow) {
-      iframe.contentWindow.postMessage(JSON.stringify({ command: cmd }), "*");
+  const getVideoRefSetter = useCallback((reelId: string) => {
+    if (!videoRefSetters.current[reelId]) {
+      videoRefSetters.current[reelId] = (el: HTMLVideoElement | null) => {
+        if (el) {
+          videoRefs.current[reelId] = el;
+          return;
+        }
+
+        delete videoRefs.current[reelId];
+        if (hlsRefs.current[reelId]) {
+          hlsRefs.current[reelId].destroy();
+          delete hlsRefs.current[reelId];
+        }
+      };
     }
+
+    return videoRefSetters.current[reelId];
   }, []);
+
+  const ensureExternalVideoSource = useCallback((reel: ReelItem, videoEl: HTMLVideoElement) => {
+    if (!reel.isExternal) return;
+    const streamUrl = reel.video_url;
+    if (!streamUrl || videoEl.dataset.streamUrl === streamUrl) return;
+
+    if (hlsRefs.current[reel.id]) {
+      hlsRefs.current[reel.id].destroy();
+      delete hlsRefs.current[reel.id];
+    }
+
+    videoEl.removeAttribute("src");
+    videoEl.load();
+
+    if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+      videoEl.src = streamUrl;
+    } else if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        maxBufferLength: 8,
+        maxMaxBufferLength: 16,
+      });
+      hls.loadSource(streamUrl);
+      hls.attachMedia(videoEl);
+      hlsRefs.current[reel.id] = hls;
+    } else {
+      videoEl.src = streamUrl;
+    }
+
+    videoEl.dataset.streamUrl = streamUrl;
+  }, []);
+
+  useEffect(() => {
+    setPausedId(null);
+  }, [currentIndex]);
 
   // Playback controller — runs when currentIndex or muted changes
   useEffect(() => {
@@ -179,35 +226,30 @@ export default function Reels() {
     const curr = allReels[currentIndex];
     if (!curr) return;
     activeIdRef.current = curr.id;
-    setPausedId(null);
 
-    // Pause ALL native videos
+    // Pause every other video
     Object.entries(videoRefs.current).forEach(([id, v]) => {
-      if (v) { v.pause(); v.muted = true; }
+      if (!v || id === curr.id) return;
+      v.pause();
+      v.muted = true;
     });
 
-    // Pause ALL iframes except current
-    Object.entries(iframeRefs.current).forEach(([id]) => {
-      if (id !== curr.id) sendIframeCmd(id, "pause");
-    });
+    const activeVideo = videoRefs.current[curr.id];
+    if (!activeVideo) return;
 
     if (curr.isExternal) {
-      sendIframeCmd(curr.id, "play");
-      sendIframeCmd(curr.id, muted ? "mute" : "unmute");
-    } else {
-      const vid = videoRefs.current[curr.id];
-      if (vid) {
-        vid.currentTime = 0;
-        vid.muted = muted;
-        vid.play().catch(() => {});
-      }
+      ensureExternalVideoSource(curr, activeVideo);
     }
+
+    activeVideo.muted = muted;
+    if (pausedId === curr.id) activeVideo.pause();
+    else activeVideo.play().catch(() => {});
 
     // Preload next batch
     if (currentIndex >= allReels.length - 4 && extHasMore && !extLoadingRef.current) {
       loadMoreExternal();
     }
-  }, [currentIndex, allReels, muted, sendIframeCmd, extHasMore, loadMoreExternal]);
+  }, [currentIndex, allReels, muted, pausedId, ensureExternalVideoSource, extHasMore, loadMoreExternal]);
 
   const handleVideoPlay = useCallback((reelId: string) => {
     if (reelId !== activeIdRef.current) {
@@ -227,15 +269,15 @@ export default function Reels() {
       const visible = entries
         .filter((e) => e.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      if (!visible) return;
+      if (!visible || visible.intersectionRatio < 0.72) return;
 
       const idx = parseInt(visible.target.getAttribute("data-index") || "0");
       
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         setCurrentIndex((prev) => (prev === idx ? prev : idx));
-      }, 100);
-    }, { root: container, threshold: [0.6] });
+      }, 120);
+    }, { root: container, threshold: [0.55, 0.72, 0.9] });
 
     const items = container.querySelectorAll("[data-index]");
     items.forEach((item) => observer.observe(item));
@@ -248,48 +290,22 @@ export default function Reels() {
 
   // Toggle pause for ANY reel type
   const togglePause = useCallback((reel: ReelItem) => {
+    const v = videoRefs.current[reel.id];
+    if (!v) return;
+
     if (pausedId === reel.id) {
-      // Resume
-      if (reel.isExternal) {
-        sendIframeCmd(reel.id, "play");
-      } else {
-        const v = videoRefs.current[reel.id];
-        if (v) v.play().catch(() => {});
-      }
+      v.play().catch(() => {});
       setPausedId(null);
     } else {
-      // Pause
-      if (reel.isExternal) {
-        sendIframeCmd(reel.id, "pause");
-      } else {
-        const v = videoRefs.current[reel.id];
-        if (v) v.pause();
-      }
+      v.pause();
       setPausedId(reel.id);
     }
-  }, [pausedId, sendIframeCmd]);
+  }, [pausedId]);
 
-  // Tap handler: single tap = pause/play, double tap = love
+  // Tap handler: single tap = pause/play
   const handleTap = useCallback((reel: ReelItem) => {
-    const now = Date.now();
-    const last = lastTapRef.current[reel.id] || 0;
-    if (tapTimerRef.current[reel.id]) clearTimeout(tapTimerRef.current[reel.id]);
-
-    if (now - last < 300) {
-      // Double tap → love
-      lastTapRef.current[reel.id] = 0;
-      if (!reel.isExternal && !userReactions[reel.id]) {
-        reactionMutation.mutate({ postId: reel.id, type: "love" });
-      }
-      setShowLoveAnim(reel.id);
-      setTimeout(() => setShowLoveAnim(null), 1000);
-    } else {
-      lastTapRef.current[reel.id] = now;
-      tapTimerRef.current[reel.id] = setTimeout(() => {
-        togglePause(reel);
-      }, 300);
-    }
-  }, [userReactions, togglePause]);
+    togglePause(reel);
+  }, [togglePause]);
 
   const reactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: string; type: string }) => {
@@ -337,6 +353,8 @@ export default function Reels() {
   useEffect(() => {
     return () => {
       Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } });
+      Object.values(hlsRefs.current).forEach((hls) => hls.destroy());
+      hlsRefs.current = {};
     };
   }, []);
 
@@ -348,7 +366,7 @@ export default function Reels() {
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {/* Header — highest z so it's always clickable */}
-      <div className="absolute top-0 left-0 right-0 z-[70] flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-[70] flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto">
         <button onClick={() => navigate(-1)} className="text-white p-2 -m-1">
           <ArrowLeft size={22} />
         </button>
@@ -439,17 +457,19 @@ export default function Reels() {
                   <>
                     {/* Video layer */}
                     {reel.isExternal ? (
-                      <iframe
-                        ref={el => { if (el) iframeRefs.current[reel.id] = el; }}
-                        src={Math.abs(index - currentIndex) <= 1 ? reel.video_url : undefined}
-                        className="absolute inset-0 w-full h-full pointer-events-none"
-                        allow="autoplay; fullscreen"
-                        allowFullScreen
-                        style={{ border: "none" }}
+                      <video
+                        ref={getVideoRefSetter(reel.id)}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        poster={reel.thumbnail_url || undefined}
+                        loop
+                        playsInline
+                        muted={muted}
+                        preload={isActive ? "auto" : "metadata"}
+                        onPlay={() => handleVideoPlay(reel.id)}
                       />
                     ) : (
                       <video
-                        ref={el => { if (el) videoRefs.current[reel.id] = el; }}
+                        ref={getVideoRefSetter(reel.id)}
                         src={reel.video_url}
                         className="absolute inset-0 w-full h-full object-cover"
                         loop playsInline muted={muted} preload="auto"
@@ -471,16 +491,6 @@ export default function Reels() {
                         </div>
                       </div>
                     )}
-
-                    {/* Love animation */}
-                    <AnimatePresence>
-                      {showLoveAnim === reel.id && (
-                        <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 2, opacity: 0 }} exit={{ opacity: 0 }}
-                          transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-[25]">
-                          <span className="text-7xl">❤️</span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
 
                     {/* Bottom gradient */}
                     <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-[18]" />
@@ -545,7 +555,7 @@ export default function Reels() {
 
           {/* Bottom loading */}
           {extHasMore && (
-            <div className="h-16 flex items-center justify-center snap-start">
+            <div className="h-16 flex items-center justify-center">
               {extLoading && <Loader2 className="w-6 h-6 text-white/40 animate-spin" />}
             </div>
           )}
