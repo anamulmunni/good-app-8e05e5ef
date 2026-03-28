@@ -322,8 +322,8 @@ export default function Reels() {
                     </div>
                     <span className="text-white font-bold text-sm drop-shadow-lg">{reel.user?.display_name || "User"}</span>
                   </button>
-                  {reel.content && (
-                    <p className="text-white/90 text-sm line-clamp-2 drop-shadow-lg">{reel.content}</p>
+                {reel.content && (
+                    <p className="text-white/90 text-[15px] line-clamp-2 drop-shadow-lg">{renderMentionText(reel.content)}</p>
                   )}
                 </div>
 
