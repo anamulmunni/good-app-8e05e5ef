@@ -732,7 +732,7 @@ export default function Feed() {
                               <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-[13px] font-bold text-gray-900 dark:text-foreground hover:underline block">
                                 {c.user?.display_name || "User"}
                               </button>
-                              <p className="text-[15px] leading-5 text-gray-900 dark:text-foreground mt-0.5 break-words whitespace-pre-wrap">{c.content}</p>
+                              <p className="text-[15px] leading-5 text-gray-900 dark:text-foreground mt-0.5 break-words whitespace-pre-wrap">{renderMentionText(c.content)}</p>
                             </div>
                             <div className="flex items-center gap-3 px-1 mt-0.5">
                               <span className="text-[11px] text-gray-500">{timeAgo(c.created_at)}</span>
