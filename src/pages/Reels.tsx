@@ -10,7 +10,7 @@ import {
 } from "@/lib/feed-api";
 import {
   ArrowLeft, Heart, MessageCircle, Send, X, User, Loader2,
-  Share2, Volume2, VolumeX, Play, Globe, Search
+  Share2, Volume2, VolumeX, Play, Pause, Globe, Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,8 @@ type ReelItem = {
   thumbnail_url?: string | null;
   category?: string;
 };
+
+type ControlHint = "play" | "pause" | "mute" | "unmute";
 
 function getWatchedCategories(): Record<string, number> {
   try { return JSON.parse(localStorage.getItem("reels_cat_prefs") || "{}"); } catch { return {}; }
@@ -71,6 +73,7 @@ export default function Reels() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
+  const [controlHint, setControlHint] = useState<ControlHint | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
@@ -211,6 +214,25 @@ export default function Reels() {
     videoEl.dataset.streamUrl = streamUrl;
   }, []);
 
+  const showControlHint = useCallback((type: ControlHint) => {
+    setControlHint(type);
+    window.setTimeout(() => {
+      setControlHint((prev) => (prev === type ? null : prev));
+    }, 900);
+  }, []);
+
+  const attemptPlay = useCallback(async (videoEl: HTMLVideoElement, withSound: boolean) => {
+    videoEl.muted = true;
+    try {
+      await videoEl.play();
+      if (withSound) videoEl.muted = false;
+      return true;
+    } catch {
+      videoEl.muted = true;
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     setPausedId(null);
   }, [currentIndex]);
@@ -236,15 +258,18 @@ export default function Reels() {
       ensureExternalVideoSource(curr, activeVideo);
     }
 
-    activeVideo.muted = muted;
     if (pausedId === curr.id) activeVideo.pause();
-    else activeVideo.play().catch(() => {});
+    else {
+      attemptPlay(activeVideo, !muted).then((ok) => {
+        if (!ok) setPausedId(curr.id);
+      });
+    }
 
     // Preload next batch
     if (currentIndex >= allReels.length - 4 && extHasMore && !extLoadingRef.current) {
       loadMoreExternal();
     }
-  }, [currentIndex, allReels, muted, pausedId, ensureExternalVideoSource, extHasMore, loadMoreExternal]);
+  }, [currentIndex, allReels, muted, pausedId, ensureExternalVideoSource, extHasMore, loadMoreExternal, attemptPlay]);
 
   const handleVideoPlay = useCallback((reelId: string) => {
     if (reelId !== activeIdRef.current) {
@@ -289,18 +314,39 @@ export default function Reels() {
     if (!v) return;
 
     if (pausedId === reel.id) {
-      v.play().catch(() => {});
+      attemptPlay(v, !muted);
       setPausedId(null);
+      showControlHint("play");
     } else {
       v.pause();
       setPausedId(reel.id);
+      showControlHint("pause");
     }
-  }, [pausedId]);
+  }, [pausedId, attemptPlay, muted, showControlHint]);
 
   // Tap handler: single tap = pause/play
   const handleTap = useCallback((reel: ReelItem) => {
     togglePause(reel);
   }, [togglePause]);
+
+  const handleMuteToggle = useCallback(() => {
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+
+    const activeId = activeIdRef.current;
+    const activeVideo = activeId ? videoRefs.current[activeId] : null;
+    if (activeVideo) {
+      if (nextMuted) {
+        activeVideo.muted = true;
+      } else {
+        attemptPlay(activeVideo, true).then((ok) => {
+          if (!ok) setMuted(true);
+        });
+      }
+    }
+
+    showControlHint(nextMuted ? "mute" : "unmute");
+  }, [muted, attemptPlay, showControlHint]);
 
   const reactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: string; type: string }) => {
@@ -370,11 +416,28 @@ export default function Reels() {
         </h1>
         <div className="flex items-center gap-1">
           <button onClick={() => setShowSearch(!showSearch)} className="text-white p-2 -m-1"><Search size={20} /></button>
-          <button onClick={() => setMuted(!muted)} className="text-white p-2 -m-1">
+          <button onClick={handleMuteToggle} className="text-white p-2 -m-1">
             {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {controlHint && (
+          <motion.div
+            key={controlHint}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="absolute top-14 left-1/2 -translate-x-1/2 z-[75] bg-black/70 text-white text-[12px] font-bold px-3 py-1 rounded-full"
+          >
+            {controlHint === "pause" && "Paused"}
+            {controlHint === "play" && "Playing"}
+            {controlHint === "mute" && "Muted"}
+            {controlHint === "unmute" && "Sound On"}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Search overlay */}
       <AnimatePresence>
@@ -515,8 +578,19 @@ export default function Reels() {
                       )}
                     </div>
 
+                    {isActive && (
+                      <div className="absolute left-3 top-16 z-[20] bg-black/45 text-white text-[11px] font-bold px-2.5 py-1 rounded-full pointer-events-none">
+                        {isPaused ? "Paused" : "Playing"} • {muted ? "Muted" : "Sound On"}
+                      </div>
+                    )}
+
                     {/* Actions — right side buttons */}
                     <div className="absolute right-2 bottom-16 z-[20] flex flex-col items-center gap-3">
+                      <button onClick={(e) => { e.stopPropagation(); togglePause(reel); }} className="flex flex-col items-center">
+                        <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
+                          {isPaused ? <Play className="w-5 h-5 text-white" /> : <Pause className="w-5 h-5 text-white" />}
+                        </div>
+                      </button>
                       {!reel.isExternal && (
                         <>
                           <button onClick={(e) => { e.stopPropagation(); reactionMutation.mutate({ postId: reel.id, type: myReaction || "love" }); }}
