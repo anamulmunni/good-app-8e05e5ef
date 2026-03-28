@@ -100,7 +100,7 @@ export function attachRemoteAudio(stream: MediaStream): HTMLAudioElement {
   const audio = document.createElement("audio");
   audio.className = "call-remote-audio";
   audio.autoplay = true;
-  audio.playsInline = true;
+  (audio as any).playsInline = true;
   audio.setAttribute("playsinline", "true");
   audio.setAttribute("webkit-playsinline", "true");
   audio.volume = 1.0;
