@@ -109,6 +109,32 @@ export default function Feed() {
     refetchInterval: 15000,
   });
 
+  const { data: notifCount = 0 } = useQuery({
+    queryKey: ["notif-count", user?.id],
+    queryFn: () => getUnreadNotificationCount(user!.id),
+    enabled: !!user,
+    refetchInterval: 10000,
+  });
+
+  const { data: newReelsCount = 0 } = useQuery({
+    queryKey: ["new-reels-count", user?.id],
+    queryFn: () => getNewReelsCount(user!.id),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const { data: notificationsList = [] } = useQuery({
+    queryKey: ["notifications-list", user?.id],
+    queryFn: () => getNotifications(user!.id),
+    enabled: !!user && activeTab === "notif",
+  });
+
+  const { data: mentionResults = [] } = useQuery({
+    queryKey: ["mention-search", mentionQuery],
+    queryFn: () => searchFeedUsers(mentionQuery),
+    enabled: showMentionSuggestions && mentionQuery.length >= 2,
+  });
+
   const { data: suggestedPeople = [] } = useQuery({
     queryKey: ["suggested-people"],
     queryFn: () => getSuggestedPeople(user!.id, 6),
