@@ -230,10 +230,10 @@ export default function Feed() {
   });
 
   const storyMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, musicName }: { file: File; musicName?: string }) => {
       if (!user) throw new Error("Login");
       const url = await uploadStoryMedia(file);
-      return createStory(user.id, url);
+      return createStory(user.id, url, musicName);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stories"] });

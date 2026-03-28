@@ -211,8 +211,10 @@ export async function getActiveStories(): Promise<Story[]> {
   return stories.map((s: any) => ({ ...s, user: userMap[s.user_id] || null }));
 }
 
-export async function createStory(userId: number, imageUrl: string): Promise<Story> {
-  const { data, error } = await (supabase.from("stories").insert({ user_id: userId, image_url: imageUrl } as any).select().single() as any);
+export async function createStory(userId: number, imageUrl: string, musicName?: string): Promise<Story> {
+  const insertData: any = { user_id: userId, image_url: imageUrl };
+  if (musicName) insertData.music_name = musicName;
+  const { data, error } = await (supabase.from("stories").insert(insertData).select().single() as any);
   if (error) throw error;
   return data;
 }
