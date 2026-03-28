@@ -185,6 +185,10 @@ export default function Feed() {
         queryClient.invalidateQueries({ queryKey: ["friend-requests"] });
         queryClient.invalidateQueries({ queryKey: ["suggested-people"] });
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notif-count"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
