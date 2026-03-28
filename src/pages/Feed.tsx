@@ -423,7 +423,7 @@ export default function Feed() {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setActiveTab("friends"); setShowFriendRequests(true); }}
+            <button onClick={() => { setActiveTab("friends"); }}
               className="mx-3 mt-1 flex items-center justify-center gap-1 text-blue-600 dark:text-primary text-[13px] font-semibold py-1.5">
               See all <ChevronRight className="w-4 h-4" />
             </button>
