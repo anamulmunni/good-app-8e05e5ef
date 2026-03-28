@@ -81,8 +81,6 @@ function scoreFallbackVideo(title: string, queryWords: string[]): number {
   for (const word of queryWords) {
     if (word && lower.includes(word)) score += 3;
   }
-  if (lower.includes("bangladesh") || lower.includes("বাংলাদেশ") || lower.includes("bangla") || lower.includes("বাংলা")) score += 5;
-  if (lower.includes("india") || lower.includes("indian") || lower.includes("hindi")) score -= 4;
   return score;
 }
 
@@ -118,8 +116,9 @@ async function fetchDailymotionFallback(
   searchQuery?: string,
   mode: "short" | "long" = "long",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const search = searchQuery?.trim() ? `${searchQuery.trim()} bangladesh` : "bangladesh viral video";
-  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(search)}&limit=${Math.max(rows * 2, 20)}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,owner.screenname,country&sort=relevance`;
+  const search = searchQuery?.trim() || "bangla video";
+  const limit = Math.max(rows * 2, 40);
+  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(search)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,owner.screenname,country&sort=relevance`;
   const res = await fetch(dmUrl);
   if (!res.ok) return { videos: [], hasMore: false };
 
@@ -130,15 +129,13 @@ async function fetchDailymotionFallback(
   const filtered = list
     .map((v: any) => {
       const duration = Number(v?.duration || 0);
-      const durationOk = mode === "short" ? duration >= 4 && duration <= 70 : duration >= 120 && duration <= 7200;
+      const durationOk = duration >= 3;
       if (!v?.id || !durationOk) return null;
 
       const title = String(v?.title || "বাংলা ভিডিও");
       const country = String(v?.country || "").toUpperCase();
       const score = scoreFallbackVideo(title, queryWords)
-        + (country === "BD" ? 6 : 0)
-        + (country === "IN" ? -4 : 0)
-        + (mode === "long" && duration >= 900 ? 2 : 0);
+        + (duration >= 60 ? 1 : 0);
 
       return {
         id: `dm-${v.id}`,
@@ -160,7 +157,7 @@ async function fetchDailymotionFallback(
     .slice(0, rows)
     .map(({ _score, ...rest }: any) => rest);
 
-  return { videos: filtered, hasMore: filtered.length >= Math.min(rows, 8) };
+  return { videos: filtered, hasMore: list.length >= limit / 2 };
 }
 
 export async function getBangladeshExternalVideos(
