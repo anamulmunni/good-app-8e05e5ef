@@ -14,7 +14,7 @@ import { getOrCreateConversation, getUnreadCount } from "@/lib/chat-api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import {
   Heart, MessageCircle, Send, Image, X, ArrowLeft,
-  Plus, User, Search, Phone, Share2, Loader2, MoreVertical, Trash2, ZoomIn, Play
+  Plus, User, Search, Phone, Share2, Loader2, MoreVertical, Trash2, Play
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -55,7 +55,7 @@ export default function Feed() {
 
   const { data: posts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["feed-posts", searchQuery],
-    queryFn: () => getFeedPosts(30, searchQuery),
+    queryFn: () => getFeedPosts(100, searchQuery),
     enabled: !!user,
   });
 
@@ -262,12 +262,14 @@ export default function Feed() {
     if (file) storyMutation.mutate(file);
   };
 
-  // Double tap to love
-  const handleDoubleTap = (postId: string) => {
+  // Single tap = zoom, double tap = love
+  const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const handleImageTap = (postId: string, imageUrl: string) => {
     const now = Date.now();
     const lastTap = doubleTapTimer[postId] || 0;
     if (now - lastTap < 300) {
-      // Double tap!
+      // Double tap = love
+      clearTimeout(tapTimerRef.current[postId]);
       if (!userReactions[postId]) {
         reactionMutation.mutate({ postId, type: "love" });
       }
@@ -275,7 +277,11 @@ export default function Feed() {
       setTimeout(() => setShowLoveAnimation(null), 1000);
       setDoubleTapTimer(prev => ({ ...prev, [postId]: 0 }));
     } else {
+      // Single tap = zoom (with delay to check for double tap)
       setDoubleTapTimer(prev => ({ ...prev, [postId]: now }));
+      tapTimerRef.current[postId] = setTimeout(() => {
+        setViewingImage(imageUrl);
+      }, 320);
     }
   };
 
@@ -656,39 +662,40 @@ export default function Feed() {
                       </button>
                       <p className="text-[10px] text-muted-foreground">{timeAgo(post.created_at)}</p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {post.user_id !== user.id && (
-                        <>
-                          <button onClick={() => startChatWith(post.user_id)}
-                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-primary">
-                            <MessageCircle className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => navigate(`/call/${post.user_id}`)}
-                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-[hsl(var(--emerald))]">
-                            <Phone className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {/* 3-dot menu for own posts */}
-                      {post.user_id === user.id && (
-                        <div className="relative">
-                          <button onClick={() => setShowPostMenu(showPostMenu === post.id ? null : post.id)}
-                            className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                          <AnimatePresence>
-                            {showPostMenu === post.id && (
-                              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                                className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[140px]">
-                                <button onClick={() => deletePostMutation.mutate(post.id)}
-                                  className="w-full flex items-center gap-2 px-4 py-3 text-destructive hover:bg-destructive/10 text-sm font-bold transition-colors">
-                                  <Trash2 className="w-4 h-4" /> পোস্ট মুছুন
+                    {/* 3-dot menu for all posts - Facebook Lite style */}
+                    <div className="relative">
+                      <button onClick={() => setShowPostMenu(showPostMenu === post.id ? null : post.id)}
+                        className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                      <AnimatePresence>
+                        {showPostMenu === post.id && (
+                          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                            className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[160px]">
+                            {post.user_id === user.id ? (
+                              <button onClick={() => deletePostMutation.mutate(post.id)}
+                                className="w-full flex items-center gap-2 px-4 py-3 text-destructive hover:bg-destructive/10 text-sm font-bold transition-colors">
+                                <Trash2 className="w-4 h-4" /> পোস্ট মুছুন
+                              </button>
+                            ) : (
+                              <>
+                                <button onClick={() => { navigate(`/user/${post.user_id}`); setShowPostMenu(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-foreground hover:bg-secondary text-sm transition-colors">
+                                  <User className="w-4 h-4" /> প্রোফাইল দেখুন
                                 </button>
-                              </motion.div>
+                                <button onClick={() => { startChatWith(post.user_id); setShowPostMenu(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-foreground hover:bg-secondary text-sm transition-colors">
+                                  <MessageCircle className="w-4 h-4" /> মেসেজ পাঠান
+                                </button>
+                                <button onClick={() => { navigate(`/call/${post.user_id}`); setShowPostMenu(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-foreground hover:bg-secondary text-sm transition-colors">
+                                  <Phone className="w-4 h-4" /> কল করুন
+                                </button>
+                              </>
                             )}
-                          </AnimatePresence>
-                        </div>
-                      )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
 
@@ -697,14 +704,8 @@ export default function Feed() {
 
                   {/* Image - clickable to zoom + double tap to love */}
                   {post.image_url && (
-                    <div className="border-y border-border/20 relative cursor-pointer" onClick={() => handleDoubleTap(post.id)}>
-                      <img src={post.image_url} alt="" className="w-full max-h-[400px] object-cover" onClick={(e) => {
-                        // Single tap opens zoom after a delay
-                      }} />
-                      <button onClick={(e) => { e.stopPropagation(); setViewingImage(post.image_url); }}
-                        className="absolute bottom-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white/80 hover:text-white">
-                        <ZoomIn className="w-4 h-4" />
-                      </button>
+                    <div className="border-y border-border/20 relative cursor-pointer" onClick={() => handleImageTap(post.id, post.image_url!)}>
+                      <img src={post.image_url} alt="" className="w-full max-h-[400px] object-cover" />
                       {/* Love animation on double tap */}
                       <AnimatePresence>
                         {showLoveAnimation === post.id && (
@@ -799,18 +800,19 @@ export default function Feed() {
                         <div className="px-4 pb-3 pt-1 border-t border-border/20 space-y-2">
                           {loadingComments ? <p className="text-xs text-muted-foreground text-center py-2">লোড হচ্ছে...</p> :
                             comments.length === 0 ? <p className="text-xs text-muted-foreground text-center py-2">কোনো মন্তব্য নেই</p> : (
-                              <div className="space-y-2 max-h-60 overflow-y-auto">
+                              <div className="space-y-2.5 max-h-60 overflow-y-auto" ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
                                 {comments.map((c) => (
                                   <div key={c.id} className="flex gap-2">
                                     <button onClick={() => navigate(`/user/${c.user_id}`)} className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
                                       {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
                                         <span className="text-[10px] text-primary font-bold">{c.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
                                     </button>
-                                    <div className="bg-secondary/60 rounded-2xl px-3 py-1.5 flex-1">
-                                      <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-xs font-bold text-foreground hover:underline">
+                                    <div className="bg-secondary rounded-2xl px-3 py-2 flex-1">
+                                      <button onClick={() => navigate(`/user/${c.user_id}`)} className="text-xs font-bold text-foreground hover:underline block">
                                         {c.user?.display_name || "User"}
                                       </button>
-                                      <p className="text-xs text-foreground/80">{c.content}</p>
+                                      <p className="text-sm text-foreground mt-0.5 break-words">{c.content}</p>
+                                      <p className="text-[10px] text-muted-foreground mt-1">{timeAgo(c.created_at)}</p>
                                     </div>
                                   </div>
                                 ))}
