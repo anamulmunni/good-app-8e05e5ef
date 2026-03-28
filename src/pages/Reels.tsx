@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Play, Search, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getBangladeshExternalVideos, type ExternalReelVideo, markReelsSeen } from "@/lib/feed-api";
 
@@ -18,6 +17,7 @@ type VideoItem = {
 
 const CHIPS = [
   "সব",
+  "All",
   "Bangla Natok",
   "Bangla Song",
   "Funny Video",
@@ -70,33 +70,9 @@ export default function Reels() {
     if (user) markReelsSeen(user.id);
   }, [user]);
 
-  const { data: uploadedVideos = [] } = useQuery({
-    queryKey: ["uploaded-videos"],
-    queryFn: async () => {
-      const { data: posts } = await (supabase.from("posts").select("id, content, video_url, user_id, created_at") as any)
-        .not("video_url", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(60);
-      if (!posts?.length) return [] as VideoItem[];
-
-      const uids = [...new Set(posts.map((p: any) => p.user_id))];
-      const { data: users } = await (supabase.from("users").select("id, display_name") as any).in("id", uids);
-      const um = new Map((users || []).map((u: any) => [u.id, u.display_name || "User"]));
-
-      return posts.map((p: any) => ({
-        id: p.id,
-        title: p.content || "Uploaded video",
-        video_url: p.video_url,
-        creator: um.get(p.user_id) || "User",
-        isExternal: false,
-      })) as VideoItem[];
-    },
-    enabled: !!user,
-  });
-
   const activeQuery = useMemo(() => {
     if (searchQuery.trim()) return searchQuery.trim();
-    if (selectedChip !== "সব") return selectedChip;
+    if (selectedChip !== "সব" && selectedChip !== "All") return selectedChip;
     return "";
   }, [searchQuery, selectedChip]);
 
@@ -157,7 +133,7 @@ export default function Reels() {
   }, [hasMore, loadMore]);
 
   const allVideos = useMemo<VideoItem[]>(() => {
-    const ext: VideoItem[] = extVideos.map((v) => ({
+    return extVideos.map((v) => ({
       id: v.id,
       title: v.title,
       video_url: v.video_url,
@@ -166,8 +142,7 @@ export default function Reels() {
       duration: v.duration,
       isExternal: true,
     }));
-    return activeQuery ? ext : [...uploadedVideos, ...ext];
-  }, [extVideos, uploadedVideos, activeQuery]);
+  }, [extVideos]);
 
   const handleSearch = useCallback(() => {
     const q = searchInput.trim();
@@ -202,7 +177,7 @@ export default function Reels() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                placeholder="Search videos..."
+                placeholder="Search any video/song..."
                 className="w-full h-9 rounded-full bg-secondary px-4 pr-9 text-sm border border-border outline-none placeholder:text-muted-foreground"
               />
               {searchInput && (
@@ -269,7 +244,7 @@ export default function Reels() {
         <div className="px-2 py-2 space-y-3">
           {allVideos.length === 0 && !loading && (
             <div className="py-16 text-center text-muted-foreground text-sm">
-              {activeQuery ? `"${activeQuery}" — কোনো ভিডিও পাওয়া যায়নি` : "ভিডিও লোড হচ্ছে..."}
+              {activeQuery ? `"${activeQuery}" — কিছু পাইনি, অন্যভাবে সার্চ করুন` : "ভিডিও লোড হচ্ছে..."}
             </div>
           )}
 
@@ -286,7 +261,7 @@ export default function Reels() {
                 ) : null}
                 {selectedVideo?.id === video.id && (
                   <div className="absolute inset-0 bg-primary/20 grid place-items-center">
-                    <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded">Now Playing</span>
+                    <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded">Playing Now</span>
                   </div>
                 )}
               </div>
