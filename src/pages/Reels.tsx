@@ -71,6 +71,7 @@ export default function Reels() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
+  const [iframeReady, setIframeReady] = useState<Record<string, boolean>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
@@ -78,6 +79,7 @@ export default function Reels() {
   const lastTapRef = useRef<Record<string, number>>({});
   const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const touchStartY = useRef(0);
+  const extLoadingRef = useRef(false);
 
   useEffect(() => { if (!isLoading && !user) navigate("/"); }, [user, isLoading, navigate]);
   useEffect(() => { if (user) markReelsSeen(user.id); }, [user]);
@@ -97,14 +99,9 @@ export default function Reels() {
     enabled: !!user,
   });
 
-  useEffect(() => {
-    if (!user || initialLoaded) return;
-    setInitialLoaded(true);
-    loadMoreExternal();
-  }, [user, initialLoaded, loadMoreExternal]);
-
   const loadMoreExternal = useCallback(async () => {
-    if (extLoading) return;
+    if (extLoadingRef.current) return;
+    extLoadingRef.current = true;
     setExtLoading(true);
     try {
       const preferred = getPreferredCategories();
@@ -116,14 +113,22 @@ export default function Reels() {
       setExtHasMore(result.hasMore);
       setExtPage(p => p + 1);
     } catch {}
+    extLoadingRef.current = false;
     setExtLoading(false);
-  }, [extPage, extLoading, activeSearch]);
+  }, [extPage, activeSearch]);
+
+  useEffect(() => {
+    if (!user || initialLoaded) return;
+    setInitialLoaded(true);
+    loadMoreExternal();
+  }, [user, initialLoaded, loadMoreExternal]);
 
   // Reset and search when user submits search
   const handleSearch = useCallback(() => {
     const q = searchInput.trim();
     setActiveSearch(q);
     setExtVideos([]);
+    setIframeReady({});
     setExtPage(1);
     setExtHasMore(true);
     setCurrentIndex(0);
@@ -134,10 +139,10 @@ export default function Reels() {
   // Load when search changes
   useEffect(() => {
     if (!user || !initialLoaded) return;
-    if (extVideos.length === 0 && extHasMore && !extLoading) {
+    if (extVideos.length === 0 && extHasMore && !extLoadingRef.current) {
       loadMoreExternal();
     }
-  }, [activeSearch, extVideos.length, extHasMore, extLoading, user, initialLoaded, loadMoreExternal]);
+  }, [activeSearch, extVideos.length, extHasMore, user, initialLoaded, loadMoreExternal]);
 
   const allReels = useMemo<ReelItem[]>(() => {
     const ur: ReelItem[] = activeSearch ? [] : reels.map(r => ({
