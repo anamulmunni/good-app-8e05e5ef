@@ -20,6 +20,19 @@ export type Message = {
   created_at: string | null;
 };
 
+const conversationActivityTs = (convo: Conversation) => {
+  const base = convo.last_message_at || convo.created_at;
+  if (!base) return 0;
+  const parsed = new Date(base).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const conversationPairKey = (convo: Conversation) => {
+  const a = Math.min(convo.participant_1, convo.participant_2);
+  const b = Math.max(convo.participant_1, convo.participant_2);
+  return `${a}:${b}`;
+};
+
 // Get or create a conversation between two users
 export async function getOrCreateConversation(userId1: number, userId2: number): Promise<Conversation> {
   const p1 = Math.min(userId1, userId2);
@@ -54,14 +67,19 @@ export async function getUserConversations(userId: number): Promise<Conversation
     .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
     .order("last_message_at", { ascending: false });
 
-  // Client-side sort to guarantee recency order
   const results = data || [];
-  results.sort((a: any, b: any) => {
-    const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-    const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
-    return tb - ta;
-  });
-  return results;
+
+  // Keep only the most recent conversation per user pair (guards against duplicate rows)
+  const latestByPair = new Map<string, Conversation>();
+  for (const convo of results as Conversation[]) {
+    const key = conversationPairKey(convo);
+    const prev = latestByPair.get(key);
+    if (!prev || conversationActivityTs(convo) > conversationActivityTs(prev)) {
+      latestByPair.set(key, convo);
+    }
+  }
+
+  return Array.from(latestByPair.values()).sort((a, b) => conversationActivityTs(b) - conversationActivityTs(a));
 }
 
 // Get messages for a conversation
@@ -92,13 +110,20 @@ export async function sendMessage(conversationId: string, senderId: number, cont
 
   if (error) throw error;
 
-  await (supabase
-    .from("conversations")
-    .update({
-      last_message: messageType === "text" ? content : (messageType === "image" ? "📷 ছবি" : "🎤 ভয়েস"),
-      last_message_at: new Date().toISOString(),
-    } as any)
-    .eq("id", conversationId) as any).catch(() => {});
+  const latestAt = data?.created_at || new Date().toISOString();
+  const latestPreview = messageType === "text" ? content : (messageType === "image" ? "📷 ছবি" : "🎤 ভয়েস");
+
+  try {
+    await (supabase
+      .from("conversations")
+      .update({
+        last_message: latestPreview,
+        last_message_at: latestAt,
+      } as any)
+      .eq("id", conversationId) as any);
+  } catch {
+    // keep message delivery successful even if preview update fails temporarily
+  }
 
   return data;
 }

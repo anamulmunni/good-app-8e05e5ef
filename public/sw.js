@@ -6,6 +6,8 @@ let supabaseUrl = "";
 let supabaseKey = "";
 let currentUserId = null;
 let lastCheckedAt = null;
+let lastNotifiedCallId = null;
+let lastNotifiedMessageId = null;
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -50,12 +52,26 @@ self.addEventListener("message", (event) => {
     supabaseKey = event.data.supabaseKey || "";
     currentUserId = event.data.userId || null;
     lastCheckedAt = new Date().toISOString();
+    pollForCalls();
     startPolling();
   }
 
   // Stop polling
   if (event.data?.type === "STOP_POLL") {
     stopPolling();
+  }
+});
+
+// Best-effort background wakeups (supported browsers/PWA only)
+self.addEventListener("periodicsync", (event) => {
+  if (event.tag === "poll-calls") {
+    event.waitUntil(pollForCalls());
+  }
+});
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === "poll-calls-once") {
+    event.waitUntil(pollForCalls());
   }
 });
 
@@ -99,6 +115,7 @@ async function pollForCalls() {
 
     if (data && data.length > 0) {
       const signal = data[0];
+      if (signal.id && signal.id === lastNotifiedCallId) return;
       // Check if signal is recent (within 30 seconds)
       const age = Date.now() - new Date(signal.created_at).getTime();
       if (age > 30000) return;
@@ -127,6 +144,7 @@ async function pollForCalls() {
         requireInteraction: true,
         data: { url: "/" },
       });
+      lastNotifiedCallId = signal.id || null;
     }
 
     // Also check for new messages
@@ -141,6 +159,7 @@ async function pollForCalls() {
       const msgs = await msgRes.json();
       if (msgs && msgs.length > 0) {
         const msg = msgs[0];
+        if (msg.id && msg.id === lastNotifiedMessageId) return;
         const preview = msg.message_type === "text" ? (msg.content || "New message") : (msg.message_type === "image" ? "📷 Photo" : "🎤 Voice");
         
         // Get sender name
@@ -163,6 +182,7 @@ async function pollForCalls() {
           vibrate: [200, 100, 200],
           data: { url: "/chat" },
         });
+        lastNotifiedMessageId = msg.id || null;
       }
     }
   } catch {

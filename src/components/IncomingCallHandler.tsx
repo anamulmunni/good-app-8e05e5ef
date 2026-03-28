@@ -94,17 +94,38 @@ export default function IncomingCallHandler() {
   useEffect(() => {
     if (!user) return;
 
-    // Register SW background polling for calls/messages
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
-      navigator.serviceWorker.controller.postMessage({
-        type: "REGISTER_POLL",
-        supabaseUrl,
-        supabaseKey,
-        userId: user.id,
-      });
-    }
+    const registerBackgroundPolling = async () => {
+      if (!("serviceWorker" in navigator)) return;
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const worker = navigator.serviceWorker.controller || registration.active || registration.waiting;
+        if (!worker) return;
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+        worker.postMessage({
+          type: "REGISTER_POLL",
+          supabaseUrl,
+          supabaseKey,
+          userId: user.id,
+        });
+
+        // Best-effort background wakeups (supported browsers only)
+        const periodicSync = (registration as any).periodicSync;
+        if (periodicSync?.register) {
+          periodicSync.register("poll-calls", { minInterval: 15000 }).catch(() => {});
+        }
+        const bgSync = (registration as any).sync;
+        if (bgSync?.register) {
+          bgSync.register("poll-calls-once").catch(() => {});
+        }
+      } catch {
+        // no-op
+      }
+    };
+
+    registerBackgroundPolling();
 
     const handleIncomingCallRequest = async (signal: any) => {
       const inCallRoute = window.location.pathname.startsWith("/call/");
@@ -203,6 +224,10 @@ export default function IncomingCallHandler() {
       if (document.visibilityState === "visible") {
         recoverPendingIncomingCall().catch(() => {});
       }
+
+      if (document.visibilityState === "hidden") {
+        registerBackgroundPolling();
+      }
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -213,6 +238,11 @@ export default function IncomingCallHandler() {
       supabase.removeChannel(channel);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onVisibilityChange);
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.controller?.postMessage({ type: "STOP_POLL" });
+      }
+
       stopRingtone();
       clearRemoteAudio();
       clearInterval(durationTimerRef.current);
