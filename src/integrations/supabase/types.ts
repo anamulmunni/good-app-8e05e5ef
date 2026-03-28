@@ -56,6 +56,35 @@ export type Database = {
           },
         ]
       }
+      comment_likes: {
+        Row: {
+          comment_id: string
+          created_at: string | null
+          id: string
+          user_id: number
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string | null
+          id?: string
+          user_id: number
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string | null
+          id?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string | null
@@ -170,11 +199,45 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          from_user_id: number | null
+          id: string
+          is_read: boolean
+          reference_id: string | null
+          type: string
+          user_id: number
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          from_user_id?: number | null
+          id?: string
+          is_read?: boolean
+          reference_id?: string | null
+          type?: string
+          user_id: number
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          from_user_id?: number | null
+          id?: string
+          is_read?: boolean
+          reference_id?: string | null
+          type?: string
+          user_id?: number
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           content: string
           created_at: string | null
           id: string
+          parent_comment_id: string | null
           post_id: string
           user_id: number
         }
@@ -182,6 +245,7 @@ export type Database = {
           content: string
           created_at?: string | null
           id?: string
+          parent_comment_id?: string | null
           post_id: string
           user_id: number
         }
@@ -189,10 +253,18 @@ export type Database = {
           content?: string
           created_at?: string | null
           id?: string
+          parent_comment_id?: string | null
           post_id?: string
           user_id?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "post_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "post_comments_post_id_fkey"
             columns: ["post_id"]
@@ -603,6 +675,7 @@ export type Database = {
           id: number
           is_blocked: boolean
           key_count: number
+          last_reels_seen_at: string | null
           online_at: string | null
           payment_scheduled_at: string | null
           payment_status: string
@@ -620,6 +693,7 @@ export type Database = {
           id?: number
           is_blocked?: boolean
           key_count?: number
+          last_reels_seen_at?: string | null
           online_at?: string | null
           payment_scheduled_at?: string | null
           payment_status?: string
@@ -637,6 +711,7 @@ export type Database = {
           id?: number
           is_blocked?: boolean
           key_count?: number
+          last_reels_seen_at?: string | null
           online_at?: string | null
           payment_scheduled_at?: string | null
           payment_status?: string
