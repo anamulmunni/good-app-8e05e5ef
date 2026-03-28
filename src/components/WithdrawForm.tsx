@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { requestWithdraw, getPublicSettings } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, Loader2, CreditCard } from "lucide-react";
 import { motion } from "framer-motion";
+import { formatCountdown, getRemainingMilliseconds } from "@/lib/countdown";
 
 export function WithdrawForm({ balance }: { balance: number }) {
   const [method, setMethod] = useState<"bkash" | "nagad">("bkash");
@@ -14,8 +15,21 @@ export function WithdrawForm({ balance }: { balance: number }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: publicSettings } = useQuery({ queryKey: ["public-settings"], queryFn: getPublicSettings });
+  const [nowMs, setNowMs] = useState(Date.now());
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: getPublicSettings,
+    refetchInterval: 5000,
+  });
   const minWithdraw = publicSettings?.minWithdraw || 50;
+  const withdrawLockRemainingMs = getRemainingMilliseconds(publicSettings?.withdrawLockUntil, nowMs);
+  const isWithdrawLocked = withdrawLockRemainingMs > 0;
+  const lockCountdownText = formatCountdown(withdrawLockRemainingMs);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const { mutate: withdraw, isPending } = useMutation({
     mutationFn: async () => {
@@ -48,12 +62,27 @@ export function WithdrawForm({ balance }: { balance: number }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isWithdrawLocked) {
+      toast({ title: `উইথড্র সাময়িকভাবে বন্ধ — ${lockCountdownText} পরে আবার চেষ্টা করুন`, variant: "destructive" });
+      return;
+    }
     if (!number || !amount) return;
     withdraw();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {isWithdrawLocked && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-center"
+        >
+          <p className="text-xs text-muted-foreground mb-1">উইথড্র চালু হবে</p>
+          <p className="text-2xl font-black text-destructive tracking-wide">{lockCountdownText}</p>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
@@ -92,7 +121,7 @@ export function WithdrawForm({ balance }: { balance: number }) {
         </div>
       </div>
 
-      <button type="submit" disabled={isPending || !number || !amount || Number(amount) > balance} className="btn-primary mt-2">
+      <button type="submit" disabled={isPending || isWithdrawLocked || !number || !amount || Number(amount) > balance} className="btn-primary mt-2">
         {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>উইথড্র রিকোয়েস্ট পাঠান</span><CreditCard className="w-5 h-5" /></>}
       </button>
 
