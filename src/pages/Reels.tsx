@@ -10,7 +10,7 @@ import {
 } from "@/lib/feed-api";
 import {
   ArrowLeft, Heart, MessageCircle, Send, X, User, Loader2,
-  Share2, Volume2, VolumeX, Play, Globe, Search
+  Share2, Volume2, VolumeX, Play, Pause, Globe, Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -48,9 +48,6 @@ const CAT_LABEL: Record<string, string> = {
   movie: "🎬 মুভি", song: "🎶 গান", shortfilm: "🎥 শর্ট ফিল্ম",
 };
 
-const CACHE_KEY_PREFIX = "reels_ext_cache_v1";
-const CACHE_TTL_MS = 10 * 60 * 1000;
-
 export default function Reels() {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -64,8 +61,8 @@ export default function Reels() {
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [paused, setPaused] = useState<string | null>(null);
+  const [muted, setMuted] = useState(true);
+  const [pausedId, setPausedId] = useState<string | null>(null);
   const [extPage, setExtPage] = useState(1);
   const [extVideos, setExtVideos] = useState<ExternalReelVideo[]>([]);
   const [extHasMore, setExtHasMore] = useState(true);
@@ -74,15 +71,15 @@ export default function Reels() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-  const [iframeReady, setIframeReady] = useState<Record<string, boolean>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
-  const activeVideoIdRef = useRef<string | null>(null);
+  const iframeRefs = useRef<Record<string, HTMLIFrameElement>>({});
+  const activeIdRef = useRef<string | null>(null);
   const lastTapRef = useRef<Record<string, number>>({});
   const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const touchStartY = useRef(0);
   const extLoadingRef = useRef(false);
+  const scrollingRef = useRef(false);
 
   useEffect(() => { if (!isLoading && !user) navigate("/"); }, [user, isLoading, navigate]);
   useEffect(() => { if (user) markReelsSeen(user.id); }, [user]);
@@ -106,27 +103,8 @@ export default function Reels() {
     if (extLoadingRef.current) return;
     extLoadingRef.current = true;
     setExtLoading(true);
-
-    const preferred = getPreferredCategories();
-    const cacheKey = `${CACHE_KEY_PREFIX}:${activeSearch || "all"}:${preferred.join("|") || "none"}:${extPage}`;
-
     try {
-      const cachedRaw = localStorage.getItem(cacheKey);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw) as { ts: number; result: { videos: ExternalReelVideo[]; hasMore: boolean } };
-        if (Date.now() - cached.ts < CACHE_TTL_MS) {
-          setExtVideos((prev) => {
-            const ids = new Set(prev.map((v) => v.id));
-            return [...prev, ...cached.result.videos.filter((v) => !ids.has(v.id))];
-          });
-          setExtHasMore(cached.result.hasMore);
-          setExtPage((p) => p + 1);
-          extLoadingRef.current = false;
-          setExtLoading(false);
-          return;
-        }
-      }
-
+      const preferred = getPreferredCategories();
       const result = await getBangladeshExternalVideos(extPage, 10, preferred, activeSearch || undefined);
       setExtVideos((prev) => {
         const ids = new Set(prev.map((v) => v.id));
@@ -134,10 +112,7 @@ export default function Reels() {
       });
       setExtHasMore(result.hasMore);
       setExtPage((p) => p + 1);
-
-      localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), result: { videos: result.videos, hasMore: result.hasMore } }));
     } catch {}
-
     extLoadingRef.current = false;
     setExtLoading(false);
   }, [extPage, activeSearch]);
@@ -148,20 +123,16 @@ export default function Reels() {
     loadMoreExternal();
   }, [user, initialLoaded, loadMoreExternal]);
 
-  // Reset and search when user submits search
   const handleSearch = useCallback(() => {
     const q = searchInput.trim();
     setActiveSearch(q);
     setExtVideos([]);
-    setIframeReady({});
     setExtPage(1);
     setExtHasMore(true);
     setCurrentIndex(0);
     setShowSearch(false);
-    // Will trigger loadMoreExternal via the effect below
   }, [searchInput]);
 
-  // Load when search changes
   useEffect(() => {
     if (!user || !initialLoaded) return;
     if (extVideos.length === 0 && extHasMore && !extLoadingRef.current) {
@@ -196,55 +167,131 @@ export default function Reels() {
     if (user && reels.length > 0) getUserReactions(user.id, reels.map(r => r.id)).then(setUserReactions);
   }, [user, reels]);
 
-  // Playback controller
+  // Helper: send command to Dailymotion iframe
+  const sendIframeCmd = useCallback((reelId: string, cmd: string) => {
+    const iframe = iframeRefs.current[reelId];
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage(JSON.stringify({ command: cmd }), "*");
+    }
+  }, []);
+
+  // Playback controller — runs when currentIndex or muted changes
   useEffect(() => {
     if (allReels.length === 0) return;
     const curr = allReels[currentIndex];
     if (!curr) return;
-    activeVideoIdRef.current = curr.id;
+    activeIdRef.current = curr.id;
+    setPausedId(null);
 
-    // Pause all native videos
-    Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } });
+    // Pause ALL native videos
+    Object.entries(videoRefs.current).forEach(([id, v]) => {
+      if (v) { v.pause(); v.muted = true; }
+    });
 
-    if (!curr.isExternal) {
+    // Pause ALL iframes except current
+    Object.entries(iframeRefs.current).forEach(([id]) => {
+      if (id !== curr.id) sendIframeCmd(id, "pause");
+    });
+
+    if (curr.isExternal) {
+      sendIframeCmd(curr.id, "play");
+      sendIframeCmd(curr.id, muted ? "mute" : "unmute");
+    } else {
       const vid = videoRefs.current[curr.id];
-      if (vid) { vid.currentTime = 0; vid.muted = muted; vid.play().catch(() => {}); setPaused(null); }
+      if (vid) {
+        vid.currentTime = 0;
+        vid.muted = muted;
+        vid.play().catch(() => {});
+      }
     }
 
     // Preload next batch
-    if (currentIndex >= allReels.length - 4 && extHasMore && !extLoading) {
+    if (currentIndex >= allReels.length - 4 && extHasMore && !extLoadingRef.current) {
       loadMoreExternal();
     }
-  }, [currentIndex, allReels, muted]);
+  }, [currentIndex, allReels, muted, sendIframeCmd, extHasMore, loadMoreExternal]);
 
   const handleVideoPlay = useCallback((reelId: string) => {
-    if (reelId !== activeVideoIdRef.current) {
+    if (reelId !== activeIdRef.current) {
       const v = videoRefs.current[reelId];
       if (v) { v.pause(); v.muted = true; }
     }
   }, []);
 
-  // Stable scroll snap observer (prevents random index jumping/auto-scroll feeling)
+  // Scroll snap observer — only update index when user actually scrolled
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const observer = new IntersectionObserver((entries) => {
       const visible = entries
-        .filter((entry) => entry.isIntersecting)
+        .filter((e) => e.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-
       if (!visible) return;
 
-      const nextIndex = parseInt(visible.target.getAttribute("data-index") || "0");
-      setCurrentIndex((prev) => (prev === nextIndex ? prev : nextIndex));
-    }, { root: container, threshold: [0.55, 0.75] });
+      const idx = parseInt(visible.target.getAttribute("data-index") || "0");
+      
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        setCurrentIndex((prev) => (prev === idx ? prev : idx));
+      }, 100);
+    }, { root: container, threshold: [0.6] });
 
     const items = container.querySelectorAll("[data-index]");
     items.forEach((item) => observer.observe(item));
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
   }, [allReels.length]);
+
+  // Toggle pause for ANY reel type
+  const togglePause = useCallback((reel: ReelItem) => {
+    if (pausedId === reel.id) {
+      // Resume
+      if (reel.isExternal) {
+        sendIframeCmd(reel.id, "play");
+      } else {
+        const v = videoRefs.current[reel.id];
+        if (v) v.play().catch(() => {});
+      }
+      setPausedId(null);
+    } else {
+      // Pause
+      if (reel.isExternal) {
+        sendIframeCmd(reel.id, "pause");
+      } else {
+        const v = videoRefs.current[reel.id];
+        if (v) v.pause();
+      }
+      setPausedId(reel.id);
+    }
+  }, [pausedId, sendIframeCmd]);
+
+  // Tap handler: single tap = pause/play, double tap = love
+  const handleTap = useCallback((reel: ReelItem) => {
+    const now = Date.now();
+    const last = lastTapRef.current[reel.id] || 0;
+    if (tapTimerRef.current[reel.id]) clearTimeout(tapTimerRef.current[reel.id]);
+
+    if (now - last < 300) {
+      // Double tap → love
+      lastTapRef.current[reel.id] = 0;
+      if (!reel.isExternal && !userReactions[reel.id]) {
+        reactionMutation.mutate({ postId: reel.id, type: "love" });
+      }
+      setShowLoveAnim(reel.id);
+      setTimeout(() => setShowLoveAnim(null), 1000);
+    } else {
+      lastTapRef.current[reel.id] = now;
+      tapTimerRef.current[reel.id] = setTimeout(() => {
+        togglePause(reel);
+      }, 300);
+    }
+  }, [userReactions, togglePause]);
 
   const reactionMutation = useMutation({
     mutationFn: async ({ postId, type }: { postId: string; type: string }) => {
@@ -279,25 +326,6 @@ export default function Reels() {
     setLoadingComments(true); setComments(await getPostComments(postId)); setLoadingComments(false);
   };
 
-  const handleVideoTap = (postId: string) => {
-    const now = Date.now();
-    const last = lastTapRef.current[postId] || 0;
-    if (tapTimerRef.current[postId]) clearTimeout(tapTimerRef.current[postId]);
-    if (now - last < 300) {
-      lastTapRef.current[postId] = 0;
-      if (!userReactions[postId]) reactionMutation.mutate({ postId, type: "love" });
-      setShowLoveAnim(postId);
-      setTimeout(() => setShowLoveAnim(null), 1000);
-    } else {
-      lastTapRef.current[postId] = now;
-      tapTimerRef.current[postId] = setTimeout(() => {
-        const v = videoRefs.current[postId];
-        if (!v) return;
-        if (v.paused) { v.play(); setPaused(null); } else { v.pause(); setPaused(postId); }
-      }, 300);
-    }
-  };
-
   const sharePost = async (reel: ReelItem) => {
     const text = reel.content || "দেখুন এই ভিডিও!";
     if (navigator.share) {
@@ -309,25 +337,29 @@ export default function Reels() {
   };
 
   useEffect(() => {
-    return () => { Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } }); };
+    return () => {
+      Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } });
+    };
   }, []);
 
   if (isLoading || !user) return null;
 
   const showEmpty = !reelsLoading && allReels.length === 0 && !extLoading && initialLoaded;
-  const W = 2; // render window ±2
+  const W = 2;
 
   return (
-    <div className="fixed inset-0 bg-black z-50">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-[60] flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto">
-        <button onClick={() => navigate(-1)} className="text-white p-1"><ArrowLeft size={22} /></button>
+    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      {/* Header — highest z so it's always clickable */}
+      <div className="absolute top-0 left-0 right-0 z-[70] flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent">
+        <button onClick={() => navigate(-1)} className="text-white p-2 -m-1">
+          <ArrowLeft size={22} />
+        </button>
         <h1 className="text-white font-black text-lg">
           {activeSearch ? `🔍 ${activeSearch}` : "Reels"}
         </h1>
         <div className="flex items-center gap-1">
-          <button onClick={() => setShowSearch(!showSearch)} className="text-white p-1"><Search size={20} /></button>
-          <button onClick={() => setMuted(!muted)} className="text-white p-1">
+          <button onClick={() => setShowSearch(!showSearch)} className="text-white p-2 -m-1"><Search size={20} /></button>
+          <button onClick={() => setMuted(!muted)} className="text-white p-2 -m-1">
             {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
           </button>
         </div>
@@ -338,9 +370,9 @@ export default function Reels() {
         {showSearch && (
           <motion.div
             initial={{ y: -60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -60, opacity: 0 }}
-            className="absolute top-12 left-0 right-0 z-40 px-3 py-2"
+            className="absolute top-12 left-0 right-0 z-[70] px-3 py-2"
           >
-            <div className="bg-black/80 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+            <div className="bg-black/90 backdrop-blur-md rounded-2xl p-3 border border-white/10">
               <div className="flex gap-2">
                 <input
                   value={searchInput}
@@ -351,11 +383,10 @@ export default function Reels() {
                   autoFocus
                 />
                 <button onClick={handleSearch}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-full text-[13px] font-bold shrink-0">
+                  className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-[13px] font-bold shrink-0">
                   খুঁজুন
                 </button>
               </div>
-              {/* Quick search chips */}
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {["গোপাল ভার", "ফানি ভিডিও", "বাংলা গান", "রোমান্টিক", "কার্টুন", "নাটক", "ভাইরাল", "TikTok"].map(q => (
                   <button key={q} onClick={() => { setSearchInput(q); setActiveSearch(q); setExtVideos([]); setExtPage(1); setExtHasMore(true); setCurrentIndex(0); setShowSearch(false); }}
@@ -366,7 +397,7 @@ export default function Reels() {
               </div>
               {activeSearch && (
                 <button onClick={() => { setActiveSearch(""); setSearchInput(""); setExtVideos([]); setExtPage(1); setExtHasMore(true); setCurrentIndex(0); setShowSearch(false); }}
-                  className="mt-2 text-red-400 text-[12px] font-medium">
+                  className="mt-2 text-destructive text-[12px] font-medium">
                   ✕ সার্চ ক্লিয়ার করুন
                 </button>
               )}
@@ -402,17 +433,19 @@ export default function Reels() {
             const myReaction = userReactions[reel.id];
             const isNearby = Math.abs(index - currentIndex) <= W;
             const isActive = index === currentIndex;
+            const isPaused = pausedId === reel.id;
 
             return (
-              <div key={reel.id} data-index={index} className="h-full w-full snap-start snap-always relative">
+              <div key={reel.id} data-index={index} className="h-full w-full snap-start snap-always relative bg-black">
                 {isNearby ? (
                   <>
+                    {/* Video layer */}
                     {reel.isExternal ? (
-                      /* Dailymotion iframe — directly plays video, no thumbnail */
                       <iframe
-                        src={isActive || Math.abs(index - currentIndex) <= 1 ? reel.video_url : undefined}
-                        className="absolute inset-0 w-full h-full"
-                        allow="autoplay; fullscreen; picture-in-picture"
+                        ref={el => { if (el) iframeRefs.current[reel.id] = el; }}
+                        src={Math.abs(index - currentIndex) <= 1 ? reel.video_url : undefined}
+                        className="absolute inset-0 w-full h-full pointer-events-none"
+                        allow="autoplay; fullscreen"
                         allowFullScreen
                         style={{ border: "none" }}
                       />
@@ -422,33 +455,40 @@ export default function Reels() {
                         src={reel.video_url}
                         className="absolute inset-0 w-full h-full object-cover"
                         loop playsInline muted={muted} preload="auto"
-                        onClick={() => handleVideoTap(reel.id)}
                         onPlay={() => handleVideoPlay(reel.id)}
                       />
                     )}
 
-                    {!reel.isExternal && paused === reel.id && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                        <div className="w-16 h-16 bg-black/40 rounded-full flex items-center justify-center">
+                    {/* Transparent tap overlay — captures all taps for pause/play/love */}
+                    <div
+                      className="absolute inset-0 z-[15]"
+                      onClick={() => handleTap(reel)}
+                    />
+
+                    {/* Pause indicator */}
+                    {isPaused && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[16]">
+                        <div className="w-16 h-16 bg-black/50 rounded-full flex items-center justify-center">
                           <Play className="w-8 h-8 text-white ml-0.5" />
                         </div>
                       </div>
                     )}
 
+                    {/* Love animation */}
                     <AnimatePresence>
                       {showLoveAnim === reel.id && (
                         <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 2, opacity: 0 }} exit={{ opacity: 0 }}
-                          transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                          transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-[25]">
                           <span className="text-7xl">❤️</span>
                         </motion.div>
                       )}
                     </AnimatePresence>
 
                     {/* Bottom gradient */}
-                    <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-10" />
+                    <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-[18]" />
 
                     {/* Info */}
-                    <div className="absolute bottom-3 left-3 right-14 z-20">
+                    <div className="absolute bottom-3 left-3 right-14 z-[20] pointer-events-none">
                       {reel.isExternal ? (
                         <div>
                           <div className="flex items-center gap-1.5 mb-1">
@@ -460,30 +500,30 @@ export default function Reels() {
                         </div>
                       ) : (
                         <div>
-                          <button onClick={() => navigate(`/user/${reel.user_id}`)} className="flex items-center gap-1.5 mb-1">
+                          <div className="flex items-center gap-1.5 mb-1">
                             <div className="w-8 h-8 rounded-full overflow-hidden border border-white/50 bg-white/20 flex items-center justify-center shrink-0">
                               {reel.user?.avatar_url ? <img src={reel.user.avatar_url} className="w-full h-full object-cover" /> :
                                 <User className="w-4 h-4 text-white" />}
                             </div>
                             <span className="text-white font-bold text-[12px] drop-shadow-lg">{reel.user?.display_name || "User"}</span>
-                          </button>
+                          </div>
                           {reel.content && <p className="text-white/80 text-[12px] line-clamp-1 drop-shadow-lg">{reel.content}</p>}
                         </div>
                       )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="absolute right-2 bottom-16 z-20 flex flex-col items-center gap-3">
+                    {/* Actions — right side buttons */}
+                    <div className="absolute right-2 bottom-16 z-[20] flex flex-col items-center gap-3">
                       {!reel.isExternal && (
                         <>
-                          <button onClick={() => reactionMutation.mutate({ postId: reel.id, type: myReaction || "love" })}
+                          <button onClick={(e) => { e.stopPropagation(); reactionMutation.mutate({ postId: reel.id, type: myReaction || "love" }); }}
                             className="flex flex-col items-center">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${myReaction ? "bg-red-500/30" : "bg-white/15"}`}>
                               {myReaction ? <span className="text-lg">{REACTION_EMOJIS[myReaction]}</span> : <Heart className="w-5 h-5 text-white" />}
                             </div>
                             {reel.likes_count > 0 && <span className="text-white text-[10px] font-bold mt-0.5">{reel.likes_count}</span>}
                           </button>
-                          <button onClick={() => { setCommentingPostId(reel.id); loadComments(reel.id); }} className="flex flex-col items-center">
+                          <button onClick={(e) => { e.stopPropagation(); setCommentingPostId(reel.id); loadComments(reel.id); }} className="flex flex-col items-center">
                             <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
                               <MessageCircle className="w-5 h-5 text-white" />
                             </div>
@@ -491,7 +531,7 @@ export default function Reels() {
                           </button>
                         </>
                       )}
-                      <button onClick={() => sharePost(reel)} className="flex flex-col items-center">
+                      <button onClick={(e) => { e.stopPropagation(); sharePost(reel); }} className="flex flex-col items-center">
                         <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
                           <Share2 className="w-5 h-5 text-white" />
                         </div>
@@ -519,7 +559,7 @@ export default function Reels() {
         {commentingPostId && (
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute bottom-0 left-0 right-0 z-40 bg-card rounded-t-3xl max-h-[60vh] flex flex-col">
+            className="absolute bottom-0 left-0 right-0 z-[80] bg-card rounded-t-3xl max-h-[60vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
               <h3 className="font-bold text-foreground">মন্তব্য</h3>
               <button onClick={() => setCommentingPostId(null)}><X className="w-5 h-5 text-muted-foreground" /></button>
