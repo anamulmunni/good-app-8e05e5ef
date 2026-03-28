@@ -568,6 +568,7 @@ export type Database = {
           auth_id: string | null
           avatar_url: string | null
           balance: number
+          cover_url: string | null
           created_at: string | null
           display_name: string | null
           email: string | null
@@ -584,6 +585,7 @@ export type Database = {
           auth_id?: string | null
           avatar_url?: string | null
           balance?: number
+          cover_url?: string | null
           created_at?: string | null
           display_name?: string | null
           email?: string | null
@@ -600,6 +602,7 @@ export type Database = {
           auth_id?: string | null
           avatar_url?: string | null
           balance?: number
+          cover_url?: string | null
           created_at?: string | null
           display_name?: string | null
           email?: string | null

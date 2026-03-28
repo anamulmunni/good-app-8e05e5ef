@@ -20,7 +20,29 @@ export default function Profile() {
   const [savingName, setSavingName] = useState(false);
   const [showSentRequests, setShowSentRequests] = useState(false);
   const [showSubmittedBatches, setShowSubmittedBatches] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingCover(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const filePath = `cover-${user.id}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      await (supabase.from("users").update({ cover_url: urlData.publicUrl } as any).eq("id", user.id) as any);
+      await refreshUser();
+      toast({ title: "কভার ফটো আপডেট হয়েছে" });
+    } catch {
+      toast({ title: "আপলোড ব্যর্থ হয়েছে", variant: "destructive" });
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   const { data: sentRequests = [] } = useQuery({
     queryKey: ["user-sent-requests", user?.guest_id],
@@ -127,7 +149,19 @@ export default function Profile() {
       <main className="max-w-md mx-auto px-4 pt-8 space-y-6 relative z-10">
         {/* Avatar & Name Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl overflow-hidden">
-          <div className="h-24 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative" />
+          {/* Cover Photo */}
+          <div className="h-32 bg-gradient-to-br from-primary/30 via-[hsl(var(--purple))]/20 to-[hsl(var(--cyan))]/20 relative overflow-hidden group">
+            {(user as any).cover_url && (
+              <img src={(user as any).cover_url} alt="Cover" className="w-full h-full object-cover" />
+            )}
+            <button onClick={() => coverInputRef.current?.click()}
+              className="absolute bottom-2 right-2 bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+              style={{ opacity: 1 }}>
+              {uploadingCover ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Camera className="w-3 h-3" />}
+              কভার ফটো
+            </button>
+            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
+          </div>
           <div className="px-8 pb-8 -mt-12 text-center">
             <div className="relative inline-block mb-4">
               <button onClick={handleAvatarClick} disabled={uploading} className="relative group">

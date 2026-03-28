@@ -13,6 +13,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
 import { hasUserPosted } from "@/lib/feed-api";
 import { formatCountdown, getRemainingMilliseconds } from "@/lib/countdown";
+import { getUnreadCount } from "@/lib/chat-api";
+
+// Chat button with real-time unread badge
+function ChatButtonWithBadge({ userId, navigate }: { userId?: number; navigate: (path: string) => void }) {
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["unread-count"],
+    queryFn: () => getUnreadCount(userId!),
+    enabled: !!userId,
+    refetchInterval: 10000,
+  });
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.9 }}
+      onClick={() => navigate("/chat")}
+      className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] shadow-lg shadow-[hsl(var(--cyan))]/40 flex items-center justify-center"
+    >
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] animate-pulse opacity-40" />
+      <MessageCircle className="w-6 h-6 text-foreground relative z-10 fill-foreground/20" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] bg-destructive text-destructive-foreground text-[11px] font-black rounded-full flex items-center justify-center px-1 z-20 shadow-lg animate-pulse border-2 border-background">
+          {unreadCount > 99 ? "99+" : unreadCount}
+        </span>
+      )}
+    </motion.button>
+  );
+}
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
@@ -807,16 +835,8 @@ export default function Dashboard() {
           <Newspaper className="w-6 h-6 text-foreground" />
         </motion.button>
 
-        {/* Chat Button */}
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate("/chat")}
-          className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] shadow-lg shadow-[hsl(var(--cyan))]/40 flex items-center justify-center"
-        >
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[hsl(var(--cyan))] to-[hsl(var(--blue))] animate-pulse opacity-40" />
-          <MessageCircle className="w-6 h-6 text-foreground relative z-10 fill-foreground/20" />
-        </motion.button>
+        {/* Chat Button with unread badge */}
+        <ChatButtonWithBadge userId={user?.id} navigate={navigate} />
       </div>
     </div>
   );

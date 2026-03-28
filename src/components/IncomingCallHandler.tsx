@@ -73,9 +73,13 @@ export default function IncomingCallHandler() {
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
-        const audio = new Audio();
+        const audio = document.createElement("audio");
+        audio.autoplay = true;
+        (audio as any).playsInline = true;
+        audio.setAttribute("playsinline", "true");
         audio.srcObject = event.streams[0];
-        audio.play();
+        document.body.appendChild(audio);
+        audio.play().catch(() => {});
       };
 
       pc.onicecandidate = (event) => {
