@@ -42,6 +42,9 @@ export default function Chat() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
+  const recordingSecondsRef = useRef(0);
+  const shouldSendRecordingRef = useRef(true);
+  const holdRecordingActiveRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -259,13 +262,21 @@ export default function Chat() {
   };
 
   const startRecording = async () => {
+    if (isRecording || holdRecordingActiveRef.current) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       audioChunksRef.current = [];
+      shouldSendRecordingRef.current = true;
       recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+        const elapsed = recordingSecondsRef.current;
+
+        if (!shouldSendRecordingRef.current || elapsed < 1 || audioChunksRef.current.length === 0) {
+          return;
+        }
+
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const pendingId = `pending-voice-${Date.now()}`;
         setPendingMedia(prev => [...prev, { id: pendingId, previewUrl: "", type: "voice", status: "uploading" }]);
@@ -282,16 +293,62 @@ export default function Chat() {
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       setRecordingTime(0);
-      recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+      recordingSecondsRef.current = 0;
+      recordingTimerRef.current = setInterval(() => {
+        recordingSecondsRef.current += 1;
+        setRecordingTime(recordingSecondsRef.current);
+      }, 1000);
     } catch {
+      holdRecordingActiveRef.current = false;
       toast({ title: "মাইক্রোফোন access দিন", variant: "destructive" });
     }
   };
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+  const stopRecording = (shouldSend = true) => {
+    shouldSendRecordingRef.current = shouldSend;
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+
+    mediaRecorderRef.current = null;
+    holdRecordingActiveRef.current = false;
     setIsRecording(false);
     clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    recordingSecondsRef.current = 0;
+    setRecordingTime(0);
+  };
+
+  const handleHoldToRecordStart = async (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (messageText.trim()) return;
+    e.preventDefault();
+
+    if (holdRecordingActiveRef.current || isRecording) return;
+
+    holdRecordingActiveRef.current = true;
+    shouldSendRecordingRef.current = true;
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // no-op
+    }
+
+    await startRecording();
+  };
+
+  const handleHoldToRecordEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (!holdRecordingActiveRef.current && !isRecording) return;
+    stopRecording(true);
+  };
+
+  const handleHoldToRecordCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (!holdRecordingActiveRef.current && !isRecording) return;
+    stopRecording(false);
   };
 
   const removePending = (id: string) => {
@@ -402,8 +459,8 @@ export default function Chat() {
                     </button>
                   )}
                   {msg.message_type === "voice" && msg.media_url && (
-                    <div className={`px-3 py-2 rounded-2xl ${isMine ? "bg-blue-500 rounded-br-md" : "bg-white rounded-bl-md shadow-sm"}`}>
-                      <audio controls src={msg.media_url} className="max-w-[200px] h-8" />
+                    <div className={`px-3 py-2 rounded-2xl ${isMine ? "bg-primary rounded-br-md" : "bg-card rounded-bl-md border border-border/40 shadow-sm"}`}>
+                      <audio controls preload="metadata" src={msg.media_url} className="w-[240px] max-w-[62vw] h-10" />
                     </div>
                   )}
                   <p className={`text-[10px] mt-0.5 px-1 ${isMine ? "text-right text-gray-500" : "text-gray-400"}`}>
@@ -472,42 +529,49 @@ export default function Chat() {
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
 
-          {isRecording ? (
-            <div className="flex-1 flex items-center gap-2 bg-red-50 rounded-full px-4 py-2">
-              <span className="text-red-600 animate-pulse text-sm font-bold">● {recordingTime}s</span>
-              <div className="flex-1" />
-              <button onClick={stopRecording} className="w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center">
-                <MicOff size={16} />
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="flex-1 flex items-center bg-gray-100 dark:bg-secondary rounded-full px-3 py-1.5">
-                <input value={messageText} onChange={(e) => setMessageText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendText()}
-                  placeholder="Aa"
-                  className="flex-1 bg-transparent text-gray-900 dark:text-foreground text-[14px] border-none outline-none placeholder:text-gray-400" />
-                <button onClick={() => setShowEmoji(!showEmoji)} className={`p-1 ${showEmoji ? "text-blue-700" : "text-blue-600"}`}><Smile size={20} /></button>
-              </div>
-              {messageText.trim() ? (
-                <button onClick={handleSendText}
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50">
-                  <Send size={22} />
-                </button>
+          <>
+            <div className={`flex-1 flex items-center rounded-full px-3 py-1.5 ${isRecording ? "bg-destructive/10 border border-destructive/20" : "bg-gray-100 dark:bg-secondary"}`}>
+              {isRecording ? (
+                <div className="flex items-center gap-2 w-full">
+                  <span className="text-destructive animate-pulse text-sm font-bold">● {recordingTime}s</span>
+                  <span className="text-[12px] font-medium text-destructive/90">ধরে বলুন, ছাড়লেই পাঠাবে</span>
+                </div>
               ) : (
                 <>
-                  <button onClick={startRecording}
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50">
-                    <Mic size={22} />
-                  </button>
+                  <input value={messageText} onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendText()}
+                    placeholder="Aa"
+                    className="flex-1 bg-transparent text-gray-900 dark:text-foreground text-[14px] border-none outline-none placeholder:text-gray-400" />
+                  <button onClick={() => setShowEmoji(!showEmoji)} className={`p-1 ${showEmoji ? "text-blue-700" : "text-blue-600"}`}><Smile size={20} /></button>
+                </>
+              )}
+            </div>
+
+            {messageText.trim() ? (
+              <button onClick={handleSendText}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50">
+                <Send size={22} />
+              </button>
+            ) : (
+              <>
+                <button
+                  onPointerDown={handleHoldToRecordStart}
+                  onPointerUp={handleHoldToRecordEnd}
+                  onPointerCancel={handleHoldToRecordCancel}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isRecording ? "bg-destructive text-destructive-foreground" : "text-blue-600 hover:bg-blue-50"}`}
+                >
+                  <Mic size={22} />
+                </button>
+                {!isRecording && (
                   <button onClick={() => sendMutation.mutate({ type: "text", content: "❤️" })}
                     className="w-9 h-9 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50">
                     <span className="text-[22px]">❤️</span>
                   </button>
-                </>
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
+          </>
         </div>
 
         {/* Emoji Picker */}

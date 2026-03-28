@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { startRingtoneLoop } from "@/lib/ringtone";
 
 const CALL_REMOTE_AUDIO_CLASS = "call-remote-audio";
 let activeRingtoneStop: (() => void) | null = null;
@@ -63,94 +64,14 @@ export function playRingtone(type: "outgoing" | "incoming" = "incoming"): { stop
     activeRingtoneStop = null;
   }
 
-  let stopped = false;
-  let loopTimer: number | null = null;
-  let toneTimer1: number | null = null;
-  let toneTimer2: number | null = null;
-  let audioCtx: AudioContext | null = null;
-
-  const playBeep = (freq: number, duration = 0.32) => {
-    if (!audioCtx || audioCtx.state === "closed") return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    osc.type = type === "outgoing" ? "sine" : "triangle";
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(type === "outgoing" ? 0.35 : 0.55, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-  };
-
-  const playRingCycle = () => {
-    if (stopped || !audioCtx || audioCtx.state === "closed") return;
-
-    try {
-      if (type === "outgoing") {
-        // Long ring-back tone (like phone ringing on the other end)
-        playBeep(440, 1.0);
-        toneTimer1 = window.setTimeout(() => {
-          if (stopped) return;
-          playBeep(480, 1.0);
-        }, 1100);
-      } else {
-        // Short alert bursts (incoming call alert)
-        playBeep(720, 0.34);
-        toneTimer1 = window.setTimeout(() => {
-          if (stopped) return;
-          playBeep(860, 0.34);
-        }, 420);
-        toneTimer2 = window.setTimeout(() => {
-          if (stopped) return;
-          playBeep(720, 0.34);
-        }, 840);
-      }
-    } catch {
-      // no-op
-    }
-  };
-
-  const init = async () => {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    // Critical: resume AudioContext (required in PWA/standalone mode)
-    if (audioCtx.state === "suspended") {
-      await audioCtx.resume();
-    }
-    playRingCycle();
-    loopTimer = window.setInterval(playRingCycle, type === "outgoing" ? 3500 : 2400);
-  };
-
-  init().catch(() => {
-    // no-op
-  });
+  const loop = startRingtoneLoop(type);
 
   const stop = () => {
-      stopped = true;
-      if (loopTimer) {
-        clearInterval(loopTimer);
-        loopTimer = null;
-      }
-      if (toneTimer1) {
-        clearTimeout(toneTimer1);
-        toneTimer1 = null;
-      }
-      if (toneTimer2) {
-        clearTimeout(toneTimer2);
-        toneTimer2 = null;
-      }
-      if (audioCtx && audioCtx.state !== "closed") {
-        audioCtx.close().catch(() => {});
-      }
-      audioCtx = null;
-
-      if (activeRingtoneStop === stop) {
-        activeRingtoneStop = null;
-      }
-    };
+    loop.stop();
+    if (activeRingtoneStop === stop) {
+      activeRingtoneStop = null;
+    }
+  };
 
   activeRingtoneStop = stop;
 

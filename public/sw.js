@@ -7,7 +7,9 @@ let supabaseKey = "";
 let currentUserId = null;
 let lastCheckedAt = null;
 let lastNotifiedCallId = null;
+let lastCallAlertAt = 0;
 let lastNotifiedMessageId = null;
+let authToken = "";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -24,6 +26,9 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window" }).then((clients) => {
       for (const client of clients) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
+          if ("navigate" in client) {
+            client.navigate(url).catch(() => {});
+          }
           return client.focus();
         }
       }
@@ -50,6 +55,7 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "REGISTER_POLL") {
     supabaseUrl = event.data.supabaseUrl || "";
     supabaseKey = event.data.supabaseKey || "";
+    authToken = event.data.authToken || "";
     currentUserId = event.data.userId || null;
     lastCheckedAt = new Date().toISOString();
     pollForCalls();
@@ -59,6 +65,11 @@ self.addEventListener("message", (event) => {
   // Stop polling
   if (event.data?.type === "STOP_POLL") {
     stopPolling();
+    currentUserId = null;
+    lastNotifiedCallId = null;
+    lastCallAlertAt = 0;
+    lastNotifiedMessageId = null;
+    authToken = "";
   }
 });
 
@@ -98,13 +109,14 @@ async function pollForCalls() {
   if (hasVisibleClient) return;
 
   try {
+    const bearer = authToken || supabaseKey;
     const since = lastCheckedAt || new Date(Date.now() - 10000).toISOString();
-    const url = `${supabaseUrl}/rest/v1/call_signals?receiver_id=eq.${currentUserId}&signal_type=eq.call-request&created_at=gte.${since}&order=created_at.desc&limit=1`;
+    const url = `${supabaseUrl}/rest/v1/call_signals?receiver_id=eq.${currentUserId}&signal_type=in.(call-request,call-ended,call-rejected,call-busy)&order=created_at.desc&limit=1`;
     
     const res = await fetch(url, {
       headers: {
         "apikey": supabaseKey,
-        "Authorization": `Bearer ${supabaseKey}`,
+        "Authorization": `Bearer ${bearer}`,
         "Content-Type": "application/json",
       },
     });
@@ -113,12 +125,18 @@ async function pollForCalls() {
     const data = await res.json();
     lastCheckedAt = new Date().toISOString();
 
-    if (data && data.length > 0) {
+    if (data && data.length > 0 && data[0]?.signal_type === "call-request") {
       const signal = data[0];
-      if (signal.id && signal.id === lastNotifiedCallId) return;
-      // Check if signal is recent (within 30 seconds)
+      // Check if signal is recent (within 45 seconds)
       const age = Date.now() - new Date(signal.created_at).getTime();
-      if (age > 30000) return;
+      if (age > 45000) return;
+
+      const now = Date.now();
+      const isSameCall = !!signal.id && signal.id === lastNotifiedCallId;
+      const shouldRenotify = isSameCall && now - lastCallAlertAt >= 8000;
+      const shouldNotify = !isSameCall || shouldRenotify;
+
+      if (!shouldNotify) return;
 
       // Fetch caller name
       let callerName = "Someone";
@@ -126,7 +144,7 @@ async function pollForCalls() {
         const userRes = await fetch(`${supabaseUrl}/rest/v1/users?id=eq.${signal.caller_id}&select=display_name&limit=1`, {
           headers: {
             "apikey": supabaseKey,
-            "Authorization": `Bearer ${supabaseKey}`,
+            "Authorization": `Bearer ${bearer}`,
           },
         });
         if (userRes.ok) {
@@ -141,10 +159,13 @@ async function pollForCalls() {
         icon: "/icon-192.png",
         badge: "/icon-192.png",
         vibrate: [400, 200, 400, 200, 400, 200, 400],
+        renotify: true,
+        silent: false,
         requireInteraction: true,
         data: { url: "/" },
       });
       lastNotifiedCallId = signal.id || null;
+      lastCallAlertAt = now;
     }
 
     // Also check for new messages
@@ -152,7 +173,7 @@ async function pollForCalls() {
     const msgRes = await fetch(msgUrl, {
       headers: {
         "apikey": supabaseKey,
-        "Authorization": `Bearer ${supabaseKey}`,
+        "Authorization": `Bearer ${bearer}`,
       },
     });
     if (msgRes.ok) {
@@ -166,7 +187,7 @@ async function pollForCalls() {
         let senderName = "New Message";
         try {
           const senderRes = await fetch(`${supabaseUrl}/rest/v1/users?id=eq.${msg.sender_id}&select=display_name&limit=1`, {
-            headers: { "apikey": supabaseKey, "Authorization": `Bearer ${supabaseKey}` },
+            headers: { "apikey": supabaseKey, "Authorization": `Bearer ${bearer}` },
           });
           if (senderRes.ok) {
             const senders = await senderRes.json();

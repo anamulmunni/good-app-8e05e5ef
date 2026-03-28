@@ -98,6 +98,8 @@ export default function IncomingCallHandler() {
       if (!("serviceWorker" in navigator)) return;
 
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const authToken = sessionData.session?.access_token || "";
         const registration = await navigator.serviceWorker.ready;
         const worker = navigator.serviceWorker.controller || registration.active || registration.waiting;
         if (!worker) return;
@@ -108,6 +110,7 @@ export default function IncomingCallHandler() {
           type: "REGISTER_POLL",
           supabaseUrl,
           supabaseKey,
+          authToken,
           userId: user.id,
         });
 
