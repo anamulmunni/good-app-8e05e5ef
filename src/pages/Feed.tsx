@@ -739,69 +739,88 @@ export default function Feed() {
       </AnimatePresence>
 
       {/* ===== Friend Requests Tab ===== */}
-      {showFriendRequests && activeTab === "friends" && (
-        <div className="max-w-lg mx-auto">
-          <div className="bg-white dark:bg-card mt-2 rounded-lg mx-1">
-            <h3 className="px-3 pt-3 pb-2 text-[16px] font-bold text-gray-900 dark:text-foreground">ফ্রেন্ড রিকুয়েস্ট</h3>
-            {friendRequests.length === 0 ? (
-              <p className="text-sm text-gray-500 px-3 pb-4">কোনো ফ্রেন্ড রিকুয়েস্ট নেই</p>
-            ) : (
+      {activeTab === "friends" && (
+        <div className="max-w-lg mx-auto pb-4">
+          {/* Friend Requests Section */}
+          {friendRequests.length > 0 && (
+            <div className="bg-white dark:bg-card mt-2 rounded-lg mx-1">
+              <h3 className="px-3 pt-3 pb-2 text-[16px] font-bold text-gray-900 dark:text-foreground">
+                ফ্রেন্ড রিকুয়েস্ট <span className="text-blue-600">({friendRequests.length})</span>
+              </h3>
               <div className="space-y-1 pb-2">
                 {friendRequests.map((fr) => (
                   <div key={fr.id} className="flex items-center gap-3 px-3 py-2">
                     <button onClick={() => navigate(`/user/${fr.sender_id}`)}
-                      className="w-12 h-12 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
+                      className="w-14 h-14 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
                       {fr.sender?.avatar_url ? <img src={fr.sender.avatar_url} className="w-full h-full object-cover" /> :
-                        <User className="w-6 h-6 text-gray-400" />}
+                        <User className="w-7 h-7 text-gray-400" />}
                     </button>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-bold text-gray-900 dark:text-foreground truncate">{fr.sender?.display_name || "User"}</p>
                       <p className="text-[11px] text-gray-500 dark:text-muted-foreground">{timeAgo(fr.created_at)}</p>
                       <div className="flex gap-2 mt-1.5">
                         <button onClick={() => acceptRequestMutation.mutate(fr.id)}
-                          className="flex-1 py-1.5 bg-blue-600 text-white text-[13px] font-semibold rounded-md hover:bg-blue-700 transition-colors">
-                          Confirm
-                        </button>
+                          className="flex-1 py-1.5 bg-blue-600 text-white text-[13px] font-semibold rounded-md">Confirm</button>
                         <button onClick={() => rejectRequestMutation.mutate(fr.id)}
-                          className="flex-1 py-1.5 bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground text-[13px] font-semibold rounded-md hover:bg-gray-300 transition-colors">
-                          Delete
-                        </button>
+                          className="flex-1 py-1.5 bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground text-[13px] font-semibold rounded-md">Delete</button>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* People You May Know - full list */}
+          {/* All Users - Facebook style list */}
           <div className="bg-white dark:bg-card mt-2 rounded-lg mx-1 pb-3">
-            <h3 className="px-3 pt-3 pb-2 text-[16px] font-bold text-gray-900 dark:text-foreground">People You May Know</h3>
-            <div className="grid grid-cols-2 gap-2 px-3">
-              {suggestedPeople.map((sp: any) => (
-                <div key={sp.id} className="rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card shadow-sm">
-                  <div className="h-[130px] relative bg-gray-100 dark:bg-secondary">
-                    {sp.cover_url ? (
-                      <img src={sp.cover_url} className="w-full h-full object-cover" alt="" />
-                    ) : sp.avatar_url ? (
-                      <img src={sp.avatar_url} className="w-full h-full object-cover" alt="" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-blue-100 to-blue-50">
-                        <User className="w-10 h-10 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-2.5">
-                    <p className="text-[13px] font-bold text-gray-900 dark:text-foreground truncate">{sp.display_name || sp.guest_id}</p>
-                    <button
-                      onClick={() => friendRequestMutation.mutate(sp.id)}
-                      className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 bg-blue-50 dark:bg-primary/10 text-blue-600 dark:text-primary rounded-md text-[13px] font-semibold hover:bg-blue-100 transition-colors">
-                      <UserPlus className="w-4 h-4" />
-                      Add friend
+            <h3 className="px-3 pt-3 pb-2 text-[16px] font-bold text-gray-900 dark:text-foreground">
+              সব ইউজার ({allUsersWithStatus.length})
+            </h3>
+            <div className="space-y-0">
+              {allUsersWithStatus.map((person: any) => {
+                const fs = person.friendship;
+                const isFriend = fs?.status === "accepted";
+                const isPending = fs?.status === "pending";
+                return (
+                  <div key={person.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-secondary/30 transition-colors">
+                    <button onClick={() => navigate(`/user/${person.id}`)}
+                      className="w-14 h-14 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0 border-2 border-gray-100 dark:border-border">
+                      {person.avatar_url ? <img src={person.avatar_url} className="w-full h-full object-cover" /> :
+                        <User className="w-7 h-7 text-gray-400" />}
                     </button>
+                    <div className="flex-1 min-w-0">
+                      <button onClick={() => navigate(`/user/${person.id}`)} className="text-left w-full">
+                        <p className="text-[14px] font-bold text-gray-900 dark:text-foreground truncate">{person.display_name || person.guest_id}</p>
+                      </button>
+                      <div className="mt-1.5">
+                        {isFriend ? (
+                          <div className="flex gap-2">
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-secondary text-gray-600 dark:text-muted-foreground text-[12px] font-semibold rounded-md">
+                              <Check className="w-3.5 h-3.5" /> বন্ধু
+                            </span>
+                            <button onClick={() => startChatWith(person.id)}
+                              className="px-3 py-1.5 bg-blue-50 dark:bg-primary/10 text-blue-600 dark:text-primary text-[12px] font-semibold rounded-md">
+                              মেসেজ
+                            </button>
+                          </div>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-secondary text-gray-500 text-[12px] font-semibold rounded-md">
+                            {fs.direction === "sent" ? "রিকুয়েস্ট পাঠানো হয়েছে" : "রিকুয়েস্ট এসেছে"}
+                          </span>
+                        ) : (
+                          <button onClick={() => friendRequestMutation.mutate(person.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[12px] font-semibold rounded-md hover:bg-blue-700 transition-colors">
+                            <UserPlus className="w-3.5 h-3.5" /> Add friend
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+              {allUsersWithStatus.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-6">কোনো ইউজার পাওয়া যায়নি</p>
+              )}
             </div>
           </div>
         </div>
