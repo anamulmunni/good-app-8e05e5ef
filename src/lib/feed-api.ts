@@ -46,9 +46,12 @@ export type ExternalReelVideo = {
   id: string;
   title: string;
   video_url: string;
-  source: "internet_archive";
+  source: "dailymotion" | "internet_archive";
   creator?: string | null;
   thumbnail_url?: string | null;
+  video_id?: string;
+  duration?: number;
+  category?: string;
 };
 
 export const REACTION_EMOJIS: Record<string, string> = {
