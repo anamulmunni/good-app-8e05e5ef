@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getUser } from "@/lib/api";
 import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig } from "@/lib/call-api";
-import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft, Volume2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,8 +24,15 @@ export default function CallPage() {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const ringtoneRef = useRef<{ stop: () => void } | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const durationTimerRef = useRef<any>(null);
+  const noAnswerTimerRef = useRef<number | null>(null);
+  const callStateRef = useRef<CallState>("idle");
   const targetUserId = parseInt(userId || "0");
+
+  useEffect(() => {
+    callStateRef.current = callState;
+  }, [callState]);
 
   // Load target user
   useEffect(() => {
@@ -52,7 +59,11 @@ export default function CallPage() {
 
         switch (signal.signal_type) {
           case "call-accepted":
-            ringtoneRef.current?.stop();
+            stopRingtone();
+            if (noAnswerTimerRef.current) {
+              clearTimeout(noAnswerTimerRef.current);
+              noAnswerTimerRef.current = null;
+            }
             setCallState("connected");
             startDurationTimer();
             break;
@@ -65,6 +76,13 @@ export default function CallPage() {
             if (peerRef.current && signal.signal_data) {
               try {
                 await peerRef.current.setRemoteDescription(new RTCSessionDescription(signal.signal_data));
+                stopRingtone();
+                if (noAnswerTimerRef.current) {
+                  clearTimeout(noAnswerTimerRef.current);
+                  noAnswerTimerRef.current = null;
+                }
+                setCallState("connected");
+                startDurationTimer();
               } catch (e) { console.error("Error setting remote desc:", e); }
             }
             break;
@@ -83,6 +101,7 @@ export default function CallPage() {
   }, [user, targetUserId]);
 
   const startDurationTimer = () => {
+    clearInterval(durationTimerRef.current);
     setCallDuration(0);
     durationTimerRef.current = setInterval(() => setCallDuration(d => d + 1), 1000);
   };
@@ -93,13 +112,34 @@ export default function CallPage() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const stopRingtone = () => {
+    ringtoneRef.current?.stop();
+    ringtoneRef.current = null;
+  };
+
+  const clearRemoteAudio = () => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.pause();
+      remoteAudioRef.current.remove();
+      remoteAudioRef.current = null;
+    }
+    document.querySelectorAll(".call-remote-audio").forEach((el) => el.remove());
+  };
+
   const startCall = async () => {
     if (!user || !targetUserId) return;
 
     try {
       // Get audio stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       localStreamRef.current = stream;
+      setIsMuted(false);
 
       // Create peer connection
       const pc = new RTCPeerConnection(rtcConfig);
@@ -110,7 +150,14 @@ export default function CallPage() {
 
       // Handle remote audio - create persistent audio element
       pc.ontrack = (event) => {
-        attachRemoteAudio(event.streams[0]);
+        const remoteStream = event.streams?.[0] || new MediaStream([event.track]);
+        remoteAudioRef.current = attachRemoteAudio(remoteStream);
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (["failed", "closed"].includes(pc.connectionState)) {
+          endCall(false);
+        }
       };
 
       // ICE candidates
@@ -132,8 +179,8 @@ export default function CallPage() {
       ringtoneRef.current = playRingtone();
 
       // Auto-end after 30 seconds if no answer
-      setTimeout(() => {
-        if (callState === "calling") {
+      noAnswerTimerRef.current = window.setTimeout(() => {
+        if (callStateRef.current === "calling") {
           endCall(true);
           toast({ title: "কোনো উত্তর নেই" });
         }
@@ -145,12 +192,15 @@ export default function CallPage() {
   };
 
   const endCall = useCallback((sendSignal = true) => {
-    ringtoneRef.current?.stop();
-    ringtoneRef.current = null;
-    clearInterval(durationTimerRef.current);
+    stopRingtone();
 
-    // Clean up remote audio elements
-    document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
+    if (noAnswerTimerRef.current) {
+      clearTimeout(noAnswerTimerRef.current);
+      noAnswerTimerRef.current = null;
+    }
+
+    clearInterval(durationTimerRef.current);
+    clearRemoteAudio();
 
     if (peerRef.current) {
       peerRef.current.close();
@@ -167,6 +217,7 @@ export default function CallPage() {
     }
 
     setCallState("ended");
+    setIsMuted(false);
     setTimeout(() => navigate(-1), 1500);
   }, [user, targetUserId, navigate]);
 
@@ -182,9 +233,10 @@ export default function CallPage() {
 
   useEffect(() => {
     return () => {
-      ringtoneRef.current?.stop();
+      stopRingtone();
+      if (noAnswerTimerRef.current) clearTimeout(noAnswerTimerRef.current);
       clearInterval(durationTimerRef.current);
-      document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
+      clearRemoteAudio();
       if (peerRef.current) peerRef.current.close();
       if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
     };
@@ -247,7 +299,7 @@ export default function CallPage() {
         </div>
 
         {/* Call controls */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 rounded-full bg-card/95 border border-border px-3 py-2 shadow-lg">
           {callState === "connected" && (
             <motion.button whileTap={{ scale: 0.9 }} onClick={toggleMute}
               className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
@@ -255,6 +307,12 @@ export default function CallPage() {
               }`}>
               {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
             </motion.button>
+          )}
+
+          {callState === "connected" && (
+            <div className="w-14 h-14 rounded-full bg-secondary text-foreground flex items-center justify-center">
+              <Volume2 className="w-6 h-6" />
+            </div>
           )}
 
           {callState === "idle" ? (
