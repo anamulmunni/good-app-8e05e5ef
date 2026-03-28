@@ -63,12 +63,28 @@ const SONG_STOP_WORDS = new Set([
   "the", "a", "an", "and", "of", "to", "for", "in", "on", "with", "by", "official", "video", "song", "music", "hd", "full",
 ]);
 
+const QUERY_ALIAS_PATTERNS: Array<[RegExp, string]> = [
+  [/\b(voj\s*puri|vojpuri|bhoj\s*puri|bhojpuri|ভোজপুরি)\b/g, "bhojpuri"],
+  [/\b(gan|gaan|gana|গান)\b/g, "song"],
+  [/\b(hd\s*song)\b/g, "song hd"],
+  [/\b(hindi\s*gan)\b/g, "hindi song"],
+  [/\b(bangla\s*gan)\b/g, "bangla song"],
+];
+
 function normalizeForMatch(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9\u0980-\u09ff\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function canonicalizeSearchQuery(searchQuery?: string): string {
+  let query = normalizeForMatch(searchQuery || "");
+  for (const [pattern, replacement] of QUERY_ALIAS_PATTERNS) {
+    query = query.replace(pattern, replacement);
+  }
+  return query.replace(/\s+/g, " ").trim();
 }
 
 function getQueryWords(searchQuery?: string): string[] {
@@ -106,8 +122,8 @@ export function isLongVideoPostContent(content?: string | null): boolean {
 }
 
 function isMusicIntent(searchQuery?: string): boolean {
-  const q = normalizeForMatch(searchQuery || "");
-  return /(song|music|audio|lyrics|gan|gaan|gana|গান|nazrul|rabindra|hindi song|bangla song|album|mp3|dj mix|sad song|love song)/.test(q);
+  const q = canonicalizeSearchQuery(searchQuery || "");
+  return /(song|music|audio|lyrics|gan|gaan|gana|গান|nazrul|rabindra|hindi song|bangla song|album|mp3|dj mix|sad song|love song|bhojpuri)/.test(q);
 }
 
 export const REACTION_EMOJIS: Record<string, string> = {
@@ -132,20 +148,20 @@ function detectExternalCategory(title: string): string {
 function scoreFallbackVideo(title: string, queryWords: string[], searchQuery?: string): number {
   const lower = title.toLowerCase();
   const normalizedTitle = normalizeForMatch(title);
-  const normalizedQuery = normalizeForMatch(searchQuery || "");
+  const normalizedQuery = canonicalizeSearchQuery(searchQuery || "");
   let score = 0;
 
   for (const word of queryWords) {
-    if (word && normalizedTitle.includes(word)) score += 4;
+    if (word && normalizedTitle.includes(word)) score += 6;
   }
-  if (queryWords.length >= 2 && queryWords.every((w) => lower.includes(w))) score += 4;
-  if (lower.includes("full") || lower.includes("official") || lower.includes("live")) score += 1;
-  if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 30;
-  score += Math.round(getQueryCoverage(queryWords, normalizedTitle) * 12);
+
+  if (queryWords.length >= 2 && queryWords.every((w) => normalizedTitle.includes(w))) score += 12;
+  if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 35;
+  score += Math.round(getQueryCoverage(queryWords, normalizedTitle) * 18);
 
   if (isMusicIntent(searchQuery)) {
-    if (/(song|music|audio|lyrics|official music video|গান|mp3|album)/.test(lower)) score += 10;
-    if (/(natok|drama|movie|serial|episode|cartoon)/.test(lower)) score -= 10;
+    if (/(song|music|audio|lyrics|official music video|গান|mp3|album|bhojpuri)/.test(lower)) score += 12;
+    if (/(natok|drama|movie|serial|episode|cartoon)/.test(lower)) score -= 16;
   }
 
   return score;
@@ -157,35 +173,37 @@ function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
 }
 
 function buildSearchVariants(searchQuery?: string): string[] {
-  const q = (searchQuery || "").trim();
-  if (!q) {
+  const raw = (searchQuery || "").trim();
+  const canonical = canonicalizeSearchQuery(raw);
+
+  if (!canonical) {
     return [
-      "bangla song official 2025",
+      "bangla new song official 2025",
       "bangla slowed reverb song",
-      "hindi song latest official",
+      "hindi latest song official",
+      "bhojpuri latest song",
       "trending music video 2025",
-      "bangla romantic song hd",
+      "bangla romantic song",
       "hindi sad song slowed reverb",
-      "bangla new song official music video",
-      "bollywood song latest hd",
     ];
   }
 
-  const compact = getQueryWords(q).slice(0, 4).join(" ");
+  const words = getQueryWords(canonical);
+  const compact = words.slice(0, 4).join(" ");
   return [
-    q,
-    `${q} song`,
-    `${q} official song`,
-    `${q} music video`,
-    `${q} hd`,
-    compact && compact !== q ? `${compact} song` : "",
-    `${q} lyrics`,
-    `${q} full`,
-  ].filter(Boolean);
+    canonical,
+    `${canonical} song`,
+    `${canonical} official song`,
+    `${canonical} music video`,
+    `${canonical} lyrics`,
+    compact && compact !== canonical ? compact : "",
+  ]
+    .filter(Boolean)
+    .filter((q, idx, arr) => arr.indexOf(q) === idx);
 }
 
-async function fetchDailymotionByQuery(query: string, page: number, limit: number) {
-  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_1080_url,thumbnail_720_url,thumbnail_480_url,thumbnail_360_url,thumbnail_url,duration,owner.screenname,country&sort=relevance&longer_than=0`;
+async function fetchDailymotionByQuery(query: string, page: number, limit: number, sort: "relevance" | "recent" = "relevance") {
+  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_1080_url,thumbnail_720_url,thumbnail_480_url,thumbnail_360_url,thumbnail_url,duration,owner.screenname,country&sort=${sort}&longer_than=0`;
   const res = await fetch(dmUrl);
   if (!res.ok) return [];
   const data = await res.json();
@@ -219,28 +237,31 @@ async function fetchDailymotionFallback(
   searchQuery?: string,
   mode: "short" | "long" = "long",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const variants = buildSearchVariants(searchQuery);
+  const canonicalQuery = canonicalizeSearchQuery(searchQuery || "");
+  const variants = buildSearchVariants(canonicalQuery);
   const perQueryLimit = Math.max(Math.ceil((rows * 3) / variants.length) + 10, 14);
+  const sort = canonicalQuery ? "relevance" : "recent";
+
   const responses = await Promise.all(
-    variants.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit))
+    variants.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, sort))
   );
 
   let list = responses.flat();
 
-  if (list.length === 0 && searchQuery?.trim()) {
+  if (list.length === 0 && canonicalQuery) {
     const fallbackQueries = [
-      `${searchQuery.trim()} song`,
-      `${getQueryWords(searchQuery).slice(0, 3).join(" ")} song`.trim(),
-      `${searchQuery.trim()} official`,
-      `${searchQuery.trim()} music`,
+      `${canonicalQuery} song`,
+      `${getQueryWords(canonicalQuery).slice(0, 3).join(" ")} song`.trim(),
+      `${canonicalQuery} official`,
+      `${canonicalQuery} lyrics`,
     ].filter((q, idx, arr) => q.length > 3 && arr.indexOf(q) === idx);
-    const fallbackResponses = await Promise.all(fallbackQueries.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit)));
+    const fallbackResponses = await Promise.all(fallbackQueries.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, "relevance")));
     list = fallbackResponses.flat();
   }
 
-  const queryWords = getQueryWords(searchQuery);
-  const normalizedQuery = normalizeForMatch(searchQuery || "");
-  const isMusicSearch = isMusicIntent(searchQuery);
+  const queryWords = getQueryWords(canonicalQuery);
+  const normalizedQuery = normalizeForMatch(canonicalQuery);
+  const isMusicSearch = isMusicIntent(canonicalQuery);
   const seen = new Set<string>();
 
   const filtered = list
@@ -254,30 +275,28 @@ async function fetchDailymotionFallback(
       const title = String(v?.title || "বাংলা ভিডিও");
       const normalizedTitle = normalizeForMatch(title);
       const coverage = getQueryCoverage(queryWords, normalizedTitle);
-      const hasMusicMarker = /(song|music|audio|lyrics|গান|mp3|album|official)/i.test(title);
+      const hasMusicMarker = /(song|music|audio|lyrics|গান|mp3|album|official|bhojpuri)/i.test(title);
       const hasNonMusicMarker = /(natok|drama|movie|serial|episode|cartoon)/i.test(title);
 
-      if (searchQuery?.trim()) {
+      if (canonicalQuery) {
+        const exactPhrase = normalizedQuery.length > 3 && normalizedTitle.includes(normalizedQuery);
+        const strictCoverage = queryWords.length <= 2 ? 0.6 : 0.45;
+
         if (isMusicSearch) {
-          const exactPhrase = normalizedQuery.length > 3 && normalizedTitle.includes(normalizedQuery);
-          if (!exactPhrase && coverage < 0.15 && !hasMusicMarker) return null;
-          if (hasNonMusicMarker && !hasMusicMarker && coverage < 0.5) return null;
+          if (!exactPhrase && coverage < strictCoverage) return null;
+          if (hasNonMusicMarker && !hasMusicMarker && !exactPhrase) return null;
         } else {
-          if (coverage < 0.15 && normalizedQuery.length > 3 && !normalizedTitle.includes(normalizedQuery)) return null;
-        }
-      } else {
-        if (hasNonMusicMarker && !hasMusicMarker) {
-          // Will be applied as penalty below
+          if (!exactPhrase && coverage < strictCoverage) return null;
         }
       }
 
-      let score = scoreFallbackVideo(title, queryWords, searchQuery)
+      let score = scoreFallbackVideo(title, queryWords, canonicalQuery)
         + (duration >= 600 ? 3 : 0)
         + (duration >= 300 ? 2 : 0)
         + (duration >= 60 ? 1 : 0)
         + ((v.thumbnail_1080_url || v.thumbnail_720_url) ? 2 : 0);
 
-      if (!searchQuery?.trim() && hasNonMusicMarker && !hasMusicMarker) {
+      if (!canonicalQuery && hasNonMusicMarker && !hasMusicMarker) {
         score -= 15;
       }
 
