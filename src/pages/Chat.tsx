@@ -321,27 +321,15 @@ export default function Chat() {
     setRecordingTime(0);
   };
 
-  const handleHoldToRecordStart = async (e: React.TouchEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
+  const handleMicToggle = async () => {
     if (messageText.trim()) return;
-    e.preventDefault();
-
-    if (holdRecordingActiveRef.current || isRecording) return;
-
-    holdRecordingActiveRef.current = true;
-    shouldSendRecordingRef.current = true;
-
-    await startRecording();
-  };
-
-  const handleHoldToRecordEnd = (e: React.TouchEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (!holdRecordingActiveRef.current && !isRecording) return;
-    stopRecording(true);
-  };
-
-  const handleHoldToRecordCancel = () => {
-    if (!holdRecordingActiveRef.current && !isRecording) return;
-    stopRecording(false);
+    if (isRecording) {
+      stopRecording(true);
+    } else {
+      holdRecordingActiveRef.current = true;
+      shouldSendRecordingRef.current = true;
+      await startRecording();
+    }
   };
 
   const removePending = (id: string) => {
@@ -527,7 +515,8 @@ export default function Chat() {
               {isRecording ? (
                 <div className="flex items-center gap-2 w-full">
                   <span className="text-destructive animate-pulse text-sm font-bold">● {recordingTime}s</span>
-                  <span className="text-[12px] font-medium text-destructive/90">ধরে বলুন, ছাড়লেই পাঠাবে</span>
+                  <span className="text-[12px] font-medium text-destructive/90">রেকর্ডিং চলছে... থামাতে ক্লিক করুন</span>
+                  <button onClick={() => stopRecording(false)} className="ml-auto text-red-500 text-xs font-bold">বাতিল</button>
                 </div>
               ) : (
                 <>
@@ -548,16 +537,10 @@ export default function Chat() {
             ) : (
               <>
                 <button
-                  onTouchStart={handleHoldToRecordStart}
-                  onTouchEnd={handleHoldToRecordEnd}
-                  onTouchCancel={() => handleHoldToRecordCancel()}
-                  onMouseDown={handleHoldToRecordStart}
-                  onMouseUp={handleHoldToRecordEnd}
-                  onMouseLeave={() => { if (isRecording) handleHoldToRecordCancel(); }}
-                  onContextMenu={(e) => e.preventDefault()}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors select-none ${isRecording ? "bg-destructive text-destructive-foreground" : "text-blue-600 hover:bg-blue-50"}`}
+                  onClick={handleMicToggle}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors select-none ${isRecording ? "bg-destructive text-destructive-foreground animate-pulse" : "text-blue-600 hover:bg-blue-50"}`}
                 >
-                  <Mic size={22} />
+                  {isRecording ? <MicOff size={22} /> : <Mic size={22} />}
                 </button>
                 {!isRecording && (
                   <button onClick={() => sendMutation.mutate({ type: "text", content: "❤️" })}
