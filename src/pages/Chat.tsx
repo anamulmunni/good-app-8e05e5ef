@@ -43,8 +43,8 @@ export default function Chat() {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
   const recordingSecondsRef = useRef(0);
+  const recordingDurationAtStopRef = useRef(0);
   const shouldSendRecordingRef = useRef(true);
-  const holdRecordingActiveRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -262,34 +262,67 @@ export default function Chat() {
   };
 
   const startRecording = async () => {
-    if (isRecording || holdRecordingActiveRef.current) return;
+    if (isRecording || mediaRecorderRef.current?.state === "recording") return;
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast({ title: "এই ডিভাইসে ভয়েস রেকর্ডিং সাপোর্ট নেই", variant: "destructive" });
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const preferredMimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/mp4"
+          : "";
+
+      const recorder = preferredMimeType
+        ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+        : new MediaRecorder(stream);
+
       audioChunksRef.current = [];
+      recordingDurationAtStopRef.current = 0;
       shouldSendRecordingRef.current = true;
-      recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const elapsed = recordingSecondsRef.current;
+        const elapsed = recordingDurationAtStopRef.current || recordingSecondsRef.current;
 
         if (!shouldSendRecordingRef.current || elapsed < 1 || audioChunksRef.current.length === 0) {
+          recordingDurationAtStopRef.current = 0;
+          recordingSecondsRef.current = 0;
+          setRecordingTime(0);
           return;
         }
 
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const mimeType = recorder.mimeType || preferredMimeType || "audio/webm";
+        const extension = mimeType.includes("mp4") ? "m4a" : mimeType.includes("ogg") ? "ogg" : "webm";
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
         const pendingId = `pending-voice-${Date.now()}`;
         setPendingMedia(prev => [...prev, { id: pendingId, previewUrl: "", type: "voice", status: "uploading" }]);
+
         try {
-          const url = await uploadChatMedia(blob, "voice.webm");
+          const url = await uploadChatMedia(blob, `voice.${extension}`);
           setPendingMedia(prev => prev.map(p => p.id === pendingId ? { ...p, status: "sending" as const } : p));
           await sendMutation.mutateAsync({ type: "voice", content: "", mediaUrl: url });
           setPendingMedia(prev => prev.filter(p => p.id !== pendingId));
         } catch {
           setPendingMedia(prev => prev.map(p => p.id === pendingId ? { ...p, status: "failed" as const } : p));
+        } finally {
+          recordingDurationAtStopRef.current = 0;
+          recordingSecondsRef.current = 0;
+          setRecordingTime(0);
         }
       };
-      recorder.start();
+
+      recorder.start(250);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       setRecordingTime(0);
@@ -299,26 +332,33 @@ export default function Chat() {
         setRecordingTime(recordingSecondsRef.current);
       }, 1000);
     } catch {
-      holdRecordingActiveRef.current = false;
       toast({ title: "মাইক্রোফোন access দিন", variant: "destructive" });
     }
   };
 
   const stopRecording = (shouldSend = true) => {
     shouldSendRecordingRef.current = shouldSend;
+    recordingDurationAtStopRef.current = recordingSecondsRef.current;
+
+    clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    setIsRecording(false);
 
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.requestData();
+      } catch {
+        // Some browsers do not support requestData here
+      }
       recorder.stop();
+    } else {
+      recordingDurationAtStopRef.current = 0;
+      recordingSecondsRef.current = 0;
+      setRecordingTime(0);
     }
 
     mediaRecorderRef.current = null;
-    holdRecordingActiveRef.current = false;
-    setIsRecording(false);
-    clearInterval(recordingTimerRef.current);
-    recordingTimerRef.current = null;
-    recordingSecondsRef.current = 0;
-    setRecordingTime(0);
   };
 
   const handleMicToggle = async () => {
@@ -326,7 +366,6 @@ export default function Chat() {
     if (isRecording) {
       stopRecording(true);
     } else {
-      holdRecordingActiveRef.current = true;
       shouldSendRecordingRef.current = true;
       await startRecording();
     }
@@ -523,7 +562,7 @@ export default function Chat() {
                   <input value={messageText} onChange={(e) => setMessageText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendText()}
                     placeholder="Aa"
-                    className="flex-1 bg-transparent text-gray-900 dark:text-foreground text-[14px] border-none outline-none placeholder:text-gray-400" />
+                    className="flex-1 bg-transparent text-gray-900 dark:text-foreground text-[16px] border-none outline-none placeholder:text-gray-400" />
                   <button onClick={() => setShowEmoji(!showEmoji)} className={`p-1 ${showEmoji ? "text-blue-700" : "text-blue-600"}`}><Smile size={20} /></button>
                 </>
               )}
