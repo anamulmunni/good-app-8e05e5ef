@@ -25,56 +25,112 @@ export async function sendCallSignal(
 }
 
 export async function cleanupCallSignals(userId1: number, userId2: number) {
-  // Delete old signals between these two users
   await (supabase.from("call_signals").delete() as any)
     .or(`and(caller_id.eq.${userId1},receiver_id.eq.${userId2}),and(caller_id.eq.${userId2},receiver_id.eq.${userId1})`);
 }
 
-// Simple ringtone using Web Audio API
+// Ringtone using Web Audio API - with proper AudioContext resume for PWA/standalone
 export function playRingtone(): { stop: () => void } {
-  const audioCtx = new AudioContext();
   let stopped = false;
   let timeoutId: any;
+  let audioCtx: AudioContext | null = null;
 
-  const playTone = () => {
-    if (stopped) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.frequency.value = 440;
-    osc.type = "sine";
-    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.8);
-
-    timeoutId = setTimeout(() => {
-      if (!stopped) {
-        const osc2 = audioCtx.createOscillator();
-        const gain2 = audioCtx.createGain();
-        osc2.connect(gain2);
-        gain2.connect(audioCtx.destination);
-        osc2.frequency.value = 554;
-        osc2.type = "sine";
-        gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
-        osc2.start();
-        osc2.stop(audioCtx.currentTime + 0.8);
-      }
-      timeoutId = setTimeout(playTone, 2000);
-    }, 1000);
+  const init = async () => {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Critical: resume AudioContext (required in PWA/standalone mode)
+    if (audioCtx.state === "suspended") {
+      await audioCtx.resume();
+    }
+    playTone();
   };
 
-  playTone();
+  const playTone = () => {
+    if (stopped || !audioCtx || audioCtx.state === "closed") return;
+
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = 440;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.7);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.7);
+
+      timeoutId = setTimeout(() => {
+        if (stopped || !audioCtx || audioCtx.state === "closed") return;
+        try {
+          const osc2 = audioCtx.createOscillator();
+          const gain2 = audioCtx.createGain();
+          osc2.connect(gain2);
+          gain2.connect(audioCtx.destination);
+          osc2.frequency.value = 554;
+          osc2.type = "sine";
+          gain2.gain.setValueAtTime(0.4, audioCtx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.7);
+          osc2.start();
+          osc2.stop(audioCtx.currentTime + 0.7);
+        } catch {}
+        timeoutId = setTimeout(playTone, 1800);
+      }, 900);
+    } catch {}
+  };
+
+  init();
 
   return {
     stop: () => {
       stopped = true;
       clearTimeout(timeoutId);
-      audioCtx.close();
+      if (audioCtx && audioCtx.state !== "closed") {
+        audioCtx.close().catch(() => {});
+      }
+      audioCtx = null;
     },
   };
+}
+
+// Attach remote audio stream to a real <audio> element for reliable playback (especially PWA)
+export function attachRemoteAudio(stream: MediaStream): HTMLAudioElement {
+  // Remove any existing call audio elements
+  document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
+
+  const audio = document.createElement("audio");
+  audio.className = "call-remote-audio";
+  audio.autoplay = true;
+  (audio as any).playsInline = true;
+  audio.setAttribute("playsinline", "true");
+  audio.setAttribute("webkit-playsinline", "true");
+  audio.volume = 1.0;
+  audio.srcObject = stream;
+  // Some mobile browsers need the element in the DOM
+  audio.style.display = "none";
+  document.body.appendChild(audio);
+
+  // Force play - critical for standalone/PWA mode
+  const tryPlay = () => {
+    const p = audio.play();
+    if (p) {
+      p.catch(() => {
+        // If autoplay blocked, retry on next user tap
+        const handler = () => {
+          audio.play().catch(() => {});
+          document.removeEventListener("touchstart", handler);
+          document.removeEventListener("click", handler);
+        };
+        document.addEventListener("click", handler, { once: false });
+        document.addEventListener("touchstart", handler, { once: false });
+      });
+    }
+  };
+
+  tryPlay();
+  // Also retry after a short delay (helps on some devices)
+  setTimeout(tryPlay, 300);
+
+  return audio;
 }
 
 // WebRTC config with free STUN servers

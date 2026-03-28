@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, playRingtone, rtcConfig } from "@/lib/call-api";
+import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig } from "@/lib/call-api";
 import { Phone, PhoneOff, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -73,22 +73,7 @@ export default function IncomingCallHandler() {
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
-        document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
-        const audio = document.createElement("audio");
-        audio.className = "call-remote-audio";
-        audio.autoplay = true;
-        audio.volume = 1.0;
-        (audio as any).playsInline = true;
-        audio.setAttribute("playsinline", "true");
-        audio.srcObject = event.streams[0];
-        document.body.appendChild(audio);
-        const playPromise = audio.play();
-        if (playPromise) {
-          playPromise.catch(() => {
-            const handler = () => { audio.play().catch(() => {}); document.removeEventListener("click", handler); };
-            document.addEventListener("click", handler);
-          });
-        }
+        attachRemoteAudio(event.streams[0]);
       };
 
       pc.onicecandidate = (event) => {
