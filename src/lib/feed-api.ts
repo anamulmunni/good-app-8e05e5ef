@@ -65,6 +65,104 @@ export const REACTION_EMOJIS: Record<string, string> = {
   angry: "😡",
 };
 
+function detectExternalCategory(title: string): string {
+  const lower = title.toLowerCase();
+  if (lower.includes("natok") || lower.includes("নাটক")) return "natok";
+  if (lower.includes("song") || lower.includes("গান") || lower.includes("music")) return "music";
+  if (lower.includes("funny") || lower.includes("comedy") || lower.includes("হাসি")) return "funny";
+  if (lower.includes("cartoon") || lower.includes("gopal")) return "cartoon";
+  if (lower.includes("viral")) return "viral";
+  return "tiktok";
+}
+
+function scoreFallbackVideo(title: string, queryWords: string[]): number {
+  const lower = title.toLowerCase();
+  let score = 0;
+  for (const word of queryWords) {
+    if (word && lower.includes(word)) score += 3;
+  }
+  if (lower.includes("bangladesh") || lower.includes("বাংলাদেশ") || lower.includes("bangla") || lower.includes("বাংলা")) score += 5;
+  if (lower.includes("india") || lower.includes("indian") || lower.includes("hindi")) score -= 4;
+  return score;
+}
+
+function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
+  if (videoId) return `https://www.dailymotion.com/embed/video/${videoId}`;
+  return fallbackUrl || "";
+}
+
+function normalizeExternalVideo(raw: any): ExternalReelVideo | null {
+  const rawId = String(raw?.id || "");
+  const cleanId = rawId.startsWith("dm-") ? rawId.replace("dm-", "") : (raw?.video_id || rawId);
+  const embedUrl = toDailymotionEmbed(cleanId, raw?.embed_url || raw?.video_url);
+  if (!embedUrl) return null;
+
+  return {
+    id: rawId || `dm-${cleanId}`,
+    title: String(raw?.title || "বাংলা ভিডিও"),
+    source: "dailymotion",
+    video_url: embedUrl,
+    watch_url: raw?.watch_url || (cleanId ? `https://www.dailymotion.com/video/${cleanId}` : undefined),
+    creator: raw?.creator || null,
+    thumbnail_url: raw?.thumbnail_url || null,
+    video_id: cleanId || undefined,
+    duration: Number(raw?.duration || 0) || undefined,
+    category: raw?.category || detectExternalCategory(String(raw?.title || "")),
+    country: raw?.country || null,
+  };
+}
+
+async function fetchDailymotionFallback(
+  page: number,
+  rows: number,
+  searchQuery?: string,
+  mode: "short" | "long" = "long",
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
+  const search = searchQuery?.trim() ? `${searchQuery.trim()} bangladesh` : "bangladesh viral video";
+  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(search)}&limit=${Math.max(rows * 2, 20)}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,owner.screenname,country&sort=relevance`;
+  const res = await fetch(dmUrl);
+  if (!res.ok) return { videos: [], hasMore: false };
+
+  const data = await res.json();
+  const list = Array.isArray(data?.list) ? data.list : [];
+  const queryWords = (searchQuery || "").toLowerCase().split(/\s+/).filter((x) => x.length >= 2);
+
+  const filtered = list
+    .map((v: any) => {
+      const duration = Number(v?.duration || 0);
+      const durationOk = mode === "short" ? duration >= 4 && duration <= 70 : duration >= 120 && duration <= 7200;
+      if (!v?.id || !durationOk) return null;
+
+      const title = String(v?.title || "বাংলা ভিডিও");
+      const country = String(v?.country || "").toUpperCase();
+      const score = scoreFallbackVideo(title, queryWords)
+        + (country === "BD" ? 6 : 0)
+        + (country === "IN" ? -4 : 0)
+        + (mode === "long" && duration >= 900 ? 2 : 0);
+
+      return {
+        id: `dm-${v.id}`,
+        title,
+        source: "dailymotion" as const,
+        video_url: `https://www.dailymotion.com/embed/video/${v.id}`,
+        watch_url: `https://www.dailymotion.com/video/${v.id}`,
+        creator: v["owner.screenname"] || null,
+        thumbnail_url: v.thumbnail_720_url || v.thumbnail_url || null,
+        video_id: v.id,
+        duration,
+        category: detectExternalCategory(title),
+        country,
+        _score: score,
+      };
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => b._score - a._score)
+    .slice(0, rows)
+    .map(({ _score, ...rest }: any) => rest);
+
+  return { videos: filtered, hasMore: filtered.length >= Math.min(rows, 8) };
+}
+
 export async function getBangladeshExternalVideos(
   page = 1,
   rows = 10,
@@ -98,19 +196,28 @@ export async function getBangladeshExternalVideos(
     );
 
     if (!res.ok) {
-      console.error("External videos API error:", res.status);
-      return { videos: [], hasMore: false };
+      console.warn("External videos API unavailable, using fallback:", res.status);
+      return fetchDailymotionFallback(page, rows, searchQuery, mode);
     }
 
     const data = await res.json();
+    const normalized = Array.isArray(data.videos)
+      ? data.videos.map(normalizeExternalVideo).filter(Boolean) as ExternalReelVideo[]
+      : [];
+
     return {
-      videos: Array.isArray(data.videos) ? data.videos : [],
+      videos: normalized,
       hasMore: !!data.hasMore,
       categories: data.categories,
     };
   } catch (e) {
-    console.error("External videos error:", e);
-    return { videos: [], hasMore: false };
+    console.warn("External videos edge failed, using fallback:", e);
+    try {
+      return await fetchDailymotionFallback(page, rows, searchQuery, mode);
+    } catch (fallbackError) {
+      console.error("External videos fallback error:", fallbackError);
+      return { videos: [], hasMore: false };
+    }
   }
 }
 
