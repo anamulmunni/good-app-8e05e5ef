@@ -202,6 +202,7 @@ export default function CallPage() {
     return () => {
       ringtoneRef.current?.stop();
       clearInterval(durationTimerRef.current);
+      document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
       if (peerRef.current) peerRef.current.close();
       if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
     };
