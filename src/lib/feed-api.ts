@@ -111,20 +111,15 @@ export async function toggleReaction(postId: string, userId: number, reactionTyp
 
   if (existing) {
     if (existing.reaction_type === reactionType) {
-      // Remove reaction (same type = toggle off)
       await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
-      await updatePostLikesCount(postId);
       return { reacted: false, type: reactionType };
     } else {
-      // Change reaction type - delete old and insert new to avoid update issues
       await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
       await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
       return { reacted: true, type: reactionType };
     }
   } else {
-    // Add new reaction
     await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
-    await updatePostLikesCount(postId);
     return { reacted: true, type: reactionType };
   }
 }
