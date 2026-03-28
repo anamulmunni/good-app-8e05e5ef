@@ -126,6 +126,7 @@ export default function IncomingCallHandler() {
     ringtoneRef.current?.stop();
     ringtoneRef.current = null;
     clearInterval(durationTimerRef.current);
+    document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
     if (peerRef.current) { peerRef.current.close(); peerRef.current = null; }
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
     if (sendSignal && user && incomingCall) sendCallSignal(user.id, incomingCall.callerId, "call-ended");
