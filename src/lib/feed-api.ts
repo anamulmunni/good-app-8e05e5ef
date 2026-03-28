@@ -67,6 +67,7 @@ export async function getBangladeshExternalVideos(
   page = 1,
   rows = 10,
   preferredCategories?: string[],
+  searchQuery?: string,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -77,6 +78,9 @@ export async function getBangladeshExternalVideos(
     params.set("rows", String(rows));
     if (preferredCategories && preferredCategories.length > 0) {
       params.set("preferred", preferredCategories.join(","));
+    }
+    if (searchQuery && searchQuery.trim()) {
+      params.set("search", searchQuery.trim());
     }
 
     const res = await fetch(

@@ -7,17 +7,19 @@ const corsHeaders = {
 
 const CATEGORIES = [
   { key: "funny", query: "bangla funny video" },
-  { key: "cartoon", query: "bangla cartoon rupkothar golpo" },
-  { key: "romantic", query: "bangla romantic song" },
+  { key: "cartoon", query: "bangla cartoon gopal bhar" },
+  { key: "romantic", query: "bangla romantic song video" },
   { key: "natok", query: "bangla natok" },
   { key: "viral", query: "bangladesh viral video" },
   { key: "music", query: "bangla music video" },
-  { key: "comedy", query: "bangla comedy" },
-  { key: "vlog", query: "dhaka vlog bangladesh" },
-  { key: "tiktok", query: "bangla tiktok compilation" },
+  { key: "comedy", query: "bangla comedy video" },
+  { key: "vlog", query: "bangladesh vlog" },
+  { key: "tiktok", query: "bangla tiktok viral" },
   { key: "movie", query: "bangla movie scene" },
-  { key: "song", query: "বাংলা গান" },
+  { key: "song", query: "bangla gan" },
   { key: "shortfilm", query: "bangla short film" },
+  { key: "gopal", query: "gopal bhar bangla cartoon" },
+  { key: "rupkotha", query: "rupkothar golpo bangla" },
 ];
 
 serve(async (req) => {
@@ -29,38 +31,54 @@ serve(async (req) => {
     const url = new URL(req.url);
     const page = parseInt(url.searchParams.get("page") || "1");
     const rows = parseInt(url.searchParams.get("rows") || "10");
+    const searchQuery = url.searchParams.get("search") || "";
     const preferredParam = url.searchParams.get("preferred") || "";
     const preferredKeys = preferredParam.split(",").filter(Boolean);
 
-    // Pick 3 categories to search this page
-    const categoriesToSearch: typeof CATEGORIES[number][] = [];
-    const numCats = 3;
+    let queries: string[] = [];
 
-    if (preferredKeys.length > 0) {
-      // 2 preferred, 1 random
+    if (searchQuery.trim()) {
+      // User searched — use their query directly
+      queries = [searchQuery.trim(), `${searchQuery.trim()} bangla`];
+    } else if (preferredKeys.length > 0) {
+      // Personalized
       for (let i = 0; i < 2; i++) {
         const key = preferredKeys[(page + i) % preferredKeys.length];
         const cat = CATEGORIES.find(c => c.key === key);
-        if (cat) categoriesToSearch.push(cat);
+        if (cat) queries.push(cat.query);
       }
       const randomIdx = (page * 7 + 3) % CATEGORIES.length;
-      categoriesToSearch.push(CATEGORIES[randomIdx]);
+      queries.push(CATEGORIES[randomIdx].query);
     } else {
-      for (let i = 0; i < numCats; i++) {
-        const idx = ((page - 1) * numCats + i) % CATEGORIES.length;
-        categoriesToSearch.push(CATEGORIES[idx]);
+      // Default rotation
+      for (let i = 0; i < 3; i++) {
+        const idx = ((page - 1) * 3 + i) % CATEGORIES.length;
+        queries.push(CATEGORIES[idx].query);
       }
     }
 
-    // Fetch from Dailymotion API in parallel
-    const perCategory = Math.ceil(rows / categoriesToSearch.length) + 2;
-    const fetchPromises = categoriesToSearch.map(async (cat) => {
+    const perQuery = Math.ceil(rows / queries.length) + 3;
+
+    const fetchPromises = queries.map(async (q) => {
       try {
-        const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(cat.query)}&limit=${perCategory}&page=${page}&fields=id,title,thumbnail_url,duration,owner.screenname&language=bn&shorter_than=15&sort=relevance`;
+        // shorter_than=20 means under 20 minutes, allow up to 1200 seconds
+        const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&limit=${perQuery}&page=${page}&fields=id,title,thumbnail_url,duration,owner.screenname,embed_url&shorter_than=20&sort=relevance`;
         const res = await fetch(dmUrl);
         if (!res.ok) { await res.text(); return []; }
         const data = await res.json();
-        return (data.list || []).map((v: any) => ({ ...v, _category: cat.key }));
+        return (data.list || []).map((v: any) => {
+          // Detect category
+          let cat = "";
+          const title = String(v.title || "").toLowerCase();
+          if (title.includes("cartoon") || title.includes("gopal") || title.includes("rupkotha")) cat = "cartoon";
+          else if (title.includes("funny") || title.includes("comedy") || title.includes("হাসি")) cat = "funny";
+          else if (title.includes("romantic") || title.includes("love")) cat = "romantic";
+          else if (title.includes("natok") || title.includes("নাটক")) cat = "natok";
+          else if (title.includes("song") || title.includes("গান") || title.includes("gan")) cat = "song";
+          else if (title.includes("movie") || title.includes("সিনেমা")) cat = "movie";
+          else cat = "viral";
+          return { ...v, _category: cat };
+        });
       } catch {
         return [];
       }
@@ -69,13 +87,12 @@ serve(async (req) => {
     const results = await Promise.all(fetchPromises);
     const allItems = results.flat();
 
-    // Deduplicate
     const seen = new Set<string>();
     const videos: any[] = [];
 
     for (const item of allItems) {
       if (seen.has(item.id)) continue;
-      if (item.duration > 900 || item.duration < 5) continue;
+      if (item.duration > 1200 || item.duration < 3) continue;
       seen.add(item.id);
 
       videos.push({
@@ -84,7 +101,8 @@ serve(async (req) => {
         creator: item["owner.screenname"] || null,
         source: "dailymotion",
         thumbnail_url: item.thumbnail_url,
-        video_url: `https://geo.dailymotion.com/player.html?video=${item.id}&mute=false&autoplay=true&loop=true&controls=false&ui-start-screen-info=false`,
+        // Embed with autoplay, no controls chrome, loop
+        video_url: `https://geo.dailymotion.com/player.html?video=${item.id}&autoplay=true&mute=false&loop=true&controls=true&ui-start-screen-info=false&ui-logo=false&sharing-enable=false`,
         video_id: item.id,
         duration: item.duration,
         category: item._category,
@@ -93,18 +111,16 @@ serve(async (req) => {
       if (videos.length >= rows) break;
     }
 
-    // Shuffle for variety
-    for (let i = videos.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [videos[i], videos[j]] = [videos[j], videos[i]];
+    // Shuffle unless search
+    if (!searchQuery.trim()) {
+      for (let i = videos.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [videos[i], videos[j]] = [videos[j], videos[i]];
+      }
     }
 
     return new Response(
-      JSON.stringify({
-        videos,
-        hasMore: true,
-        categories: CATEGORIES.map(c => c.key),
-      }),
+      JSON.stringify({ videos, hasMore: true, categories: CATEGORIES.map(c => c.key) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
