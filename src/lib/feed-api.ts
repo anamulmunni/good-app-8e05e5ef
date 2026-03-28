@@ -225,6 +225,21 @@ export async function uploadStoryMedia(file: File): Promise<string> {
   return data.publicUrl;
 }
 
+// Delete a post (only owner)
+export async function deletePost(postId: string, userId: number): Promise<void> {
+  const { error } = await (supabase.from("posts").delete() as any).eq("id", postId).eq("user_id", userId);
+  if (error) throw error;
+  // Clean up reactions and comments
+  await (supabase.from("post_reactions").delete() as any).eq("post_id", postId);
+  await (supabase.from("post_comments").delete() as any).eq("post_id", postId);
+}
+
+// Delete a story (only owner)
+export async function deleteStory(storyId: string, userId: number): Promise<void> {
+  const { error } = await (supabase.from("stories").delete() as any).eq("id", storyId).eq("user_id", userId);
+  if (error) throw error;
+}
+
 // Search/suggest users
 export async function searchFeedUsers(query: string) {
   const { data } = await (supabase.from("users").select("id, guest_id, display_name, avatar_url") as any)
