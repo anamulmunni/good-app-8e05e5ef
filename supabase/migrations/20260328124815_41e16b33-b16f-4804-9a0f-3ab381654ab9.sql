@@ -1,0 +1,1 @@
+ALTER TABLE public.stories ADD COLUMN music_name text DEFAULT NULL;

@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import StoryEditor from "@/components/StoryEditor";
+import StoryEditor, { getAudioUrlForMusic } from "@/components/StoryEditor";
+import StoryViewer from "@/components/StoryViewer";
 
 export default function Feed() {
   const { user, isLoading } = useAuth();
@@ -230,10 +231,10 @@ export default function Feed() {
   });
 
   const storyMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, musicName }: { file: File; musicName?: string }) => {
       if (!user) throw new Error("Login");
       const url = await uploadStoryMedia(file);
-      return createStory(user.id, url);
+      return createStory(user.id, url, musicName);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stories"] });
@@ -318,7 +319,7 @@ export default function Feed() {
   };
 
   const handleStoryPublish = (editedFile: File, musicName?: string) => {
-    storyMutation.mutate(editedFile);
+    storyMutation.mutate({ file: editedFile, musicName });
     setStoryEditorFile(null);
   };
 
@@ -924,34 +925,16 @@ export default function Feed() {
       {/* Story viewer */}
       <AnimatePresence>
         {viewingStory && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black flex flex-col" onClick={() => setViewingStory(null)}>
-            <div className="p-4 flex items-center gap-3 relative z-10">
-              <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/user/${viewingStory.user_id}`); }}
-                className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
-                {viewingStory.user?.avatar_url ? <img src={viewingStory.user.avatar_url} className="w-full h-full object-cover" /> :
-                  <span className="text-white text-xs font-bold">{viewingStory.user?.display_name?.[0] || "?"}</span>}
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/user/${viewingStory.user_id}`); }} className="flex-1 text-left">
-                <p className="text-white font-bold text-sm">{viewingStory.user?.display_name || "User"}</p>
-                <p className="text-white/60 text-[10px]">{timeAgo(viewingStory.created_at)}</p>
-              </button>
-              <div className="flex items-center gap-2">
-                {viewingStory.user_id === user.id && (
-                  <button onClick={(e) => { e.stopPropagation(); deleteStoryMutation.mutate(viewingStory.id); }}
-                    className="text-white/80 hover:text-red-500 p-1"><Trash2 size={20} /></button>
-                )}
-                <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); startChatWith(viewingStory.user_id); }}
-                  className="text-white/80 hover:text-white p-1"><MessageCircle size={20} /></button>
-                <button onClick={(e) => { e.stopPropagation(); setViewingStory(null); navigate(`/call/${viewingStory.user_id}`); }}
-                  className="text-white/80 hover:text-white p-1"><Phone size={20} /></button>
-                <button onClick={() => setViewingStory(null)} className="text-white/80"><X size={24} /></button>
-              </div>
-            </div>
-            <div className="flex-1 flex items-center justify-center p-4">
-              <img src={viewingStory.image_url} alt="" className="max-w-full max-h-full object-contain rounded-xl" />
-            </div>
-          </motion.div>
+          <StoryViewer
+            story={viewingStory}
+            userId={user.id}
+            onClose={() => setViewingStory(null)}
+            onDelete={(id) => deleteStoryMutation.mutate(id)}
+            onMessage={(uid) => { setViewingStory(null); startChatWith(uid); }}
+            onCall={(uid) => { setViewingStory(null); navigate(`/call/${uid}`); }}
+            onProfile={(uid) => { setViewingStory(null); navigate(`/user/${uid}`); }}
+            timeAgo={timeAgo}
+          />
         )}
       </AnimatePresence>
 
