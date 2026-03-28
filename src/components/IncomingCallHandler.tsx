@@ -94,6 +94,18 @@ export default function IncomingCallHandler() {
   useEffect(() => {
     if (!user) return;
 
+    // Register SW background polling for calls/messages
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+      navigator.serviceWorker.controller.postMessage({
+        type: "REGISTER_POLL",
+        supabaseUrl,
+        supabaseKey,
+        userId: user.id,
+      });
+    }
+
     const handleIncomingCallRequest = async (signal: any) => {
       const inCallRoute = window.location.pathname.startsWith("/call/");
       const isBusy = callActiveRef.current || !!incomingCallRef.current || inCallRoute;
