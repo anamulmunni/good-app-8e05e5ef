@@ -10,7 +10,7 @@ import {
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
-import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Video, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
+import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
