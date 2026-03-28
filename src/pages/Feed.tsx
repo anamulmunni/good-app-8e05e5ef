@@ -255,16 +255,25 @@ export default function Feed() {
   const commentMutation = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
       if (!user || !commentingPostId) throw new Error("Error");
-      return addComment(commentingPostId, user.id, text);
+      return addComment(commentingPostId, user.id, text, replyingTo?.id);
     },
     onMutate: async ({ text }) => {
       if (!user || !commentingPostId) return;
-      setComments(prev => [...prev, {
-        id: `temp-${Date.now()}`, post_id: commentingPostId, user_id: user.id,
+      const tc: PostComment = {
+        id: `temp-${Date.now()}`,
+        post_id: commentingPostId,
+        user_id: user.id,
         content: text, created_at: new Date().toISOString(),
+        parent_comment_id: replyingTo?.id || null,
         user: { display_name: user.display_name, avatar_url: user.avatar_url, guest_id: user.guest_id },
-      }]);
+      };
+      if (replyingTo) {
+        setComments(prev => prev.map(c => c.id === replyingTo.id ? { ...c, replies: [...(c.replies || []), tc] } : c));
+      } else {
+        setComments(prev => [...prev, tc]);
+      }
       setCommentText("");
+      setReplyingTo(null);
     },
     onSuccess: (_data, _vars) => {
       if (commentingPostId) loadComments(commentingPostId);
@@ -274,6 +283,34 @@ export default function Feed() {
       if (commentingPostId) loadComments(commentingPostId);
     },
   });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => { if (!user) throw new Error("Login"); await deleteComment(commentId, user.id); },
+    onSuccess: () => { if (commentingPostId) loadComments(commentingPostId); queryClient.invalidateQueries({ queryKey: ["feed-posts", searchQuery] }); },
+  });
+
+  const commentLikeMutation = useMutation({
+    mutationFn: async (commentId: string) => { if (!user) throw new Error("Login"); return toggleCommentLike(commentId, user.id); },
+    onMutate: async (commentId) => {
+      setComments(prev => prev.map(c => {
+        if (c.id === commentId) return { ...c, liked_by_me: !c.liked_by_me, likes_count: (c.likes_count || 0) + (c.liked_by_me ? -1 : 1) };
+        if (c.replies) return { ...c, replies: c.replies.map(r => r.id === commentId ? { ...r, liked_by_me: !r.liked_by_me, likes_count: (r.likes_count || 0) + (r.liked_by_me ? -1 : 1) } : r) };
+        return c;
+      }));
+    },
+  });
+
+  const handleCommentInputChange = (val: string) => {
+    setCommentText(val);
+    const atMatch = val.match(/@(\w{2,})$/);
+    if (atMatch) { setMentionQuery(atMatch[1]); setShowMentionSuggestions(true); }
+    else { setShowMentionSuggestions(false); }
+  };
+
+  const insertMention = (name: string) => {
+    setCommentText(commentText.replace(/@\w*$/, `@${name} `));
+    setShowMentionSuggestions(false);
+  };
 
   const storyMutation = useMutation({
     mutationFn: async ({ file, musicName }: { file: File; musicName?: string }) => {
