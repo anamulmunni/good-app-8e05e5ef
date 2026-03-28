@@ -3,8 +3,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig } from "@/lib/call-api";
-import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft, Volume2 } from "lucide-react";
+import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification } from "@/lib/call-api";
+import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft, Volume2, PhoneIncoming } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -226,7 +226,7 @@ export default function CallPage() {
       await sendCallSignal(user.id, targetUserId, "call-request", { offer: offer });
 
       setCallState("calling");
-      ringtoneRef.current = playRingtone();
+      ringtoneRef.current = playRingtone("outgoing");
 
       // Auto-end after 30 seconds if no answer
       noAnswerTimerRef.current = window.setTimeout(() => {
@@ -345,8 +345,8 @@ export default function CallPage() {
           <h2 className="text-2xl font-black text-foreground">{targetUser?.display_name || "User"}</h2>
           <p className="text-sm text-muted-foreground mt-1">
             {callState === "idle" && "কল করতে নিচে ট্যাপ করুন"}
-            {callState === "calling" && "কল হচ্ছে..."}
-              {callState === "ringing" && "Ringing..."}
+              {callState === "calling" && "Calling..."}
+              {callState === "ringing" && "Ringing ☎️"}
             {callState === "connected" && formatDuration(callDuration)}
             {callState === "ended" && "কল শেষ"}
           </p>

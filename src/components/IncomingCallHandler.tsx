@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig } from "@/lib/call-api";
+import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification } from "@/lib/call-api";
 import { Phone, PhoneOff, User } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -116,9 +116,15 @@ export default function IncomingCallHandler() {
         offer: signal.signal_data?.offer,
       });
 
-      sendCallSignal(user.id, signal.caller_id, "call-ringing").catch(() => {});
-      notifyIncomingCall(caller.display_name || "User");
-      ringtoneRef.current = playRingtone();
+      sendCallSignal(user!.id, signal.caller_id, "call-ringing").catch(() => {});
+      showCallNotification(
+        `${caller.display_name || "User"} calling...`,
+        "Tap to open and receive the call",
+        "incoming-call",
+        "/"
+      );
+      if ("vibrate" in navigator) navigator.vibrate([350, 180, 350, 180, 350]);
+      ringtoneRef.current = playRingtone("incoming");
     };
 
     const recoverPendingIncomingCall = async () => {
