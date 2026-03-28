@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   toggleReaction, getUserReactions, getPostComments, addComment,
-  REACTION_EMOJIS, type Post, type PostComment
+  REACTION_EMOJIS, type Post, type PostComment, markReelsSeen
 } from "@/lib/feed-api";
 import {
   ArrowLeft, Heart, MessageCircle, Send, X, User,
@@ -33,10 +33,18 @@ export default function Reels() {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
   const lastTapRef = useRef<Record<string, number>>({});
+  const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [user, isLoading, navigate]);
+
+  // Mark reels as seen when entering
+  useEffect(() => {
+    if (user) {
+      markReelsSeen(user.id);
+    }
+  }, [user]);
 
   // Fetch video posts only
   const { data: reels = [], isLoading: reelsLoading } = useQuery({
@@ -148,18 +156,29 @@ export default function Reels() {
     setLoadingComments(false);
   };
 
-  const handleDoubleTap = (postId: string) => {
+  const handleVideoTap = (postId: string) => {
     const now = Date.now();
     const last = lastTapRef.current[postId] || 0;
+
+    // Clear any pending single-tap timer
+    if (tapTimerRef.current[postId]) {
+      clearTimeout(tapTimerRef.current[postId]);
+    }
+
     if (now - last < 300) {
+      // Double tap = like
+      lastTapRef.current[postId] = 0;
       if (!userReactions[postId]) {
         reactionMutation.mutate({ postId, type: "love" });
       }
       setShowLoveAnim(postId);
       setTimeout(() => setShowLoveAnim(null), 1000);
-      lastTapRef.current[postId] = 0;
     } else {
+      // Single tap = play/pause (with delay to detect double tap)
       lastTapRef.current[postId] = now;
+      tapTimerRef.current[postId] = setTimeout(() => {
+        togglePause(postId);
+      }, 300);
     }
   };
 
@@ -231,7 +250,7 @@ export default function Reels() {
                   loop
                   playsInline
                   muted={muted}
-                  onClick={() => handleDoubleTap(reel.id)}
+                  onClick={() => handleVideoTap(reel.id)}
                   onTouchEnd={() => {}} // keep touch events
                 />
 

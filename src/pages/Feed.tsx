@@ -865,7 +865,7 @@ export default function Feed() {
               </span>
             )}
           </button>
-          <button onClick={() => navigate("/reels")}
+          <button onClick={() => { if (user) { markReelsSeen(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["new-reels-count"] })); } navigate("/reels"); }}
             className="relative flex-1 py-2.5 flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground">
             <Play className="w-5 h-5" />
             {newReelsCount > 0 && (
@@ -1119,13 +1119,40 @@ export default function Feed() {
         </>
       )}
 
-      {/* Notification tab placeholder */}
+      {/* Notification tab */}
       {activeTab === "notif" && (
-        <div className="max-w-lg mx-auto mt-4 px-3">
-          <div className="bg-white dark:bg-card rounded-lg p-6 text-center">
-            <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="font-bold text-gray-700 dark:text-foreground">নোটিফিকেশন</p>
-            <p className="text-sm text-gray-500 mt-1">শীঘ্রই আসছে...</p>
+        <div className="max-w-lg mx-auto mt-2 px-2">
+          <div className="bg-white dark:bg-card rounded-lg">
+            <h3 className="px-4 pt-3 pb-2 text-[16px] font-bold text-gray-900 dark:text-foreground">নোটিফিকেশন</h3>
+            {notificationsList.length === 0 ? (
+              <div className="p-6 text-center">
+                <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">কোনো নোটিফিকেশন নেই</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-border/20">
+                {notificationsList.map((n: any) => (
+                  <button key={n.id} onClick={() => { if (n.reference_id) { setActiveTab("home"); openComments(n.reference_id); } }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-secondary/30 transition-colors ${!n.is_read ? "bg-blue-50/60 dark:bg-primary/5" : ""}`}>
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
+                      {n.from_user?.avatar_url ? <img src={n.from_user.avatar_url} className="w-full h-full object-cover" /> :
+                        <User className="w-5 h-5 text-gray-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-gray-900 dark:text-foreground">
+                        <span className="font-bold">{n.from_user?.display_name || "কেউ"}</span>
+                        {n.type === "mention" && " আপনাকে মেন্টশন করেছে"}
+                        {n.type === "like" && " আপনার পোস্টে লাইক দিয়েছে"}
+                        {n.type === "comment" && " আপনার পোস্টে মন্তব্য করেছে"}
+                      </p>
+                      {n.content && <p className="text-[12px] text-gray-500 dark:text-muted-foreground truncate mt-0.5">"{n.content}"</p>}
+                      <p className="text-[11px] text-gray-400 dark:text-muted-foreground mt-0.5">{timeAgo(n.created_at)}</p>
+                    </div>
+                    {!n.is_read && <div className="w-3 h-3 rounded-full bg-blue-600 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
