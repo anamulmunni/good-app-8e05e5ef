@@ -815,10 +815,14 @@ export default function Feed() {
           {/* All Users - Facebook style list */}
           <div className="bg-white dark:bg-card mt-2 rounded-lg mx-1 pb-3">
             <h3 className="px-3 pt-3 pb-2 text-[16px] font-bold text-gray-900 dark:text-foreground">
-              সব ইউজার ({allUsersWithStatus.length})
+              সব ইউজার ({allUsersWithStatus.filter((p: any) => !(p.friendship?.status === "pending" && p.friendship?.direction === "sent")).length})
             </h3>
             <div className="space-y-0">
-              {allUsersWithStatus.map((person: any) => {
+              {allUsersWithStatus.filter((person: any) => {
+                const fs = person.friendship;
+                if (fs?.status === "pending" && fs.direction === "sent") return false;
+                return true;
+              }).map((person: any) => {
                 const fs = person.friendship;
                 const isFriend = fs?.status === "accepted";
                 const isPending = fs?.status === "pending";
