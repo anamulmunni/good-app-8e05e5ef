@@ -81,6 +81,8 @@ function scoreFallbackVideo(title: string, queryWords: string[]): number {
   for (const word of queryWords) {
     if (word && lower.includes(word)) score += 3;
   }
+  if (queryWords.length >= 2 && queryWords.every((w) => lower.includes(w))) score += 4;
+  if (lower.includes("full") || lower.includes("official") || lower.includes("live")) score += 1;
   return score;
 }
 
@@ -93,12 +95,14 @@ function buildSearchVariants(searchQuery?: string): string[] {
   const q = (searchQuery || "").trim();
   if (!q) {
     return [
-      "bangla natok",
-      "bangla song",
+      "bangla full natok",
+      "bangla song official",
       "hindi song",
       "bangla cartoon",
       "bangla funny video",
       "trending music video",
+      "bangla drama",
+      "live music",
     ];
   }
 
@@ -106,10 +110,20 @@ function buildSearchVariants(searchQuery?: string): string[] {
     q,
     `${q} full video`,
     `${q} official`,
+    `${q} live`,
     `${q} song`,
     `${q} natok`,
     `${q} cartoon`,
+    `${q} drama`,
   ];
+}
+
+async function fetchDailymotionByQuery(query: string, page: number, limit: number) {
+  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,owner.screenname,country&sort=relevance`;
+  const res = await fetch(dmUrl);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data?.list) ? data.list : [];
 }
 
 function normalizeExternalVideo(raw: any): ExternalReelVideo | null {
@@ -140,18 +154,18 @@ async function fetchDailymotionFallback(
   mode: "short" | "long" = "long",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
   const variants = buildSearchVariants(searchQuery);
-  const perQueryLimit = Math.max(Math.ceil((rows * 2) / variants.length) + 10, 12);
+  const perQueryLimit = Math.max(Math.ceil((rows * 3) / variants.length) + 10, 14);
   const responses = await Promise.all(
-    variants.map(async (q) => {
-      const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(q)}&limit=${perQueryLimit}&page=${page}&fields=id,title,thumbnail_720_url,thumbnail_url,duration,owner.screenname,country&sort=relevance`;
-      const res = await fetch(dmUrl);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data?.list) ? data.list : [];
-    })
+    variants.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit))
   );
 
-  const list = responses.flat();
+  let list = responses.flat();
+
+  if (list.length === 0 && searchQuery?.trim()) {
+    const fallbackResponses = await Promise.all(buildSearchVariants(undefined).slice(0, 4).map((q) => fetchDailymotionByQuery(q, page, perQueryLimit)));
+    list = fallbackResponses.flat();
+  }
+
   const queryWords = (searchQuery || "").toLowerCase().split(/\s+/).filter((x) => x.length >= 2);
   const seen = new Set<string>();
 
@@ -165,6 +179,7 @@ async function fetchDailymotionFallback(
 
       const title = String(v?.title || "বাংলা ভিডিও");
       const score = scoreFallbackVideo(title, queryWords)
+        + (duration >= 600 ? 3 : 0)
         + (duration >= 300 ? 2 : 0)
         + (duration >= 60 ? 1 : 0);
 
@@ -188,7 +203,7 @@ async function fetchDailymotionFallback(
     .slice(0, rows)
     .map(({ _score, ...rest }: any) => rest);
 
-  return { videos: filtered, hasMore: filtered.length >= Math.min(rows, 10) };
+  return { videos: filtered, hasMore: list.length > 0 };
 }
 
 export async function getBangladeshExternalVideos(
@@ -198,6 +213,11 @@ export async function getBangladeshExternalVideos(
   searchQuery?: string,
   mode: "short" | "long" = "long",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
+  const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode);
+  if (direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
+    return direct;
+  }
+
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -232,6 +252,10 @@ export async function getBangladeshExternalVideos(
     const normalized = Array.isArray(data.videos)
       ? data.videos.map(normalizeExternalVideo).filter(Boolean) as ExternalReelVideo[]
       : [];
+
+    if (normalized.length === 0) {
+      return direct;
+    }
 
     return {
       videos: normalized,
