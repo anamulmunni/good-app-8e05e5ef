@@ -262,12 +262,14 @@ export default function Feed() {
     if (file) storyMutation.mutate(file);
   };
 
-  // Double tap to love
-  const handleDoubleTap = (postId: string) => {
+  // Single tap = zoom, double tap = love
+  const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const handleImageTap = (postId: string, imageUrl: string) => {
     const now = Date.now();
     const lastTap = doubleTapTimer[postId] || 0;
     if (now - lastTap < 300) {
-      // Double tap!
+      // Double tap = love
+      clearTimeout(tapTimerRef.current[postId]);
       if (!userReactions[postId]) {
         reactionMutation.mutate({ postId, type: "love" });
       }
@@ -275,7 +277,11 @@ export default function Feed() {
       setTimeout(() => setShowLoveAnimation(null), 1000);
       setDoubleTapTimer(prev => ({ ...prev, [postId]: 0 }));
     } else {
+      // Single tap = zoom (with delay to check for double tap)
       setDoubleTapTimer(prev => ({ ...prev, [postId]: now }));
+      tapTimerRef.current[postId] = setTimeout(() => {
+        setViewingImage(imageUrl);
+      }, 320);
     }
   };
 
