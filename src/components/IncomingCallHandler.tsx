@@ -40,6 +40,23 @@ export default function IncomingCallHandler() {
     ringtoneRef.current = null;
   };
 
+  const notifyIncomingCall = (callerName: string) => {
+    if (document.visibilityState === "visible") return;
+
+    if ("vibrate" in navigator) {
+      navigator.vibrate([350, 180, 350]);
+    }
+
+    if ("Notification" in window && Notification.permission === "granted") {
+      const notification = new Notification(`${callerName} is calling`, {
+        body: "Open the app to receive the call",
+        tag: "incoming-call",
+        icon: "/icon-192.png",
+      });
+      notification.onclick = () => window.focus();
+    }
+  };
+
   const clearRemoteAudio = () => {
     if (remoteAudioRef.current) {
       remoteAudioRef.current.pause();
@@ -77,6 +94,65 @@ export default function IncomingCallHandler() {
   useEffect(() => {
     if (!user) return;
 
+    const handleIncomingCallRequest = async (signal: any) => {
+      const inCallRoute = window.location.pathname.startsWith("/call/");
+      const isBusy = callActiveRef.current || !!incomingCallRef.current || inCallRoute;
+
+      if (isBusy) {
+        sendCallSignal(user.id, signal.caller_id, "call-busy").catch(() => {});
+        return;
+      }
+
+      pendingIceCandidatesRef.current = [];
+      remoteDescriptionSetRef.current = false;
+      const caller = await getUser(signal.caller_id);
+      if (!caller) return;
+
+      stopRingtone();
+      setIncomingCall({
+        callerId: signal.caller_id,
+        callerName: caller.display_name || "User",
+        callerAvatar: caller.avatar_url,
+        offer: signal.signal_data?.offer,
+      });
+
+      sendCallSignal(user.id, signal.caller_id, "call-ringing").catch(() => {});
+      notifyIncomingCall(caller.display_name || "User");
+      ringtoneRef.current = playRingtone();
+    };
+
+    const recoverPendingIncomingCall = async () => {
+      if (document.visibilityState === "hidden") return;
+      if (callActiveRef.current || incomingCallRef.current) return;
+
+      const { data } = await (supabase.from("call_signals") as any)
+        .select("caller_id, signal_type, signal_data, created_at")
+        .eq("receiver_id", user.id)
+        .in("signal_type", ["call-request", "call-ended", "call-rejected", "call-busy"])
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (!data?.length) return;
+
+      const latestByCaller = new Map<number, any>();
+      for (const row of data) {
+        if (!latestByCaller.has(row.caller_id)) {
+          latestByCaller.set(row.caller_id, row);
+        }
+      }
+
+      const pending = Array.from(latestByCaller.values()).find((row: any) => {
+        if (row.signal_type !== "call-request") return false;
+        if (!row.created_at) return true;
+        const ageMs = Date.now() - new Date(row.created_at).getTime();
+        return ageMs >= 0 && ageMs <= 35000;
+      });
+
+      if (pending) {
+        await handleIncomingCallRequest(pending);
+      }
+    };
+
     const channel = supabase
       .channel(`incoming-calls-${user.id}`)
       .on("postgres_changes", {
@@ -87,23 +163,11 @@ export default function IncomingCallHandler() {
         const activeCall = incomingCallRef.current;
         const isSameCaller = !!activeCall && activeCall.callerId === signal.caller_id;
 
-        if (signal.signal_type === "call-request" && !callActiveRef.current && !incomingCallRef.current) {
-          pendingIceCandidatesRef.current = [];
-          remoteDescriptionSetRef.current = false;
-          const caller = await getUser(signal.caller_id);
-          if (caller) {
-            stopRingtone();
-            setIncomingCall({
-              callerId: signal.caller_id,
-              callerName: caller.display_name || "User",
-              callerAvatar: caller.avatar_url,
-              offer: signal.signal_data?.offer,
-            });
-            ringtoneRef.current = playRingtone();
-          }
+        if (signal.signal_type === "call-request") {
+          await handleIncomingCallRequest(signal);
         }
 
-        if (signal.signal_type === "call-ended" && isSameCaller) {
+        if (["call-ended", "call-busy"].includes(signal.signal_type) && isSameCaller) {
           endCall(false);
         }
 
@@ -117,8 +181,20 @@ export default function IncomingCallHandler() {
       })
       .subscribe();
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        recoverPendingIncomingCall().catch(() => {});
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onVisibilityChange);
+    recoverPendingIncomingCall().catch(() => {});
+
     return () => {
       supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onVisibilityChange);
       stopRingtone();
       clearRemoteAudio();
       clearInterval(durationTimerRef.current);
@@ -160,7 +236,11 @@ export default function IncomingCallHandler() {
       };
 
       pc.onconnectionstatechange = () => {
-        if (["failed", "closed"].includes(pc.connectionState)) {
+        if (pc.connectionState === "connected") {
+          stopRingtone();
+        }
+
+        if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
           endCall(false);
         }
       };
