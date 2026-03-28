@@ -110,25 +110,7 @@ export default function CallPage() {
 
       // Handle remote audio - create persistent audio element
       pc.ontrack = (event) => {
-        // Remove any existing call audio elements
-        document.querySelectorAll('.call-remote-audio').forEach(el => el.remove());
-        const audio = document.createElement("audio");
-        audio.className = "call-remote-audio";
-        audio.autoplay = true;
-        audio.volume = 1.0;
-        (audio as any).playsInline = true;
-        audio.setAttribute("playsinline", "true");
-        audio.srcObject = event.streams[0];
-        document.body.appendChild(audio);
-        // Force play with user interaction context
-        const playPromise = audio.play();
-        if (playPromise) {
-          playPromise.catch(() => {
-            // Retry play on user interaction
-            const handler = () => { audio.play().catch(() => {}); document.removeEventListener("click", handler); };
-            document.addEventListener("click", handler);
-          });
-        }
+        attachRemoteAudio(event.streams[0]);
       };
 
       // ICE candidates
