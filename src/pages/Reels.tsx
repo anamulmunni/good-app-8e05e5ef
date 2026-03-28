@@ -10,7 +10,7 @@ import {
 } from "@/lib/feed-api";
 import {
   ArrowLeft, Heart, MessageCircle, Send, X, User, Loader2,
-  Share2, Volume2, VolumeX, Play, Globe
+  Share2, Volume2, VolumeX, Play, Globe, Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +28,6 @@ type ReelItem = {
   externalCreator?: string | null;
   thumbnail_url?: string | null;
   category?: string;
-  source?: string;
 };
 
 function getWatchedCategories(): Record<string, number> {
@@ -42,11 +41,11 @@ function getPreferredCategories(): string[] {
   return Object.entries(getWatchedCategories()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k);
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  funny: "😂 মজার ভিডিও", cartoon: "🎨 কার্টুন", romantic: "❤️ রোমান্টিক",
-  natok: "🎭 নাটক", viral: "🔥 ভাইরাল", music: "🎵 গান",
+const CAT_LABEL: Record<string, string> = {
+  funny: "😂 মজার", cartoon: "🎨 কার্টুন", romantic: "❤️ রোমান্টিক",
+  natok: "🎭 নাটক", viral: "🔥 ভাইরাল", music: "🎵 মিউজিক",
   comedy: "😄 কমেডি", vlog: "📹 ভ্লগ", tiktok: "📱 টিকটক",
-  movie: "🎬 মুভি", song: "🎶 বাংলা গান", shortfilm: "🎥 শর্ট ফিল্ম",
+  movie: "🎬 মুভি", song: "🎶 গান", shortfilm: "🎥 শর্ট ফিল্ম",
 };
 
 export default function Reels() {
@@ -69,16 +68,16 @@ export default function Reels() {
   const [extHasMore, setExtHasMore] = useState(true);
   const [extLoading, setExtLoading] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
   const activeVideoIdRef = useRef<string | null>(null);
   const lastTapRef = useRef<Record<string, number>>({});
   const tapTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  // Touch-based swipe for smoother scroll
   const touchStartY = useRef(0);
-  const isScrolling = useRef(false);
 
   useEffect(() => { if (!isLoading && !user) navigate("/"); }, [user, isLoading, navigate]);
   useEffect(() => { if (user) markReelsSeen(user.id); }, [user]);
@@ -98,7 +97,6 @@ export default function Reels() {
     enabled: !!user,
   });
 
-  // Preload first batch immediately
   useEffect(() => {
     if (!user || initialLoaded) return;
     setInitialLoaded(true);
@@ -110,7 +108,7 @@ export default function Reels() {
     setExtLoading(true);
     try {
       const preferred = getPreferredCategories();
-      const result = await getBangladeshExternalVideos(extPage, 12, preferred);
+      const result = await getBangladeshExternalVideos(extPage, 12, preferred, activeSearch || undefined);
       setExtVideos(prev => {
         const ids = new Set(prev.map(v => v.id));
         return [...prev, ...result.videos.filter(v => !ids.has(v.id))];
@@ -119,10 +117,30 @@ export default function Reels() {
       setExtPage(p => p + 1);
     } catch {}
     setExtLoading(false);
-  }, [extPage, extLoading]);
+  }, [extPage, extLoading, activeSearch]);
+
+  // Reset and search when user submits search
+  const handleSearch = useCallback(() => {
+    const q = searchInput.trim();
+    setActiveSearch(q);
+    setExtVideos([]);
+    setExtPage(1);
+    setExtHasMore(true);
+    setCurrentIndex(0);
+    setShowSearch(false);
+    // Will trigger loadMoreExternal via the effect below
+  }, [searchInput]);
+
+  // Load when search changes
+  useEffect(() => {
+    if (!user || !initialLoaded) return;
+    if (extVideos.length === 0 && extHasMore && !extLoading) {
+      loadMoreExternal();
+    }
+  }, [activeSearch, extVideos.length, extHasMore, extLoading, user, initialLoaded]);
 
   const allReels = useMemo<ReelItem[]>(() => {
-    const ur: ReelItem[] = reels.map(r => ({
+    const ur: ReelItem[] = activeSearch ? [] : reels.map(r => ({
       id: r.id, video_url: r.video_url!, content: r.content,
       likes_count: r.likes_count, comments_count: r.comments_count,
       user_id: r.user_id, user: r.user, isExternal: false,
@@ -131,12 +149,12 @@ export default function Reels() {
       id: v.id, video_url: v.video_url, content: v.title,
       likes_count: 0, comments_count: 0, user_id: 0, user: null,
       isExternal: true, externalTitle: v.title, externalCreator: v.creator,
-      thumbnail_url: v.thumbnail_url, category: v.category, source: v.source,
+      thumbnail_url: v.thumbnail_url, category: v.category,
     }));
     return [...ur, ...ext];
-  }, [reels, extVideos]);
+  }, [reels, extVideos, activeSearch]);
 
-  // Track category
+  // Track category preference
   useEffect(() => {
     const reel = allReels[currentIndex];
     if (!reel?.isExternal || !reel.category) return;
@@ -155,17 +173,16 @@ export default function Reels() {
     if (!curr) return;
     activeVideoIdRef.current = curr.id;
 
-    Object.entries(videoRefs.current).forEach(([, v]) => {
-      if (v) { v.pause(); v.muted = true; }
-    });
+    // Pause all native videos
+    Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } });
 
     if (!curr.isExternal) {
       const vid = videoRefs.current[curr.id];
       if (vid) { vid.currentTime = 0; vid.muted = muted; vid.play().catch(() => {}); setPaused(null); }
     }
 
-    // Preload next batch when near end
-    if (currentIndex >= allReels.length - 3 && extHasMore && !extLoading) {
+    // Preload next batch
+    if (currentIndex >= allReels.length - 4 && extHasMore && !extLoading) {
       loadMoreExternal();
     }
   }, [currentIndex, allReels, muted]);
@@ -177,50 +194,17 @@ export default function Reels() {
     }
   }, []);
 
-  // Programmatic swipe navigation (touch-based)
-  const goToIndex = useCallback((idx: number) => {
-    const container = containerRef.current;
-    if (!container || idx < 0 || idx >= allReels.length) return;
-    const target = container.querySelector(`[data-index="${idx}"]`) as HTMLElement;
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      setCurrentIndex(idx);
-    }
-  }, [allReels.length]);
-
-  // Touch swipe handler for reliable navigation
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-    isScrolling.current = false;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    const dy = touchStartY.current - e.changedTouches[0].clientY;
-    const threshold = 50;
-    if (Math.abs(dy) > threshold) {
-      if (dy > 0 && currentIndex < allReels.length - 1) {
-        goToIndex(currentIndex + 1);
-      } else if (dy < 0 && currentIndex > 0) {
-        goToIndex(currentIndex - 1);
-      }
-    }
-  }, [currentIndex, allReels.length, goToIndex]);
-
-  // Fallback: IntersectionObserver for desktop scroll
+  // Scroll snap observer
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const idx = parseInt(entry.target.getAttribute("data-index") || "0");
-          setCurrentIndex(idx);
-        }
+      entries.forEach(e => {
+        if (e.isIntersecting) setCurrentIndex(parseInt(e.target.getAttribute("data-index") || "0"));
       });
     }, { root: container, threshold: 0.6 });
-
     const items = container.querySelectorAll("[data-index]");
-    items.forEach((item) => observer.observe(item));
+    items.forEach(item => observer.observe(item));
     return () => observer.disconnect();
   }, [allReels.length]);
 
@@ -231,11 +215,7 @@ export default function Reels() {
     },
     onMutate: async ({ postId, type }) => {
       const prev = userReactions[postId];
-      setUserReactions(r => {
-        const next = { ...r };
-        if (prev === type) delete next[postId]; else next[postId] = type;
-        return next;
-      });
+      setUserReactions(r => { const n = { ...r }; if (prev === type) delete n[postId]; else n[postId] = type; return n; });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["reels-posts"] }),
   });
@@ -258,9 +238,7 @@ export default function Reels() {
   });
 
   const loadComments = async (postId: string) => {
-    setLoadingComments(true);
-    setComments(await getPostComments(postId));
-    setLoadingComments(false);
+    setLoadingComments(true); setComments(await getPostComments(postId)); setLoadingComments(false);
   };
 
   const handleVideoTap = (postId: string) => {
@@ -292,21 +270,6 @@ export default function Reels() {
     }
   };
 
-  const renderMentionText = (text: string) => {
-    const parts = text.split(/(@[\w\s]+?)(?=\s@|\s*$|[.,!?])/g);
-    return parts.map((part, i) => {
-      if (part.startsWith("@")) {
-        const name = part.slice(1).trim();
-        return <button key={i} onClick={async (e) => {
-          e.stopPropagation();
-          const { data: users } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
-          if (users?.[0]) navigate(`/user/${users[0].id}`);
-        }} className="text-blue-500 font-bold hover:underline inline">@{name}</button>;
-      }
-      return <span key={i}>{part}</span>;
-    });
-  };
-
   useEffect(() => {
     return () => { Object.values(videoRefs.current).forEach(v => { if (v) { v.pause(); v.muted = true; } }); };
   }, []);
@@ -314,191 +277,200 @@ export default function Reels() {
   if (isLoading || !user) return null;
 
   const showEmpty = !reelsLoading && allReels.length === 0 && !extLoading && initialLoaded;
-
-  // Only render nearby reels (current ±2) for performance
-  const renderWindow = 2;
+  const W = 2; // render window ±2
 
   return (
     <div className="fixed inset-0 bg-black z-50">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent">
-        <button onClick={() => navigate(-1)} className="text-white"><ArrowLeft size={24} /></button>
-        <h1 className="text-white font-black text-lg">Reels</h1>
-        <button onClick={() => setMuted(!muted)} className="text-white">
-          {muted ? <VolumeX size={22} /> : <Volume2 size={22} />}
-        </button>
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-3 py-2.5 bg-gradient-to-b from-black/70 to-transparent">
+        <button onClick={() => navigate(-1)} className="text-white p-1"><ArrowLeft size={22} /></button>
+        <h1 className="text-white font-black text-lg">
+          {activeSearch ? `🔍 ${activeSearch}` : "Reels"}
+        </h1>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setShowSearch(!showSearch)} className="text-white p-1"><Search size={20} /></button>
+          <button onClick={() => setMuted(!muted)} className="text-white p-1">
+            {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          </button>
+        </div>
       </div>
 
-      {(reelsLoading && !initialLoaded) ? (
+      {/* Search overlay */}
+      <AnimatePresence>
+        {showSearch && (
+          <motion.div
+            initial={{ y: -60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -60, opacity: 0 }}
+            className="absolute top-12 left-0 right-0 z-40 px-3 py-2"
+          >
+            <div className="bg-black/80 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+              <div className="flex gap-2">
+                <input
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleSearch()}
+                  placeholder="গান, কার্টুন, ফানি, রোমান্টিক খুঁজুন..."
+                  className="flex-1 bg-white/10 text-white rounded-full px-4 py-2.5 text-[14px] border-none outline-none placeholder:text-white/40"
+                  autoFocus
+                />
+                <button onClick={handleSearch}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-full text-[13px] font-bold shrink-0">
+                  খুঁজুন
+                </button>
+              </div>
+              {/* Quick search chips */}
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {["গোপাল ভার", "ফানি ভিডিও", "বাংলা গান", "রোমান্টিক", "কার্টুন", "নাটক", "ভাইরাল", "TikTok"].map(q => (
+                  <button key={q} onClick={() => { setSearchInput(q); setActiveSearch(q); setExtVideos([]); setExtPage(1); setExtHasMore(true); setCurrentIndex(0); setShowSearch(false); }}
+                    className="bg-white/10 text-white/80 text-[12px] px-3 py-1.5 rounded-full hover:bg-white/20 transition-colors">
+                    {q}
+                  </button>
+                ))}
+              </div>
+              {activeSearch && (
+                <button onClick={() => { setActiveSearch(""); setSearchInput(""); setExtVideos([]); setExtPage(1); setExtHasMore(true); setCurrentIndex(0); setShowSearch(false); }}
+                  className="mt-2 text-red-400 text-[12px] font-medium">
+                  ✕ সার্চ ক্লিয়ার করুন
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {(reelsLoading && !initialLoaded && extVideos.length === 0) ? (
         <div className="flex items-center justify-center h-full">
           <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin" />
         </div>
       ) : showEmpty ? (
-        <div className="flex flex-col items-center justify-center h-full text-white/60 gap-3">
-          <Play className="w-16 h-16" />
-          <p className="font-bold text-lg">ভিডিও লোড হচ্ছে...</p>
-          <button onClick={() => { setExtPage(1); setExtHasMore(true); loadMoreExternal(); }}
-            className="mt-4 px-6 py-2 bg-primary rounded-full text-primary-foreground font-bold">আবার চেষ্টা করুন</button>
+        <div className="flex flex-col items-center justify-center h-full text-white/60 gap-3 px-6 text-center">
+          <Play className="w-14 h-14" />
+          <p className="font-bold text-lg">{activeSearch ? `"${activeSearch}" পাওয়া যায়নি` : "ভিডিও লোড হচ্ছে..."}</p>
+          <div className="flex gap-2">
+            {activeSearch && (
+              <button onClick={() => { setActiveSearch(""); setExtVideos([]); setExtPage(1); setExtHasMore(true); }}
+                className="px-5 py-2 bg-white/20 rounded-full text-white font-bold text-sm">ক্লিয়ার</button>
+            )}
+            <button onClick={() => { setExtPage(1); setExtHasMore(true); loadMoreExternal(); }}
+              className="px-5 py-2 bg-primary rounded-full text-primary-foreground font-bold text-sm">আবার চেষ্টা</button>
+          </div>
         </div>
       ) : (
         <div
           ref={containerRef}
           className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           {allReels.map((reel, index) => {
             const myReaction = userReactions[reel.id];
-            const isNearby = Math.abs(index - currentIndex) <= renderWindow;
+            const isNearby = Math.abs(index - currentIndex) <= W;
             const isActive = index === currentIndex;
 
             return (
-              <div
-                key={reel.id}
-                data-index={index}
-                className="h-full w-full snap-start snap-always relative"
-              >
-                {/* Only render heavy content for nearby items */}
+              <div key={reel.id} data-index={index} className="h-full w-full snap-start snap-always relative">
                 {isNearby ? (
                   <>
                     {reel.isExternal ? (
-                      <>
-                        {/* Thumbnail background */}
-                        {reel.thumbnail_url && (
-                          <img
-                            src={reel.thumbnail_url}
-                            alt=""
-                            className="absolute inset-0 w-full h-full object-cover"
-                            style={{ filter: isActive ? "none" : "blur(2px) brightness(0.5)" }}
-                            loading="lazy"
-                          />
-                        )}
-                        {/* Iframe only for active & ±1 */}
-                        {Math.abs(index - currentIndex) <= 1 && (
-                          <iframe
-                            src={isActive ? reel.video_url : undefined}
-                            className="absolute inset-0 w-full h-full z-10"
-                            allow="autoplay; fullscreen; picture-in-picture"
-                            allowFullScreen
-                            style={{ border: "none", opacity: isActive ? 1 : 0 }}
-                            loading="lazy"
-                          />
-                        )}
-                        {/* Loading spinner while iframe loads */}
-                        {isActive && (
-                          <div className="absolute inset-0 flex items-center justify-center z-5 pointer-events-none">
-                            <Loader2 className="w-10 h-10 text-white/50 animate-spin" />
-                          </div>
-                        )}
-                      </>
+                      /* Dailymotion iframe — directly plays video, no thumbnail */
+                      <iframe
+                        src={isActive || Math.abs(index - currentIndex) <= 1 ? reel.video_url : undefined}
+                        className="absolute inset-0 w-full h-full"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        style={{ border: "none" }}
+                      />
                     ) : (
                       <video
-                        ref={(el) => { if (el) videoRefs.current[reel.id] = el; }}
+                        ref={el => { if (el) videoRefs.current[reel.id] = el; }}
                         src={reel.video_url}
                         className="absolute inset-0 w-full h-full object-cover"
-                        loop playsInline muted={muted} preload={isNearby ? "auto" : "none"}
+                        loop playsInline muted={muted} preload="auto"
                         onClick={() => handleVideoTap(reel.id)}
                         onPlay={() => handleVideoPlay(reel.id)}
-                        poster={reel.thumbnail_url || undefined}
                       />
                     )}
 
-                    {/* Pause indicator */}
                     {!reel.isExternal && paused === reel.id && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                        <div className="w-20 h-20 bg-black/40 rounded-full flex items-center justify-center">
-                          <Play className="w-10 h-10 text-white ml-1" />
+                        <div className="w-16 h-16 bg-black/40 rounded-full flex items-center justify-center">
+                          <Play className="w-8 h-8 text-white ml-0.5" />
                         </div>
                       </div>
                     )}
 
-                    {/* Love animation */}
                     <AnimatePresence>
                       {showLoveAnim === reel.id && (
                         <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 2, opacity: 0 }} exit={{ opacity: 0 }}
                           transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                          <span className="text-8xl">❤️</span>
+                          <span className="text-7xl">❤️</span>
                         </motion.div>
                       )}
                     </AnimatePresence>
 
                     {/* Bottom gradient */}
-                    <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-10" />
+                    <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-black/70 to-transparent pointer-events-none z-10" />
 
                     {/* Info */}
-                    <div className="absolute bottom-4 left-4 right-16 z-20">
+                    <div className="absolute bottom-3 left-3 right-14 z-20">
                       {reel.isExternal ? (
-                        <>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                              <Globe className="w-4.5 h-4.5 text-white" />
-                            </div>
-                            <div>
-                              <span className="text-white font-bold text-[13px] drop-shadow-lg block">{reel.externalCreator || "বাংলা ভিডিও"}</span>
-                              <span className="text-white/60 text-[10px] drop-shadow-lg">
-                                {CATEGORY_LABELS[reel.category || ""] || "বাংলাদেশ ভিডিও"}
-                              </span>
-                            </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Globe className="w-4 h-4 text-white/70 shrink-0" />
+                            <span className="text-white font-bold text-[12px] drop-shadow-lg truncate">{reel.externalCreator || "বাংলা"}</span>
+                            {reel.category && <span className="text-white/50 text-[10px]">{CAT_LABEL[reel.category] || ""}</span>}
                           </div>
-                          {reel.externalTitle && (
-                            <p className="text-white/90 text-[13px] line-clamp-2 drop-shadow-lg">{reel.externalTitle}</p>
-                          )}
-                        </>
+                          <p className="text-white/80 text-[12px] line-clamp-1 drop-shadow-lg">{reel.externalTitle}</p>
+                        </div>
                       ) : (
-                        <>
-                          <button onClick={() => navigate(`/user/${reel.user_id}`)} className="flex items-center gap-2 mb-1.5">
-                            <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-white/50 bg-white/20 flex items-center justify-center">
+                        <div>
+                          <button onClick={() => navigate(`/user/${reel.user_id}`)} className="flex items-center gap-1.5 mb-1">
+                            <div className="w-8 h-8 rounded-full overflow-hidden border border-white/50 bg-white/20 flex items-center justify-center shrink-0">
                               {reel.user?.avatar_url ? <img src={reel.user.avatar_url} className="w-full h-full object-cover" /> :
-                                <User className="w-4.5 h-4.5 text-white" />}
+                                <User className="w-4 h-4 text-white" />}
                             </div>
-                            <span className="text-white font-bold text-[13px] drop-shadow-lg">{reel.user?.display_name || "User"}</span>
+                            <span className="text-white font-bold text-[12px] drop-shadow-lg">{reel.user?.display_name || "User"}</span>
                           </button>
-                          {reel.content && <p className="text-white/90 text-[13px] line-clamp-2 drop-shadow-lg">{renderMentionText(reel.content)}</p>}
-                        </>
+                          {reel.content && <p className="text-white/80 text-[12px] line-clamp-1 drop-shadow-lg">{reel.content}</p>}
+                        </div>
                       )}
                     </div>
 
                     {/* Actions */}
-                    <div className="absolute right-3 bottom-20 z-20 flex flex-col items-center gap-4">
+                    <div className="absolute right-2 bottom-16 z-20 flex flex-col items-center gap-3">
                       {!reel.isExternal && (
                         <>
                           <button onClick={() => reactionMutation.mutate({ postId: reel.id, type: myReaction || "love" })}
-                            className="flex flex-col items-center gap-0.5">
-                            <div className={`w-11 h-11 rounded-full flex items-center justify-center ${myReaction ? "bg-red-500/30" : "bg-white/20"}`}>
-                              {myReaction ? <span className="text-xl">{REACTION_EMOJIS[myReaction]}</span> : <Heart className="w-5 h-5 text-white" />}
+                            className="flex flex-col items-center">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${myReaction ? "bg-red-500/30" : "bg-white/15"}`}>
+                              {myReaction ? <span className="text-lg">{REACTION_EMOJIS[myReaction]}</span> : <Heart className="w-5 h-5 text-white" />}
                             </div>
-                            {reel.likes_count > 0 && <span className="text-white text-[11px] font-bold">{reel.likes_count}</span>}
+                            {reel.likes_count > 0 && <span className="text-white text-[10px] font-bold mt-0.5">{reel.likes_count}</span>}
                           </button>
-                          <button onClick={() => { setCommentingPostId(reel.id); loadComments(reel.id); }}
-                            className="flex flex-col items-center gap-0.5">
-                            <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
+                          <button onClick={() => { setCommentingPostId(reel.id); loadComments(reel.id); }} className="flex flex-col items-center">
+                            <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
                               <MessageCircle className="w-5 h-5 text-white" />
                             </div>
-                            {reel.comments_count > 0 && <span className="text-white text-[11px] font-bold">{reel.comments_count}</span>}
+                            {reel.comments_count > 0 && <span className="text-white text-[10px] font-bold mt-0.5">{reel.comments_count}</span>}
                           </button>
                         </>
                       )}
-                      <button onClick={() => sharePost(reel)} className="flex flex-col items-center gap-0.5">
-                        <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
+                      <button onClick={() => sharePost(reel)} className="flex flex-col items-center">
+                        <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
                           <Share2 className="w-5 h-5 text-white" />
                         </div>
-                        <span className="text-white text-[10px] font-bold">শেয়ার</span>
                       </button>
                     </div>
                   </>
                 ) : (
-                  /* Placeholder for far-away items — just a dark div */
                   <div className="absolute inset-0 bg-black" />
                 )}
               </div>
             );
           })}
 
-          {/* Loading indicator at bottom */}
+          {/* Bottom loading */}
           {extHasMore && (
-            <div className="h-20 flex items-center justify-center snap-start">
-              <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+            <div className="h-16 flex items-center justify-center snap-start">
+              {extLoading && <Loader2 className="w-6 h-6 text-white/40 animate-spin" />}
             </div>
           )}
         </div>
@@ -519,7 +491,7 @@ export default function Reels() {
                 <p className="text-sm text-muted-foreground text-center py-4">লোড হচ্ছে...</p>
               ) : comments.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">প্রথম মন্তব্য করুন!</p>
-              ) : comments.map((c) => (
+              ) : comments.map(c => (
                 <div key={c.id} className="flex gap-2">
                   <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
                     {c.user?.avatar_url ? <img src={c.user.avatar_url} className="w-full h-full object-cover" /> :
@@ -527,14 +499,14 @@ export default function Reels() {
                   </div>
                   <div className="bg-secondary/60 rounded-2xl px-3 py-2 flex-1">
                     <p className="text-[12px] font-bold text-foreground">{c.user?.display_name || "User"}</p>
-                    <p className="text-[13px] text-foreground/90 mt-0.5">{renderMentionText(c.content)}</p>
+                    <p className="text-[13px] text-foreground/90 mt-0.5">{c.content}</p>
                   </div>
                 </div>
               ))}
             </div>
             <div className="flex items-center gap-2 px-4 py-3 border-t border-border/30">
-              <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && commentText.trim() && commentMutation.mutate()}
+              <input value={commentText} onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && commentText.trim() && commentMutation.mutate()}
                 placeholder="মন্তব্য করুন..."
                 className="flex-1 bg-secondary text-foreground rounded-full px-4 py-2.5 text-sm border-none outline-none placeholder:text-muted-foreground" />
               <button onClick={() => commentText.trim() && commentMutation.mutate()}
