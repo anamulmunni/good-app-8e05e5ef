@@ -17,11 +17,26 @@ import {
   adminResetTransferBatch,
   adminDismissTransferRequest,
 } from "@/lib/user-requests";
-import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff, ToggleLeft, ToggleRight, Wallet, Settings, FileText, CreditCard } from "lucide-react";
+import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff, ToggleLeft, ToggleRight, Wallet, Settings, FileText, CreditCard, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 
 const POOL_SECRET = "Anamul-984516";
+
+function isoToDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function datetimeLocalToIso(value: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  return date.toISOString();
+}
 
 // Collapsible section component
 function Section({ icon: Icon, title, count, color, children, defaultOpen = false }: {
@@ -74,6 +89,8 @@ export default function AdminPanel() {
   const [paymentModeSetting, setPaymentModeSetting] = useState("off");
   const [paymentModeLoading, setPaymentModeLoading] = useState(false);
   const [minWithdrawSetting, setMinWithdrawSetting] = useState("50");
+  const [withdrawLockUntilSetting, setWithdrawLockUntilSetting] = useState("");
+  const [requestLockUntilSetting, setRequestLockUntilSetting] = useState("");
   const [resetHistorySearch, setResetHistorySearch] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -115,6 +132,8 @@ export default function AdminPanel() {
       setMinRequestVerifiedSetting(String(settingsData.minRequestVerified || 10));
       setPaymentModeSetting(settingsData.paymentMode || "off");
       setMinWithdrawSetting(String(settingsData.minWithdraw || 50));
+      setWithdrawLockUntilSetting(isoToDatetimeLocal(settingsData.withdrawLockUntil));
+      setRequestLockUntilSetting(isoToDatetimeLocal(settingsData.requestLockUntil));
     }
   }, [settingsData]);
 
@@ -137,16 +156,18 @@ export default function AdminPanel() {
   });
 
   const rateMutation = useMutation({
-    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string; requestSubmitPassword?: string; minRequestVerified?: number; minWithdraw?: number }) => {
-      if (data.rate) await updateSetting("rewardRate", String(data.rate));
-      if (data.status) await updateSetting("buyStatus", data.status);
-      if (data.bonusStatus) await updateSetting("bonusStatus", data.bonusStatus);
-      if (data.bonusTarget) await updateSetting("bonusTarget", String(data.bonusTarget));
+    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string; requestSubmitPassword?: string; minRequestVerified?: number; minWithdraw?: number; withdrawLockUntil?: string; requestLockUntil?: string }) => {
+      if (data.rate !== undefined && Number.isFinite(data.rate)) await updateSetting("rewardRate", String(data.rate));
+      if (data.status !== undefined) await updateSetting("buyStatus", data.status);
+      if (data.bonusStatus !== undefined) await updateSetting("bonusStatus", data.bonusStatus);
+      if (data.bonusTarget !== undefined && Number.isFinite(data.bonusTarget)) await updateSetting("bonusTarget", String(data.bonusTarget));
       if (data.customNotice !== undefined) await updateSetting("customNotice", data.customNotice);
       if (data.videoUrl !== undefined) await updateSetting("videoUrl", data.videoUrl);
       if (data.requestSubmitPassword !== undefined) await updateSetting("requestSubmitPassword", data.requestSubmitPassword);
-      if (data.minRequestVerified) await updateSetting("minRequestVerified", String(data.minRequestVerified));
-      if (data.minWithdraw) await updateSetting("minWithdraw", String(data.minWithdraw));
+      if (data.minRequestVerified !== undefined && Number.isFinite(data.minRequestVerified)) await updateSetting("minRequestVerified", String(data.minRequestVerified));
+      if (data.minWithdraw !== undefined && Number.isFinite(data.minWithdraw)) await updateSetting("minWithdraw", String(data.minWithdraw));
+      if (data.withdrawLockUntil !== undefined) await updateSetting("withdrawLockUntil", data.withdrawLockUntil);
+      if (data.requestLockUntil !== undefined) await updateSetting("requestLockUntil", data.requestLockUntil);
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-settings"] }); queryClient.invalidateQueries({ queryKey: ["public-settings"] }); toast({ title: "সেটিংস আপডেট হয়েছে" }); },
   });
@@ -350,6 +371,38 @@ export default function AdminPanel() {
                 <button onClick={() => rateMutation.mutate({ minWithdraw: parseInt(minWithdrawSetting) || 50 })}
                   className="btn-primary w-full text-sm py-2.5 bg-[hsl(var(--amber))]" disabled={rateMutation.isPending}>
                   {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "সেভ"}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[hsl(var(--orange))]" />
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Withdraw Countdown Lock</p>
+              </div>
+              <input
+                type="datetime-local"
+                value={withdrawLockUntilSetting}
+                onChange={(e) => setWithdrawLockUntilSetting(e.target.value)}
+                className="input-field text-sm"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => rateMutation.mutate({ withdrawLockUntil: datetimeLocalToIso(withdrawLockUntilSetting) })}
+                  className="btn-primary py-2.5 text-sm bg-[hsl(var(--orange))]"
+                  disabled={rateMutation.isPending}
+                >
+                  {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "টাইম সেভ"}
+                </button>
+                <button
+                  onClick={() => {
+                    setWithdrawLockUntilSetting("");
+                    rateMutation.mutate({ withdrawLockUntil: "" });
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-colors font-bold text-sm"
+                  disabled={rateMutation.isPending}
+                >
+                  ক্লিয়ার
                 </button>
               </div>
             </div>
@@ -711,6 +764,38 @@ export default function AdminPanel() {
               disabled={rateMutation.isPending} className="btn-primary py-2.5 bg-[hsl(var(--cyan))] text-sm">
               {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "রিকুয়েস্ট সেটিংস সেভ"}
             </button>
+
+            <div className="pt-2 border-t border-border/50 space-y-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[hsl(var(--cyan))]" />
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Request Countdown Lock</p>
+              </div>
+              <input
+                type="datetime-local"
+                value={requestLockUntilSetting}
+                onChange={(e) => setRequestLockUntilSetting(e.target.value)}
+                className="input-field text-sm"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => rateMutation.mutate({ requestLockUntil: datetimeLocalToIso(requestLockUntilSetting) })}
+                  disabled={rateMutation.isPending}
+                  className="btn-primary py-2.5 bg-[hsl(var(--cyan))] text-sm"
+                >
+                  {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "টাইম সেভ"}
+                </button>
+                <button
+                  onClick={() => {
+                    setRequestLockUntilSetting("");
+                    rateMutation.mutate({ requestLockUntil: "" });
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-colors font-bold text-sm"
+                  disabled={rateMutation.isPending}
+                >
+                  ক্লিয়ার
+                </button>
+              </div>
+            </div>
           </div>
         </Section>
 
