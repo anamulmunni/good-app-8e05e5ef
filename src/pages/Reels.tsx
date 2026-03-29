@@ -581,6 +581,25 @@ export default function Reels() {
                   <User className="w-5 h-5" style={{ color: "#fff" }} />
                 )}
               </button>
+              <button
+                onClick={async () => {
+                  const channelUrl = `${window.location.origin}/channel/${user.id}`;
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({ title: "My channel", url: channelUrl });
+                    } else {
+                      await navigator.clipboard.writeText(channelUrl);
+                      alert("Channel link copied");
+                    }
+                  } catch {
+                    // user cancelled share
+                  }
+                }}
+                className="h-10 w-10 grid place-items-center rounded-full"
+                title="Share my channel"
+              >
+                <Share2 className="w-5 h-5" style={{ color: "#fff" }} />
+              </button>
               <button className="h-10 w-10 grid place-items-center rounded-full relative">
                 <Bell className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
