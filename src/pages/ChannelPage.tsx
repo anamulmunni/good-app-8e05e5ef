@@ -11,8 +11,37 @@ import {
   type ChannelStats,
   type ExternalReelVideo,
 } from "@/lib/feed-api";
-import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X, Share2 } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X, Share2, Copy, Check } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
+
+async function shareOrCopy(title: string, url: string) {
+  // Try native share first
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url });
+      return;
+    } catch (e: any) {
+      if (e?.name === "AbortError") return; // user cancelled
+    }
+  }
+  // Fallback: copy to clipboard
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copied!", { description: url });
+  } catch {
+    // Final fallback: prompt
+    const input = document.createElement("textarea");
+    input.value = url;
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand("copy");
+    document.body.removeChild(input);
+    toast.success("Link copied!", { description: url });
+  }
+}
 
 function parseLongVideoMeta(content?: string | null): { title: string; duration?: number } | null {
   if (!content || !content.startsWith(LONG_VIDEO_MARKER)) return null;
@@ -243,16 +272,9 @@ export default function ChannelPage() {
                 <Video className="w-4 h-4" /> Upload Video
               </button>
               <button
-                onClick={async () => {
+                onClick={() => {
                   const channelUrl = `${window.location.origin}/channel/${channelUserId}`;
-                  try {
-                    if (navigator.share) {
-                      await navigator.share({ title: `${channelOwner.display_name || channelOwner.guest_id} - good-app`, url: channelUrl });
-                    } else {
-                      await navigator.clipboard.writeText(channelUrl);
-                      alert("Channel link copied!");
-                    }
-                  } catch {}
+                  shareOrCopy(`${channelOwner.display_name || channelOwner.guest_id} - good-app`, channelUrl);
                 }}
                 className="flex-1 py-2.5 rounded-full text-[13px] font-semibold"
                 style={{ background: "#272727", color: "#f1f1f1" }}
@@ -265,17 +287,10 @@ export default function ChannelPage() {
           {!isOwnChannel && (
             <div className="mt-2 flex justify-end">
               <button
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
                   const channelUrl = `${window.location.origin}/channel/${channelUserId}`;
-                  try {
-                    if (navigator.share) {
-                      await navigator.share({ title: `${channelOwner.display_name || channelOwner.guest_id} - good-app`, url: channelUrl });
-                    } else {
-                      await navigator.clipboard.writeText(channelUrl);
-                      alert("Channel link copied!");
-                    }
-                  } catch {}
+                  shareOrCopy(`${channelOwner.display_name || channelOwner.guest_id} - good-app`, channelUrl);
                 }}
                 className="px-3 py-1.5 rounded-full text-[12px] font-medium flex items-center gap-1"
                 style={{ background: "#272727", color: "#aaa" }}
@@ -318,10 +333,10 @@ export default function ChannelPage() {
           ) : (
             <div>
               {videos.map((video) => (
-                <button
+                <div
                   key={video.id}
-                  onClick={() => navigate(`/reels?play=${video.post_id}`)}
-                  className="w-full text-left"
+                  onClick={() => navigate(`/watch/${video.post_id}`)}
+                  className="w-full text-left cursor-pointer"
                 >
                   {/* Thumbnail - use video poster or placeholder */}
                   <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
@@ -371,17 +386,11 @@ export default function ChannelPage() {
                       </p>
                       <button
                         type="button"
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
+                          e.preventDefault();
                           const videoUrl = `${window.location.origin}/watch/${video.post_id}`;
-                          try {
-                            if (navigator.share) {
-                              await navigator.share({ title: video.title, url: videoUrl });
-                            } else {
-                              await navigator.clipboard.writeText(videoUrl);
-                              alert("Video link copied!");
-                            }
-                          } catch {}
+                          shareOrCopy(video.title, videoUrl);
                         }}
                         className="flex items-center gap-1 mt-1 text-[11px] font-medium"
                         style={{ color: "#3ea6ff" }}
@@ -390,7 +399,7 @@ export default function ChannelPage() {
                       </button>
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
