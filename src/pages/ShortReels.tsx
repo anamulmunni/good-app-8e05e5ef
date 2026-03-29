@@ -152,7 +152,7 @@ export default function ShortReels() {
       if (doubleTapTimerRef.current) { clearTimeout(doubleTapTimerRef.current); doubleTapTimerRef.current = null; }
       setShowLoveAnimation(true);
       setTimeout(() => setShowLoveAnimation(false), 1000);
-      if (currentVideo) {
+      if (currentVideo && !currentVideo.isSample) {
         // Instant UI update
         setUserReactions((prev) => ({ ...prev, [currentVideo.id]: "love" }));
         // Fire-and-forget API call
