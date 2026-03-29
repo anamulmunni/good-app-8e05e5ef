@@ -86,9 +86,10 @@ function isEmbed(url: string) {
 
 function buildExternalPlayerUrl(url: string, autoplay = false) {
   const separator = url.includes("?") ? "&" : "?";
-  // YouTube embeds
+  // YouTube autoplay with sound is often force-muted by browser policy.
+  // Keep autoplay off for YouTube so first manual play starts with sound.
   if (url.includes("youtube.com/embed/")) {
-    return `${url}${separator}autoplay=${autoplay ? 1 : 0}&rel=0&modestbranding=1&playsinline=1`;
+    return `${url}${separator}autoplay=0&mute=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1`;
   }
   // Dailymotion embeds
   return `${url}${separator}autoplay=${autoplay ? 1 : 0}&quality=1080&mute=0&sharing-enable=false&ui-start-screen-info=false&start=0`;
