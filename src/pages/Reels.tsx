@@ -296,6 +296,7 @@ export default function Reels() {
   const [longThumbnailFile, setLongThumbnailFile] = useState<File | null>(null);
   const [longThumbnailPreview, setLongThumbnailPreview] = useState<string | null>(null);
   const [channelStats, setChannelStats] = useState<{ subscriber_count: number; total_videos: number; is_subscribed: boolean } | null>(null);
+  const [showHistorySheet, setShowHistorySheet] = useState(false);
   const [channelLoading, setChannelLoading] = useState(false);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [engagementStats, setEngagementStats] = useState<{ likes_count: number; comments_count: number } | null>(null);
@@ -796,52 +797,61 @@ export default function Reels() {
               <Search className="w-5 h-5" style={{ color: "#fff" }} />
             </button>
           </div>
-          {/* Search history dropdown */}
-          {searchHistory.length > 0 && (
-            <div className="px-2 pb-2 space-y-0.5" style={{ maxHeight: "60vh", overflowY: "auto" }}>
-              <div className="flex items-center justify-between px-2 py-1.5">
-                <span className="text-[13px] font-medium" style={{ color: "#aaa" }}>সার্চ হিস্ট্রি</span>
-                <button
-                  onClick={() => {
-                    window.localStorage.removeItem(SEARCH_HISTORY_KEY);
-                    setSearchHistory([]);
-                  }}
-                  className="text-[11px] px-2 py-1 rounded"
-                  style={{ color: "#3ea6ff" }}
-                >
-                  Clear all
-                </button>
-              </div>
-              {searchHistory.map((q) => (
-                <div key={q} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
-                  <History className="w-4 h-4 shrink-0" style={{ color: "#717171" }} />
-                  <button
-                    className="flex-1 text-left text-[14px] truncate"
-                    style={{ color: "#f1f1f1" }}
-                    onClick={() => {
-                      setSearchInput(q);
-                      setSearchQuery(q);
-                      setSelectedChip("All");
-                      setSearchMode(false);
-                      saveSearchHistory(q);
-                      setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
-                    }}
-                  >
-                    {q}
-                  </button>
-                  <button
-                    onClick={() => {
-                      removeSearchHistoryItem(q);
-                      setSearchHistory(readSearchHistory());
-                    }}
-                    className="shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
-                  </button>
+          {/* Search suggestions - filter as user types */}
+          {(() => {
+            const q = searchInput.trim().toLowerCase();
+            const filtered = q
+              ? searchHistory.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+              : searchHistory;
+            if (filtered.length === 0) return null;
+            return (
+              <div className="px-2 pb-2 space-y-0.5" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-[13px] font-medium" style={{ color: "#aaa" }}>{q ? "সাজেশন" : "সার্চ হিস্ট্রি"}</span>
+                  {!q && (
+                    <button
+                      onClick={() => {
+                        window.localStorage.removeItem(SEARCH_HISTORY_KEY);
+                        setSearchHistory([]);
+                      }}
+                      className="text-[11px] px-2 py-1 rounded"
+                      style={{ color: "#3ea6ff" }}
+                    >
+                      Clear all
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+                {filtered.map((item) => (
+                  <div key={item} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
+                    {q ? <Search className="w-4 h-4 shrink-0" style={{ color: "#717171" }} /> : <History className="w-4 h-4 shrink-0" style={{ color: "#717171" }} />}
+                    <button
+                      className="flex-1 text-left text-[14px] truncate"
+                      style={{ color: "#f1f1f1" }}
+                      onClick={() => {
+                        setSearchInput(item);
+                        setSearchQuery(item);
+                        setSelectedChip("All");
+                        setSearchMode(false);
+                        saveSearchHistory(item);
+                        setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
+                      }}
+                    >
+                      {item}
+                    </button>
+                    <button
+                      onClick={() => {
+                        removeSearchHistoryItem(item);
+                        setSearchHistory(readSearchHistory());
+                      }}
+                      className="shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           </>
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
@@ -863,7 +873,7 @@ export default function Reels() {
               <button onClick={handleRefreshFeed} className="h-10 w-10 grid place-items-center rounded-full">
                 <RefreshCcw className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
-              <button onClick={() => navigate(`/channel/${user.id}`)} className="h-10 w-10 grid place-items-center rounded-full overflow-hidden" title="My Channel">
+              <button onClick={() => { setShowHistorySheet(true); setWatchHistory(readWatchHistory()); }} className="h-10 w-10 grid place-items-center rounded-full overflow-hidden" title="My Channel & History">
                 {user.avatar_url ? (
                   <img src={user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
                 ) : (
@@ -1363,6 +1373,126 @@ export default function Reels() {
         )}
       </AnimatePresence>
 
+      {/* Profile & Watch History Bottom Sheet */}
+      <AnimatePresence>
+        {showHistorySheet && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100]"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={() => setShowHistorySheet(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="absolute bottom-0 left-0 right-0 rounded-t-2xl flex flex-col"
+              style={{ background: "#212121", maxHeight: "80vh" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Handle bar */}
+              <div className="flex justify-center py-2">
+                <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
+              </div>
+
+              {/* Profile section */}
+              <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: "1px solid #383838" }}>
+                <div className="w-12 h-12 rounded-full overflow-hidden" style={{ background: "#383838" }}>
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-lg font-bold" style={{ color: "#aaa" }}>
+                      {(user?.display_name || "?")[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold truncate" style={{ color: "#f1f1f1" }}>{user?.display_name || user?.guest_id}</p>
+                  <button
+                    onClick={() => { setShowHistorySheet(false); navigate(`/channel/${user.id}`); }}
+                    className="text-[13px] mt-0.5"
+                    style={{ color: "#3ea6ff" }}
+                  >
+                    View your channel
+                  </button>
+                </div>
+              </div>
+
+              {/* Watch History */}
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid #383838" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="w-4.5 h-4.5" style={{ color: "#aaa" }} />
+                  <span className="text-[15px] font-semibold" style={{ color: "#f1f1f1" }}>সম্প্রতি দেখা হয়েছে</span>
+                </div>
+                {watchHistory.length === 0 ? (
+                  <p className="text-[13px] py-4 text-center" style={{ color: "#717171" }}>কোনো ভিডিও দেখা হয়নি</p>
+                ) : (
+                  <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+                    {watchHistory.slice(0, 20).map((h) => (
+                      <button
+                        key={h.id}
+                        onClick={() => {
+                          setShowHistorySheet(false);
+                          playVideo({
+                            id: h.id,
+                            title: h.title,
+                            video_url: h.video_url,
+                            watch_url: h.watch_url,
+                            thumbnail_url: h.thumbnail_url,
+                            creator: h.creator,
+                            duration: h.duration,
+                            isExternal: h.isExternal,
+                            uploader_user_id: h.uploader_user_id,
+                            uploader_guest_id: h.uploader_guest_id,
+                            uploader_avatar_url: h.uploader_avatar_url,
+                            uploader_is_verified_badge: h.uploader_is_verified_badge,
+                            local_post_id: h.local_post_id,
+                            likes_count: h.likes_count,
+                            comments_count: h.comments_count,
+                          });
+                        }}
+                        className="flex gap-3 w-full text-left"
+                      >
+                        <div className="w-[120px] h-[68px] shrink-0 rounded-lg overflow-hidden relative" style={{ background: "#1a1a1a" }}>
+                          {h.thumbnail_url ? (
+                            <img src={h.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full grid place-items-center"><Play className="w-5 h-5" style={{ color: "#555" }} /></div>
+                          )}
+                          {h.duration ? (
+                            <span className="absolute right-1 bottom-1 text-[9px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
+                              {fmt(h.duration)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1 py-0.5">
+                          <p className="text-[13px] font-medium line-clamp-2 leading-[17px]" style={{ color: "#f1f1f1" }}>{h.title}</p>
+                          <p className="text-[11px] mt-1 truncate" style={{ color: "#aaa" }}>{h.creator || "Unknown"}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Close button */}
+              <div className="px-4 py-3">
+                <button
+                  onClick={() => setShowHistorySheet(false)}
+                  className="w-full py-2.5 rounded-full text-[14px] font-medium"
+                  style={{ background: "#383838", color: "#f1f1f1" }}
+                >
+                  বন্ধ করুন
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {selectedVideo && miniPlayer && (
         <div
           className="fixed bottom-20 right-3 w-[180px] rounded-lg overflow-hidden shadow-2xl cursor-pointer z-50"
@@ -1424,56 +1554,7 @@ export default function Reels() {
             </div>
           )}
 
-          {/* Watch History Section - show when no video is selected and not searching */}
-          {!selectedVideo && !searchQuery.trim() && watchHistory.length > 0 && (
-            <div className="px-3 py-3" style={{ borderBottom: "1px solid #272727" }}>
-              <div className="flex items-center gap-2 mb-2.5">
-                <Clock className="w-4 h-4" style={{ color: "#aaa" }} />
-                <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>সম্প্রতি দেখা হয়েছে</span>
-              </div>
-              <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
-                {watchHistory.slice(0, 10).map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={() => playVideo({
-                      id: h.id,
-                      title: h.title,
-                      video_url: h.video_url,
-                      watch_url: h.watch_url,
-                      thumbnail_url: h.thumbnail_url,
-                      creator: h.creator,
-                      duration: h.duration,
-                      isExternal: h.isExternal,
-                      uploader_user_id: h.uploader_user_id,
-                      uploader_guest_id: h.uploader_guest_id,
-                      uploader_avatar_url: h.uploader_avatar_url,
-                      uploader_is_verified_badge: h.uploader_is_verified_badge,
-                      local_post_id: h.local_post_id,
-                      likes_count: h.likes_count,
-                      comments_count: h.comments_count,
-                    })}
-                    className="shrink-0 w-[150px] text-left"
-                  >
-                    <div className="w-full aspect-video rounded-lg overflow-hidden relative" style={{ background: "#1a1a1a" }}>
-                      {h.thumbnail_url ? (
-                        <img src={h.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-full grid place-items-center"><Play className="w-6 h-6" style={{ color: "#555" }} /></div>
-                      )}
-                      {h.duration ? (
-                        <span className="absolute right-1 bottom-1 text-[9px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
-                          {fmt(h.duration)}
-                        </span>
-                      ) : null}
-                      <div className="absolute inset-0 bg-black/20" />
-                    </div>
-                    <p className="text-[11px] font-medium line-clamp-2 mt-1.5 leading-[14px]" style={{ color: "#f1f1f1" }}>{h.title}</p>
-                    <p className="text-[10px] mt-0.5 line-clamp-1" style={{ color: "#aaa" }}>{h.creator || "Unknown"}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Watch history removed from here - now in profile sheet */}
 
           {allVideos.filter((v) => v.id !== selectedVideo?.id).map((video) => (
             <button
