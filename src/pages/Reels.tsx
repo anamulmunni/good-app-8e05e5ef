@@ -151,7 +151,7 @@ export default function Reels() {
     if (!reset && !hasMore) return;
     loadingRef.current = true;
     setLoading(true);
-    let p = reset ? (activeQuery ? 1 : Math.floor(Math.random() * 8) + 1) : page;
+    let p = reset ? (activeQuery ? 1 : (Math.abs((Date.now() + refreshTick * 997) % 45) + 1)) : page;
     try {
       let [externalResult, localResult] = await Promise.all([
         getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long", refreshTick),
@@ -191,7 +191,7 @@ export default function Reels() {
       loadingRef.current = true;
       setLoading(true);
       try {
-        let externalStartPage = activeQuery ? 1 : Math.floor(Math.random() * 8) + 1;
+        let externalStartPage = activeQuery ? 1 : (Math.abs((Date.now() + refreshTick * 997) % 45) + 1);
         let [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
@@ -316,6 +316,7 @@ export default function Reels() {
   }, []);
 
   const playVideo = useCallback((v: VideoItem) => {
+    trackVideoPreference({ title: v.title });
     setSelectedVideo(v);
     setMiniPlayer(false);
     setTimeout(() => playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);

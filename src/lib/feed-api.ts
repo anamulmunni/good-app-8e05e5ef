@@ -696,82 +696,69 @@ export async function getBangladeshExternalVideos(
   mode: "short" | "long" = "long",
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
-  // Try YouTube (via Invidious) first — it has the best Bangla music catalog
-  try {
-    const ytResult = await fetchYouTubeVideos(searchQuery, page, rows, freshnessToken);
-    if (ytResult.videos.length > 0) {
-      return ytResult;
-    }
-  } catch (e) {
-    console.warn("YouTube/Invidious search failed, falling back to Dailymotion:", e);
+  const trimmedQuery = searchQuery?.trim();
+  const safeRows = Math.max(rows, 12);
+
+  const [ytResult, dmResult] = await Promise.allSettled([
+    fetchYouTubeVideos(trimmedQuery, page, safeRows, freshnessToken + page),
+    fetchDailymotionFallback(page, safeRows, trimmedQuery, mode, freshnessToken + page * 13),
+  ]);
+
+  const ytVideos = ytResult.status === "fulfilled" ? ytResult.value.videos : [];
+  const dmVideos = dmResult.status === "fulfilled" ? dmResult.value.videos : [];
+  const ytHasMore = ytResult.status === "fulfilled" ? ytResult.value.hasMore : false;
+  const dmHasMore = dmResult.status === "fulfilled" ? dmResult.value.hasMore : false;
+
+  let merged = dedupeExternalVideos([...ytVideos, ...dmVideos]);
+
+  if (trimmedQuery) {
+    const canonical = canonicalizeSearchQuery(trimmedQuery);
+    const words = getQueryWords(canonical);
+
+    merged = merged
+      .map((video) => {
+        const normalizedTitle = normalizeForMatch(video.title);
+        const normalizedCreator = normalizeForMatch(video.creator || "");
+
+        let score = scoreFallbackVideo(video.title, words, canonical)
+          + scorePreferredCategory(video.title, video.category)
+          + (video.source === "youtube" ? 6 : 0)
+          + (video.duration && video.duration >= 120 ? 2 : 0);
+
+        if (normalizedTitle.includes(canonical)) score += 24;
+        if (words.length > 0 && words.every((w) => normalizedTitle.includes(w) || normalizedCreator.includes(w))) {
+          score += 16;
+        }
+
+        return { ...video, _score: score };
+      })
+      .sort((a: any, b: any) => b._score - a._score)
+      .map(({ _score, ...rest }: any) => rest);
+  } else {
+    merged = merged
+      .map((video) => {
+        let score = scorePreferredCategory(video.title, video.category)
+          + (isBanglaDefaultSuggestion(video.title, video.country) ? 16 : 0)
+          + (hasFreshMarker(video.title) ? 11 : 0)
+          + (hasQualityMarker(video.title) ? 9 : 0)
+          + (video.source === "youtube" ? 5 : 0);
+
+        return { ...video, _score: score };
+      })
+      .sort((a: any, b: any) => b._score - a._score)
+      .map(({ _score, ...rest }: any) => rest);
+
+    merged = seededShuffle(merged, freshnessToken + page * 31);
   }
 
-  // Fallback to Dailymotion
-  const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
-  if ((searchQuery && searchQuery.trim()) || direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
-    return direct;
+  if (merged.length === 0) {
+    return { videos: [], hasMore: false };
   }
 
-  try {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("rows", String(rows));
-    params.set("mode", mode);
-    if (preferredCategories && preferredCategories.length > 0) {
-      params.set("preferred", preferredCategories.join(","));
-    }
-    if (searchQuery && searchQuery.trim()) {
-      params.set("search", searchQuery.trim());
-    }
-
-    const res = await fetch(
-      `${supabaseUrl}/functions/v1/fetch-external-videos?${params.toString()}`,
-      {
-        headers: {
-          "Authorization": `Bearer ${supabaseKey}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!res.ok) {
-      console.warn("External videos API unavailable, using fallback:", res.status);
-      return fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
-    }
-
-    const data = await res.json();
-    const normalized = Array.isArray(data.videos)
-      ? data.videos.map(normalizeExternalVideo).filter(Boolean) as ExternalReelVideo[]
-      : [];
-
-    const normalizedForMode = searchQuery?.trim()
-      ? normalized
-      : (() => {
-          const strict = normalized.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
-          return strict.length > 0 ? strict : normalized;
-        })();
-
-    if (normalizedForMode.length === 0) {
-      return direct;
-    }
-
-    return {
-      videos: normalizedForMode,
-      hasMore: !!data.hasMore,
-      categories: data.categories,
-    };
-  } catch (e) {
-    console.warn("External videos edge failed, using fallback:", e);
-    try {
-      return await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
-    } catch (fallbackError) {
-      console.error("External videos fallback error:", fallbackError);
-      return { videos: [], hasMore: false };
-    }
-  }
+  return {
+    videos: merged.slice(0, rows),
+    hasMore: merged.length > rows || ytHasMore || dmHasMore,
+  };
 }
 
 // Check if user has posted at least once

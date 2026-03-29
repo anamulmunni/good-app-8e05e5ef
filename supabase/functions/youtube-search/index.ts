@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const INVIDIOUS_INSTANCES = [
@@ -21,48 +21,113 @@ const PIPED_INSTANCES = [
   "https://api.piped.projectsegfau.lt",
 ];
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error(`timeout_${ms}`)), ms);
+    promise
+      .then((value) => {
+        clearTimeout(id);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(id);
+        reject(error);
+      });
+  });
+}
+
+function normalizeVideo(item: any): any | null {
+  const videoId = String(item?.videoId || "").trim();
+  if (!videoId) return null;
+
+  const title = String(item?.title || "").trim();
+  if (!title) return null;
+
+  const duration = Number(item?.lengthSeconds || 0);
+  if (!Number.isFinite(duration) || duration < 30) return null;
+
+  return {
+    videoId,
+    title,
+    author: item?.author ? String(item.author) : null,
+    lengthSeconds: duration,
+    thumbnail: item?.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+  };
+}
+
+async function tryInvidiousInstance(instance: string, query: string, page: number): Promise<any[]> {
+  const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${page}&type=video&sort_by=relevance&region=BD`;
+  const res = await withTimeout(fetch(url), 3200);
+  if (!res.ok) return [];
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+
+  return data
+    .map((item: any) => normalizeVideo({
+      videoId: item?.videoId,
+      title: item?.title,
+      author: item?.author,
+      lengthSeconds: item?.lengthSeconds,
+      thumbnail: item?.videoThumbnails?.[0]?.url,
+    }))
+    .filter(Boolean);
+}
+
 async function searchInvidious(query: string, page: number): Promise<any[]> {
-  for (const instance of INVIDIOUS_INSTANCES) {
-    try {
-      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${page}&type=video&sort_by=relevance&region=BD`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data.map((item: any) => ({
-          videoId: item.videoId,
-          title: item.title,
-          author: item.author,
-          lengthSeconds: item.lengthSeconds,
-          thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
-        }));
-      }
-    } catch { continue; }
-  }
-  return [];
+  const calls = INVIDIOUS_INSTANCES.map((instance) =>
+    tryInvidiousInstance(instance, query, page).catch(() => [])
+  );
+
+  const settled = await Promise.allSettled(calls);
+  return settled
+    .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
+    .flatMap((result) => result.value)
+    .slice(0, 60);
+}
+
+async function tryPipedInstance(instance: string, query: string): Promise<any[]> {
+  const url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
+  const res = await withTimeout(fetch(url), 3200);
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  const items = Array.isArray(data?.items) ? data.items : [];
+
+  return items
+    .filter((item: any) => item?.type === "stream")
+    .map((item: any) => {
+      const videoId = String(item?.url || "").replace("/watch?v=", "");
+      return normalizeVideo({
+        videoId,
+        title: item?.title,
+        author: item?.uploaderName,
+        lengthSeconds: item?.duration,
+        thumbnail: item?.thumbnail,
+      });
+    })
+    .filter(Boolean);
 }
 
 async function searchPiped(query: string): Promise<any[]> {
-  for (const instance of PIPED_INSTANCES) {
-    try {
-      const url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (Array.isArray(data?.items) && data.items.length > 0) {
-        return data.items
-          .filter((item: any) => item.type === "stream")
-          .map((item: any) => ({
-            videoId: item.url?.replace("/watch?v=", ""),
-            title: item.title,
-            author: item.uploaderName,
-            lengthSeconds: item.duration,
-            thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${item.url?.replace("/watch?v=", "")}/hqdefault.jpg`,
-          }));
-      }
-    } catch { continue; }
-  }
-  return [];
+  const calls = PIPED_INSTANCES.map((instance) =>
+    tryPipedInstance(instance, query).catch(() => [])
+  );
+
+  const settled = await Promise.allSettled(calls);
+  return settled
+    .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
+    .flatMap((result) => result.value)
+    .slice(0, 60);
+}
+
+function dedupeVideos(items: any[]): any[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = String(item?.videoId || "");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 serve(async (req) => {
@@ -72,22 +137,30 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const query = url.searchParams.get("q") || "bangla new song 2025";
-    const page = parseInt(url.searchParams.get("page") || "1");
+    const query = String(url.searchParams.get("q") || "bangla new song 2025").trim().slice(0, 140);
+    const pageRaw = Number(url.searchParams.get("page") || "1");
+    const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(20, Math.floor(pageRaw))) : 1;
 
-    // Try Invidious first, then Piped
-    let results = await searchInvidious(query, page);
-    if (results.length === 0) {
-      results = await searchPiped(query);
+    if (!query) {
+      return new Response(JSON.stringify({ results: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    const [invidiousResults, pipedResults] = await Promise.all([
+      searchInvidious(query, page),
+      searchPiped(query),
+    ]);
+
+    const results = dedupeVideos([...invidiousResults, ...pipedResults]).slice(0, 80);
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("youtube-search error:", e);
-    return new Response(JSON.stringify({ results: [], error: String(e) }), {
-      status: 500,
+    return new Response(JSON.stringify({ results: [], error: "search_failed" }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
