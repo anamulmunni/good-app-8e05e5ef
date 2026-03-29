@@ -384,7 +384,15 @@ async function fetchYouTubeVideos(
   const preferredCats = topPreferredCategories(2);
 
   const queries = canonical
-    ? [canonical, `${canonical} song`, `${canonical} official video`, `${canonical} lyrics`, `${canonical} full hd`]
+    ? [
+        canonical,
+        `${canonical} song`,
+        `${canonical} official video`,
+        `${canonical} lyrics`,
+        `${canonical} full hd`,
+        `${canonical} bangla`,
+        `${canonical} audio`,
+      ]
     : [
         ...preferredCats.map((cat) => `bangla ${cat} song new`),
         "bangla new song 2025",
@@ -398,7 +406,7 @@ async function fetchYouTubeVideos(
   const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
   const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
 
-  const fetchPromises = ordered.slice(0, 4).map((q) => fetchYouTubeViaEdge(q, page));
+  const fetchPromises = ordered.slice(0, 6).map((q, idx) => fetchYouTubeViaEdge(q, page + (idx % 2), freshnessToken + idx * 97));
   const allResults = await Promise.all(fetchPromises);
   const results = allResults.flat();
 
