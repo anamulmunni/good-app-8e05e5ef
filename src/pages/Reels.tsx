@@ -694,16 +694,13 @@ export default function Reels() {
               <button
                 onClick={async () => {
                   const channelUrl = `${window.location.origin}/channel/${user.id}`;
-                  try {
-                    if (navigator.share) {
-                      await navigator.share({ title: "My channel", url: channelUrl });
-                    } else {
-                      await navigator.clipboard.writeText(channelUrl);
-                      alert("Channel link copied");
-                    }
-                  } catch {
-                    // user cancelled share
+                  if (navigator.share) {
+                    try { await navigator.share({ title: "My channel", url: channelUrl }); return; } catch (e: any) { if (e?.name === "AbortError") return; }
                   }
+                  try { await navigator.clipboard.writeText(channelUrl); } catch {
+                    const ta = document.createElement("textarea"); ta.value = channelUrl; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+                  }
+                  alert("Channel link copied: " + channelUrl);
                 }}
                 className="h-10 w-10 grid place-items-center rounded-full"
                 title="Share my channel"
@@ -952,14 +949,27 @@ export default function Reels() {
                 const shareUrl = selectedVideo.isExternal
                   ? selectedVideo.watch_url || selectedVideo.video_url
                   : `${window.location.origin}/watch/${selectedVideo.local_post_id || selectedVideo.id}`;
-                try {
-                  if (navigator.share) {
+                if (navigator.share) {
+                  try {
                     await navigator.share({ title: selectedVideo.title, url: shareUrl });
-                  } else {
-                    await navigator.clipboard.writeText(shareUrl);
-                    alert("Link copied!");
+                    return;
+                  } catch (e: any) {
+                    if (e?.name === "AbortError") return;
                   }
-                } catch {}
+                }
+                try {
+                  await navigator.clipboard.writeText(shareUrl);
+                } catch {
+                  const ta = document.createElement("textarea");
+                  ta.value = shareUrl;
+                  ta.style.position = "fixed";
+                  ta.style.opacity = "0";
+                  document.body.appendChild(ta);
+                  ta.select();
+                  document.execCommand("copy");
+                  document.body.removeChild(ta);
+                }
+                alert("Link copied: " + shareUrl);
               }}
             >
               <Share2 className="w-5 h-5" />

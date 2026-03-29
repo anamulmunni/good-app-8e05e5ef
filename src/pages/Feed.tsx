@@ -328,10 +328,12 @@ export default function Feed() {
   };
 
   const storyMutation = useMutation({
-    mutationFn: async ({ file, musicName }: { file: File; musicName?: string }) => {
+    mutationFn: async ({ files, musicName }: { files: File[]; musicName?: string }) => {
       if (!user) throw new Error("Login");
-      const url = await uploadStoryMedia(file);
-      return createStory(user.id, url, musicName);
+      for (const file of files) {
+        const url = await uploadStoryMedia(file);
+        await createStory(user.id, url, musicName);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stories"] });
@@ -413,13 +415,20 @@ export default function Feed() {
   };
 
   const handleStorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setStoryEditorFile(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (files.length === 1) {
+      setStoryEditorFile(files[0]);
+    } else {
+      // Multi-file: upload all directly (max 5)
+      const fileArr = Array.from(files).slice(0, 5);
+      storyMutation.mutate({ files: fileArr });
+    }
     if (e.target) e.target.value = "";
   };
 
   const handleStoryPublish = (editedFile: File, musicName?: string) => {
-    storyMutation.mutate({ file: editedFile, musicName });
+    storyMutation.mutate({ files: [editedFile], musicName });
     setStoryEditorFile(null);
   };
 
@@ -496,10 +505,20 @@ export default function Feed() {
     return `${Math.floor(hrs / 24)} দি.`;
   };
 
+  // Group stories by user, own stories first, newest uploaders first
   const storyGroups = stories.reduce<Record<number, Story[]>>((acc, s) => {
     (acc[s.user_id] = acc[s.user_id] || []).push(s);
     return acc;
   }, {});
+  const sortedStoryEntries = Object.entries(storyGroups).sort(([aId, aStories], [bId, bStories]) => {
+    // Own stories always first
+    if (parseInt(aId) === user?.id) return -1;
+    if (parseInt(bId) === user?.id) return 1;
+    // Then by most recent story
+    const aTime = new Date(aStories[0].created_at || 0).getTime();
+    const bTime = new Date(bStories[0].created_at || 0).getTime();
+    return bTime - aTime;
+  });
 
   if (isLoading || !user) return null;
 
@@ -1040,20 +1059,19 @@ export default function Feed() {
                       <span className="text-[11px] font-semibold text-gray-900 dark:text-foreground mt-1">Create story</span>
                     </div>
                   </button>
-                  <input ref={storyInputRef} type="file" accept="image/*" className="hidden" onChange={handleStorySelect} />
+                  <input ref={storyInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleStorySelect} />
 
-                  {Object.entries(storyGroups).map(([uid, userStories]) => {
+                  {sortedStoryEntries.map(([uid, userStories]) => {
                     const storyUser = userStories[0].user;
                     return (
                       <button key={uid} onClick={() => setViewingStory(userStories[0])}
                         className="relative min-w-[110px] h-[170px] rounded-xl overflow-hidden shrink-0">
                         <img src={userStories[0].image_url} className="w-full h-full object-cover" alt="" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-                        {userStories.length > 1 && (
-                          <span className="absolute top-2 right-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
-                            {userStories.length}
-                          </span>
-                        )}
+                        {/* Story count badge in blue */}
+                        <span className="absolute top-2 right-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
+                          {userStories.length}
+                        </span>
                         <div className="absolute top-2 left-2 w-9 h-9 rounded-full p-[2px] bg-blue-600">
                           <div className="w-full h-full rounded-full overflow-hidden bg-white">
                             {storyUser?.avatar_url ? <img src={storyUser.avatar_url} className="w-full h-full object-cover" /> :
