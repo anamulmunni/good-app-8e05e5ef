@@ -486,11 +486,13 @@ export default function Reels() {
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
+        try { await (screen.orientation as any).unlock?.(); } catch {}
         return;
       }
 
       if (shell.requestFullscreen) {
         await shell.requestFullscreen();
+        try { await (screen.orientation as any).lock?.("landscape"); } catch {}
         return;
       }
 
