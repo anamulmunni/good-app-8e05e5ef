@@ -1036,7 +1036,12 @@ export default function Feed() {
                 <button onClick={() => { setShowCreatePost(true); setTimeout(() => fileInputRef.current?.click(), 300); }}
                   className="flex flex-col items-center gap-0.5 px-2">
                   <Image className="w-5 h-5 text-green-600" />
-                  <span className="text-[10px] text-gray-500 font-medium">Photo</span>
+                  <span className="text-[10px] text-gray-500 font-medium">ছবি</span>
+                </button>
+                <button onClick={() => { setShowCreatePost(true); setTimeout(() => videoInputRef.current?.click(), 300); }}
+                  className="flex flex-col items-center gap-0.5 px-2">
+                  <Video className="w-5 h-5 text-red-500" />
+                  <span className="text-[10px] text-gray-500 font-medium">ভিডিও</span>
                 </button>
               </div>
             </div>
