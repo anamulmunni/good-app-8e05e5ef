@@ -5,9 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// In-memory cache (edge function cold start resets it)
 const cache = new Map<string, { data: any; ts: number }>();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 10 * 60 * 1000;
 
 function getCached(key: string) {
   const entry = cache.get(key);
@@ -17,21 +16,12 @@ function getCached(key: string) {
 }
 
 function setCache(key: string, data: any) {
-  // Limit cache size
   if (cache.size > 200) {
     const oldest = cache.keys().next().value;
     if (oldest) cache.delete(oldest);
   }
   cache.set(key, { data, ts: Date.now() });
 }
-
-// Fallback Invidious instances for when API quota is exhausted
-const INVIDIOUS_INSTANCES = [
-  "https://inv.nadeko.net",
-  "https://invidious.nerdvpn.de",
-  "https://yewtu.be",
-  "https://iv.nbonn.ch",
-];
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -87,32 +77,45 @@ async function searchYouTubeOfficial(
   return { results, nextPageToken: data?.nextPageToken };
 }
 
-// Fallback: Invidious search (no API key needed)
-async function searchInvidiousFallback(query: string): Promise<any[]> {
-  for (const instance of INVIDIOUS_INSTANCES) {
-    try {
-      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort_by=relevance&region=BD`;
-      const res = await withTimeout(fetch(url), 6000);
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (!Array.isArray(data)) continue;
+// Trending/Most Popular videos via YouTube Data API
+async function getTrendingVideos(
+  apiKey: string,
+  maxResults = 25,
+  categoryId?: string,
+): Promise<{ results: any[] }> {
+  const params = new URLSearchParams({
+    part: "snippet,contentDetails",
+    chart: "mostPopular",
+    regionCode: "BD",
+    maxResults: String(maxResults),
+    key: apiKey,
+  });
+  if (categoryId) params.set("videoCategoryId", categoryId);
 
-      return data
-        .filter((item: any) => item?.videoId && item?.title)
-        .map((item: any) => ({
-          videoId: item.videoId,
-          title: item.title,
-          author: item.author || "",
-          channelId: item.authorId || "",
-          lengthSeconds: item.lengthSeconds || 0,
-          thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
-        }))
-        .slice(0, 50);
-    } catch {
-      continue;
-    }
+  const url = `https://www.googleapis.com/youtube/v3/videos?${params}`;
+  const res = await withTimeout(fetch(url), 8000);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error("YouTube Trending API error:", res.status, errBody);
+    return { results: [] };
   }
-  return [];
+
+  const data = await res.json();
+  const items = Array.isArray(data?.items) ? data.items : [];
+
+  const results = items
+    .filter((item: any) => item?.id)
+    .map((item: any) => ({
+      videoId: item.id,
+      title: item.snippet?.title || "",
+      author: item.snippet?.channelTitle || "",
+      channelId: item.snippet?.channelId || "",
+      thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+      publishedAt: item.snippet?.publishedAt || "",
+    }));
+
+  return { results };
 }
 
 serve(async (req) => {
@@ -122,18 +125,58 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const query = String(url.searchParams.get("q") || "bangla new song 2025").trim().slice(0, 140);
+    const action = url.searchParams.get("action") || "search";
+    const query = String(url.searchParams.get("q") || "").trim().slice(0, 140);
     const pageToken = url.searchParams.get("pageToken") || undefined;
-    const order = url.searchParams.get("order") || "relevance"; // relevance, viewCount, date, rating
+    const order = url.searchParams.get("order") || "relevance";
     const maxResults = Math.min(50, Math.max(5, Number(url.searchParams.get("maxResults") || "25")));
 
-    if (!query) {
-      return new Response(JSON.stringify({ results: [] }), {
+    const apiKey = Deno.env.get("YOUTUBE_API_KEY");
+    if (!apiKey) {
+      return new Response(JSON.stringify({ results: [], error: "no_api_key" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Check cache
+    // ACTION: Trending videos
+    if (action === "trending") {
+      const categoryId = url.searchParams.get("categoryId") || undefined;
+      const cacheKey = `trending:${categoryId || "all"}:${maxResults}`;
+      const cached = getCached(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const response = await getTrendingVideos(apiKey, maxResults, categoryId);
+      if (response.results.length > 0) setCache(cacheKey, response);
+
+      return new Response(JSON.stringify(response), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ACTION: Search
+    if (!query) {
+      // Default: return trending
+      const cacheKey = `trending:default:${maxResults}`;
+      const cached = getCached(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const response = await getTrendingVideos(apiKey, maxResults);
+      if (response.results.length > 0) setCache(cacheKey, response);
+
+      return new Response(JSON.stringify(response), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const cacheKey = `search:${query}:${order}:${maxResults}:${pageToken || ""}`;
     const cached = getCached(cacheKey);
     if (cached) {
@@ -142,27 +185,8 @@ serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get("YOUTUBE_API_KEY");
-    let response: { results: any[]; nextPageToken?: string };
-
-    if (apiKey) {
-      try {
-        response = await searchYouTubeOfficial(apiKey, query, pageToken, maxResults, order);
-      } catch (err) {
-        console.error("Official API failed, using fallback:", err);
-        const fallbackResults = await searchInvidiousFallback(query);
-        response = { results: fallbackResults };
-      }
-    } else {
-      console.warn("No YOUTUBE_API_KEY, using Invidious fallback");
-      const fallbackResults = await searchInvidiousFallback(query);
-      response = { results: fallbackResults };
-    }
-
-    // Cache result
-    if (response.results.length > 0) {
-      setCache(cacheKey, response);
-    }
+    const response = await searchYouTubeOfficial(apiKey, query, pageToken, maxResults, order);
+    if (response.results.length > 0) setCache(cacheKey, response);
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
