@@ -243,7 +243,17 @@ export default function ChannelPage() {
                 <Video className="w-4 h-4" /> Upload Video
               </button>
               <button
-                onClick={() => navigate("/profile")}
+                onClick={async () => {
+                  const channelUrl = `${window.location.origin}/channel/${channelUserId}`;
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({ title: `${channelOwner.display_name || channelOwner.guest_id} - good-app`, url: channelUrl });
+                    } else {
+                      await navigator.clipboard.writeText(channelUrl);
+                      alert("Channel link copied!");
+                    }
+                  } catch {}
+                }}
                 className="flex-1 py-2.5 rounded-full text-[13px] font-semibold"
                 style={{ background: "#272727", color: "#f1f1f1" }}
               >
