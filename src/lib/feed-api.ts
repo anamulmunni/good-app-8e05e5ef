@@ -353,7 +353,7 @@ async function fetchYouTubeViaEdge(query: string, page = 1, seed = 0): Promise<a
         "Authorization": `Bearer ${supabaseKey}`,
         "Content-Type": "application/json",
       },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(4500),
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -402,38 +402,41 @@ async function fetchYouTubeVideos(
         `${canonical} song`,
         `${canonical} official video`,
         `${canonical} lyrics`,
-        `${canonical} full hd`,
-        `${canonical} bangla`,
-        `${canonical} audio`,
       ]
     : [
         ...preferredCats.map((cat) => `bangla ${cat} song new`),
         "bangla new song 2025",
         "bangla latest song official video",
-        "bangla romantic song new",
         "বাংলা নতুন গান",
-        "bangla hit song 2025",
       ];
 
   const uniqueQueries = queries.filter((q, idx, arr) => q && arr.indexOf(q) === idx);
   const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
   const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
 
-  const pageWindow = canonical ? 4 : 6;
-  const startPage = Math.abs((freshnessToken + page * 7) % pageWindow) + 1;
-  const fetchPromises = ordered.slice(0, 8).map((q, idx) => {
+  const pageWindow = canonical ? 3 : 4;
+  const startPage = Math.abs((freshnessToken + page * 5) % pageWindow) + 1;
+  const fetchPromises = ordered.slice(0, 3).map((q, idx) => {
     const queryPage = ((startPage + idx - 1) % pageWindow) + 1;
-    return fetchYouTubeViaEdge(q, queryPage, freshnessToken + idx * 97 + page * 13);
+    return fetchYouTubeViaEdge(q, queryPage, freshnessToken + idx * 67 + page * 11);
   });
-  const allResults = await Promise.all(fetchPromises);
-  let results = allResults.flat();
+
+  const allResults = await Promise.allSettled(fetchPromises);
+  let results = allResults
+    .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
+    .flatMap((result) => result.value);
 
   if (results.length < rows) {
     const fallbackCalls = ordered
-      .slice(0, 3)
-      .map((q, idx) => fetchYouTubeViaEdge(q, 1, freshnessToken + 500 + idx * 67));
-    const fallbackResults = await Promise.all(fallbackCalls);
-    results = [...results, ...fallbackResults.flat()];
+      .slice(0, 1)
+      .map((q, idx) => fetchYouTubeViaEdge(q, 1, freshnessToken + 500 + idx * 37));
+    const fallbackResults = await Promise.allSettled(fallbackCalls);
+    results = [
+      ...results,
+      ...fallbackResults
+        .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
+        .flatMap((result) => result.value),
+    ];
   }
 
   const queryWords = getQueryWords(canonical);
