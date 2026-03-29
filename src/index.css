@@ -195,6 +195,11 @@
   }
 }
 
+@keyframes shimmer-text {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 200% center; }
+}
+
 @keyframes loading-bar {
   0% { width: 10%; margin-left: 0; }
   50% { width: 60%; margin-left: 20%; }

@@ -40,7 +40,7 @@ type ShortVideo = {
   videoId?: string;
 };
 
-// YouTube Reel Player using iframe embed (reliable, always works)
+// YouTube Reel Player - only renders iframe for the ACTIVE video to prevent multiple audio
 function YouTubeReelPlayer({
   videoId,
   isActive,
@@ -48,6 +48,13 @@ function YouTubeReelPlayer({
   videoId: string;
   isActive: boolean;
 }) {
+  const [loaded, setLoaded] = useState(false);
+
+  // Reset loaded state when becoming inactive
+  useEffect(() => {
+    if (!isActive) setLoaded(false);
+  }, [isActive]);
+
   if (!isActive) {
     return (
       <div className="w-full h-full relative bg-black">
@@ -55,19 +62,39 @@ function YouTubeReelPlayer({
           src={`https://i.ytimg.com/vi/${videoId}/hq720.jpg`}
           className="w-full h-full object-cover"
           alt=""
+          loading="lazy"
         />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-black/50 grid place-items-center">
+            <Play className="w-8 h-8 text-white ml-1" />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <iframe
-      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=0&enablejsapi=0`}
-      className="w-full h-full border-0"
-      allow="autoplay; encrypted-media; picture-in-picture"
-      allowFullScreen
-      style={{ pointerEvents: "auto" }}
-    />
+    <div className="w-full h-full relative bg-black">
+      {!loaded && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
+          <img
+            src={`https://i.ytimg.com/vi/${videoId}/hq720.jpg`}
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
+            alt=""
+          />
+          <Loader2 className="w-10 h-10 text-white animate-spin relative z-10" />
+        </div>
+      )}
+      <iframe
+        key={videoId}
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=0&enablejsapi=0`}
+        className="w-full h-full border-0"
+        allow="autoplay; encrypted-media; picture-in-picture"
+        allowFullScreen
+        style={{ pointerEvents: "auto" }}
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
   );
 }
 
@@ -287,7 +314,7 @@ export default function ShortReels() {
           <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center">
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
-          <h1 className="text-white font-bold text-lg">Reels</h1>
+          <h1 className="font-black text-lg" style={{ background: "linear-gradient(90deg, #fff, #ffd600)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Reels</h1>
           <div className="w-10" />
         </div>
 
@@ -335,11 +362,11 @@ export default function ShortReels() {
               className="h-full w-full relative snap-start snap-always"
               style={{ scrollSnapAlign: "start" }}
             >
-              {/* Video */}
+              {/* Video - only active index gets iframe to prevent multiple audio */}
               {video.isYouTube ? (
                 <YouTubeReelPlayer
                   videoId={video.videoId!}
-                  isActive={Math.abs(index - currentIndex) <= 1}
+                  isActive={index === currentIndex}
                 />
               ) : (
                 <video
