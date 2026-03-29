@@ -846,105 +846,31 @@ export async function getBangladeshExternalVideos(
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   const trimmedQuery = searchQuery?.trim();
-  const safeRows = Math.max(rows * 2, 24);
 
-  const [ytResult, dmResult] = await Promise.allSettled([
-    fetchYouTubeVideos(trimmedQuery, page, safeRows, freshnessToken + page),
-    fetchDailymotionFallback(page, safeRows, trimmedQuery, mode, freshnessToken + page * 13),
-  ]);
+  // Use YouTube only - with viewCount order for trending feel when no query
+  const order = trimmedQuery ? "relevance" : "viewCount";
+  const ytResult = await fetchYouTubeVideos(trimmedQuery, Math.max(rows, 30), order);
 
-  const ytVideos = ytResult.status === "fulfilled" ? ytResult.value.videos : [];
-  const dmVideos = dmResult.status === "fulfilled" ? dmResult.value.videos : [];
-  const ytHasMore = ytResult.status === "fulfilled" ? ytResult.value.hasMore : false;
-  const dmHasMore = dmResult.status === "fulfilled" ? dmResult.value.hasMore : false;
+  let videos = ytResult.videos;
 
+  // Avoid repeating recently shown videos
   const recentIds = readRecentVideoIds();
   const recentArray = Array.from(recentIds);
   const hardBlock = new Set(recentArray.slice(0, 220));
-  const softBlock = new Set(recentArray.slice(220, 700));
-  let merged = dedupeExternalVideos([...ytVideos, ...dmVideos]);
 
-  // Avoid repeating recently shown videos in default suggestion mode
   if (!trimmedQuery) {
-    const unseenHard = merged.filter((video) => !hardBlock.has(video.id));
-    const unseenSoft = unseenHard.filter((video) => !softBlock.has(video.id));
-    if (unseenSoft.length >= rows) {
-      merged = unseenSoft;
-    } else if (unseenHard.length >= rows) {
-      merged = unseenHard;
-    } else {
-      merged = unseenHard.length > 0 ? [...unseenHard, ...merged.filter((video) => !hardBlock.has(video.id) && softBlock.has(video.id))] : merged;
+    const unseen = videos.filter((v) => !hardBlock.has(v.id));
+    if (unseen.length >= Math.min(rows, 5)) {
+      videos = unseen;
     }
   }
 
-  if (trimmedQuery) {
-    const canonical = canonicalizeSearchQuery(trimmedQuery);
-    const words = getQueryWords(canonical);
-    const strict = buildStrictQueryRegex(trimmedQuery);
-
-    merged = merged
-      .map((video) => {
-        const normalizedTitle = normalizeForMatch(video.title);
-        const normalizedCreator = normalizeForMatch(video.creator || "");
-        const strictMatch = strict.test(normalizedTitle) || strict.test(normalizedCreator);
-        const coverage = getQueryCoverage(words, normalizedTitle);
-
-        if (!strictMatch && coverage < 0.6) {
-          return null;
-        }
-
-        let score = scoreFallbackVideo(video.title, words, canonical)
-          + scorePreferredCategory(video.title, video.category)
-          + (video.source === "youtube" ? 8 : 0)
-          + (video.duration && video.duration >= 120 ? 2 : 0)
-          + (strictMatch ? 70 : 0);
-
-        if (normalizedTitle.includes(canonical)) score += 26;
-        if (words.length > 0 && words.every((w) => normalizedTitle.includes(w) || normalizedCreator.includes(w))) {
-          score += 18;
-        }
-
-        return { ...video, _score: score };
-      })
-      .filter(Boolean)
-      .sort((a: any, b: any) => b._score - a._score)
-      .map(({ _score, ...rest }: any) => rest);
-  } else {
-    merged = merged
-      .map((video) => {
-        let score = scorePreferredCategory(video.title, video.category)
-          + (isBanglaDefaultSuggestion(video.title, video.country) ? 16 : 0)
-          + (hasFreshMarker(video.title) ? 11 : 0)
-          + (hasVeryFreshMarker(video.title) ? 22 : 0)
-          + (hasQualityMarker(video.title) ? 9 : 0)
-          + (hasStrongQualityMarker(video.title) ? 16 : 0)
-          + (video.source === "youtube" ? 6 : 0)
-          + (hardBlock.has(video.id) ? -220 : 0)
-          + (softBlock.has(video.id) ? -70 : 0);
-
-        if (!isBanglaDefaultSuggestion(video.title, video.country)) {
-          score -= 40;
-        }
-
-        return { ...video, _score: score };
-      })
-      .sort((a: any, b: any) => b._score - a._score)
-      .map(({ _score, ...rest }: any) => rest);
-
-    const mixedSources = seededShuffle(merged, freshnessToken + page * 31);
-    merged = diversifyByCreator(mixedSources, 1);
-  }
-
-  if (merged.length === 0) {
-    return { videos: [], hasMore: false };
-  }
-
-  const finalVideos = merged.slice(0, rows);
-  writeRecentVideoIds(finalVideos.map((video) => video.id));
+  const finalVideos = videos.slice(0, rows);
+  writeRecentVideoIds(finalVideos.map((v) => v.id));
 
   return {
     videos: finalVideos,
-    hasMore: merged.length > rows || ytHasMore || dmHasMore,
+    hasMore: ytResult.hasMore,
   };
 }
 
