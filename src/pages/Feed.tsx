@@ -822,6 +822,13 @@ export default function Feed() {
           </button>
 
           <button
+            onClick={() => navigate("/short-reels")}
+            className="relative flex-1 h-full flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground"
+          >
+            <Video className="w-6 h-6" />
+          </button>
+
+          <button
             onClick={() => { if (user) { markReelsSeen(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["new-reels-count"] })); } navigate("/reels"); }}
             className="relative flex-1 h-full flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground"
           >
