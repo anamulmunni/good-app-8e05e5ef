@@ -472,9 +472,13 @@ export default function Chat() {
             </p>
             <p className="text-[11px]" style={{ color: isDarkTheme ? "#9ca3af" : "#6b7280" }}>{otherOnline ? "Active now" : `Last seen ${lastSeenAgo(otherUser.online_at)}`}</p>
           </button>
-          <button onClick={() => navigate(`/call/${otherUser.id}`)}
+          <button onClick={() => navigate(`/call/${otherUser.id}?auto=1`)}
             className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: theme.accent }}>
             <Phone size={20} />
+          </button>
+          <button onClick={() => navigate(`/call/${otherUser.id}?video=1&auto=1`)}
+            className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: theme.accent }}>
+            <Video size={20} />
           </button>
           <button onClick={() => setShowThemePicker(true)}
             className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: theme.accent }}>
