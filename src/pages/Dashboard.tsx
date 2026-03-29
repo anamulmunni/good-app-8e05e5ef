@@ -21,7 +21,7 @@ function ChatButtonWithBadge({ userId, navigate }: { userId?: number; navigate: 
     queryKey: ["unread-count"],
     queryFn: () => getUnreadCount(userId!),
     enabled: !!userId,
-    refetchInterval: 10000,
+    refetchInterval: 20000,
   });
 
   return (
@@ -70,25 +70,23 @@ export default function Dashboard() {
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchInterval: 5000,
   });
 
   const { data: incomingRequests = [] } = useQuery({
     queryKey: ["incoming-user-transfer-requests", user?.guest_id],
     queryFn: () => getIncomingTransferRequests(user?.guest_id || ""),
     enabled: !!user?.guest_id,
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
 
   const { data: userHasPosted = true } = useQuery({
     queryKey: ["user-has-posted", user?.id],
     queryFn: () => hasUserPosted(user!.id),
     enabled: !!user?.id,
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
 
   const createUserRequestMutation = useMutation({
