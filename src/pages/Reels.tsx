@@ -500,14 +500,25 @@ export default function Reels() {
         getBangladeshExternalVideos(requestPage, 30, undefined, activeQuery || undefined, "long", refreshTick + cursor * 17),
         getUploadedLongVideos(cursor, 12, activeQuery || undefined),
       ]);
-      let merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+      // Interleave local videos randomly into external results
+      let merged = dedupeVideos([...externalResult.videos]);
+      const localVideos = dedupeVideos(localResult.videos);
+      // Spread local videos randomly throughout
+      for (const lv of localVideos) {
+        const pos = Math.floor(Math.random() * (merged.length + 1));
+        merged.splice(pos, 0, lv);
+      }
 
       if (!activeQuery && merged.length === 0 && requestPage !== 1) {
         [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick),
           getUploadedLongVideos(cursor, 12),
         ]);
-        merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+        merged = dedupeVideos([...externalResult.videos]);
+        for (const lv of dedupeVideos(localResult.videos)) {
+          const pos = Math.floor(Math.random() * (merged.length + 1));
+          merged.splice(pos, 0, lv);
+        }
       }
 
       setExtVideos((prev) => {
