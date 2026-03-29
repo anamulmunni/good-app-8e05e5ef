@@ -36,6 +36,7 @@ type ShortVideo = {
   comments_count: number;
   created_at: string | null;
   user?: { display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
+  isSample?: boolean;
 };
 
 export default function ShortReels() {
