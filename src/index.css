@@ -79,3 +79,9 @@
     @apply w-full bg-primary text-primary-foreground rounded-xl px-6 py-3 font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed;
   }
 }
+
+@keyframes loading-bar {
+  0% { width: 10%; margin-left: 0; }
+  50% { width: 60%; margin-left: 20%; }
+  100% { width: 10%; margin-left: 90%; }
+}
