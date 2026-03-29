@@ -7,10 +7,9 @@ import {
   toggleReaction, getUserReactions, getPostComments, addComment,
   type PostComment,
 } from "@/lib/feed-api";
-import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Music, Play, Pause } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { getShuffledSampleReels } from "@/lib/sample-reels";
 
 function ReelsCaption({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -37,7 +36,121 @@ type ShortVideo = {
   created_at: string | null;
   user?: { display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
   isSample?: boolean;
+  isYouTube?: boolean;
+  videoId?: string;
 };
+
+// Fetch stream URL from our edge function
+async function getYouTubeStreamUrl(videoId: string): Promise<string | null> {
+  try {
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const res = await fetch(
+      `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=stream&videoId=${videoId}`,
+      { headers: { "Content-Type": "application/json" } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.streamUrl || null;
+  } catch {
+    return null;
+  }
+}
+
+// YouTube video player component with lazy stream loading
+function YouTubeReelPlayer({
+  videoId,
+  thumbnail,
+  isActive,
+  paused,
+  videoRef,
+}: {
+  videoId: string;
+  thumbnail: string;
+  isActive: boolean;
+  paused: boolean;
+  videoRef: (el: HTMLVideoElement | null) => void;
+}) {
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!isActive || streamUrl) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    getYouTubeStreamUrl(videoId).then((url) => {
+      if (cancelled) return;
+      if (url) {
+        setStreamUrl(url);
+      } else {
+        setError(true);
+      }
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [isActive, videoId, streamUrl]);
+
+  if (loading || (!streamUrl && !error)) {
+    return (
+      <div className="w-full h-full relative">
+        <img src={thumbnail} className="w-full h-full object-cover" alt="" />
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-10 h-10 text-white animate-spin" />
+            <p className="text-white/80 text-sm">লোড হচ্ছে...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-full relative">
+        <img src={thumbnail} className="w-full h-full object-cover" alt="" />
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <RefreshCw className="w-8 h-8 text-white/70" />
+            <p className="text-white/70 text-sm">ভিডিও লোড হয়নি</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setStreamUrl(null);
+                setError(false);
+              }}
+              className="px-4 py-2 bg-white/20 rounded-full text-white text-sm"
+            >
+              আবার চেষ্টা করুন
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <video
+      ref={videoRef}
+      src={streamUrl!}
+      loop
+      playsInline
+      className="w-full h-full object-cover"
+      style={{ pointerEvents: "none" }}
+      poster={thumbnail}
+    />
+  );
+}
+
+// Category tabs
+const CATEGORIES = [
+  { id: "mixed", label: "🔥 সব" },
+  { id: "gajal", label: "🕌 গজল" },
+  { id: "slowed_reverb", label: "🎧 Slowed" },
+  { id: "funny", label: "😂 ফানি" },
+  { id: "dance", label: "💃 ড্যান্স" },
+  { id: "nature", label: "🌿 প্রকৃতি" },
+];
 
 export default function ShortReels() {
   const navigate = useNavigate();
@@ -54,26 +167,58 @@ export default function ShortReels() {
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
   const [showLoveAnimation, setShowLoveAnimation] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState("mixed");
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const lastTapRef = useRef(0);
   const doubleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Memoized sample reels (shuffled once per mount)
-  const sampleReels = useMemo(() => getShuffledSampleReels(), []);
-
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
 
-  // Fetch short videos (≤2min, from feed posts with video_url)
-  const { data: videos = [], isLoading: videosLoading } = useQuery({
-    queryKey: ["short-reels"],
+  // Fetch YouTube Shorts from our edge function
+  const { data: youtubeShorts = [], isLoading: ytLoading } = useQuery({
+    queryKey: ["youtube-shorts", selectedCategory],
+    queryFn: async () => {
+      try {
+        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+        const res = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=search&category=${selectedCategory}`,
+          { headers: { "Content-Type": "application/json" } }
+        );
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data?.results || []).map((item: any) => ({
+          id: `yt-${item.videoId}`,
+          user_id: 0,
+          video_url: "", // Will be loaded lazily via stream
+          content: item.title,
+          likes_count: Math.floor(Math.random() * 2000) + 100,
+          comments_count: Math.floor(Math.random() * 100),
+          created_at: new Date().toISOString(),
+          user: { display_name: item.author, avatar_url: null, guest_id: "youtube", is_verified_badge: true },
+          isSample: true,
+          isYouTube: true,
+          videoId: item.videoId,
+          thumbnail: item.thumbnail,
+        }));
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 10 * 60 * 1000, // 10 min cache
+  });
+
+  // Fetch user-posted short videos
+  const { data: userVideos = [], isLoading: userLoading } = useQuery({
+    queryKey: ["short-reels-user"],
     queryFn: async () => {
       const { data: posts } = await (supabase.from("posts").select("*") as any)
         .not("video_url", "is", null)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(50);
 
       const shortPosts = (posts || []).filter((p: any) => !p.content?.startsWith("__GOODAPP_LONG__::"));
 
@@ -84,35 +229,30 @@ export default function ShortReels() {
         (users || []).forEach((u: any) => { userMap[u.id] = u; });
       }
 
-      const userVideos: ShortVideo[] = shortPosts.map((p: any) => ({
+      return shortPosts.map((p: any) => ({
         ...p,
         user: userMap[p.user_id] || null,
         isSample: false,
-      }));
-
-      // Add sample reels at the end (always available)
-      const sampleVideos: ShortVideo[] = sampleReels.map((s) => ({
-        id: s.id,
-        user_id: 0,
-        video_url: s.video_url,
-        content: s.caption,
-        likes_count: Math.floor(Math.random() * 500) + 50,
-        comments_count: Math.floor(Math.random() * 30),
-        created_at: new Date().toISOString(),
-        user: { display_name: s.creator, avatar_url: null, guest_id: "sample", is_verified_badge: true },
-        isSample: true,
-      }));
-
-      // User videos first, then sample
-      return [...userVideos, ...sampleVideos];
+        isYouTube: false,
+      })) as ShortVideo[];
     },
     enabled: !!user,
   });
 
+  // Combine: user videos first, then YouTube shorts
+  const videos = useMemo(() => {
+    return [...userVideos, ...youtubeShorts];
+  }, [userVideos, youtubeShorts]);
+
+  const videosLoading = userLoading || ytLoading;
+
   // Load reactions
   useEffect(() => {
     if (user && videos.length > 0) {
-      getUserReactions(user.id, videos.map((v) => v.id)).then(setUserReactions);
+      const nonSampleIds = videos.filter(v => !v.isSample).map(v => v.id);
+      if (nonSampleIds.length > 0) {
+        getUserReactions(user.id, nonSampleIds).then(setUserReactions);
+      }
     }
   }, [user, videos]);
 
@@ -148,16 +288,13 @@ export default function ShortReels() {
     e.stopPropagation();
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
-      // Double tap = love (instant, optimistic)
       if (doubleTapTimerRef.current) { clearTimeout(doubleTapTimerRef.current); doubleTapTimerRef.current = null; }
       setShowLoveAnimation(true);
       setTimeout(() => setShowLoveAnimation(false), 1000);
       if (currentVideo && !currentVideo.isSample) {
-        // Instant UI update
         setUserReactions((prev) => ({ ...prev, [currentVideo.id]: "love" }));
-        // Fire-and-forget API call
         toggleReaction(currentVideo.id, user!.id, "love").then(() => {
-          queryClient.invalidateQueries({ queryKey: ["short-reels"] });
+          queryClient.invalidateQueries({ queryKey: ["short-reels-user"] });
         }).catch(() => {});
       }
       lastTapRef.current = 0;
@@ -165,7 +302,6 @@ export default function ShortReels() {
       lastTapRef.current = now;
       doubleTapTimerRef.current = setTimeout(() => {
         if (lastTapRef.current === now) {
-          // Single tap = instant pause/play
           setPaused((p) => {
             const next = !p;
             const el = videoRefs.current[currentIndex];
@@ -191,7 +327,7 @@ export default function ShortReels() {
     setCommentText("");
     setReplyingTo(null);
     await loadComments(currentVideo.id);
-    queryClient.invalidateQueries({ queryKey: ["short-reels"] });
+    queryClient.invalidateQueries({ queryKey: ["short-reels-user"] });
     setCommentSending(false);
   };
 
@@ -206,28 +342,56 @@ export default function ShortReels() {
     return `${Math.floor(hrs / 24)}d`;
   };
 
+  // Reset index when category changes
+  useEffect(() => {
+    setCurrentIndex(0);
+    if (containerRef.current) containerRef.current.scrollTop = 0;
+  }, [selectedCategory]);
+
   if (isLoading || !user) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-3 py-2 bg-gradient-to-b from-black/60 to-transparent">
-        <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center">
-          <ArrowLeft className="w-6 h-6 text-white" />
-        </button>
-        <h1 className="text-white font-bold text-lg">Reels</h1>
-        <div className="w-10" />
+      <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/70 to-transparent">
+        <div className="flex items-center justify-between px-3 py-2">
+          <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center">
+            <ArrowLeft className="w-6 h-6 text-white" />
+          </button>
+          <h1 className="text-white font-bold text-lg">Reels</h1>
+          <div className="w-10" />
+        </div>
+
+        {/* Category tabs */}
+        <div className="flex gap-2 px-3 pb-2 overflow-x-auto scrollbar-hide">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-all ${
+                selectedCategory === cat.id
+                  ? "bg-white text-black"
+                  : "bg-white/20 text-white/80"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {videosLoading ? (
         <div className="h-full flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-white animate-spin" />
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-10 h-10 text-white animate-spin" />
+            <p className="text-white/60 text-sm">ভিডিও খোঁজা হচ্ছে...</p>
+          </div>
         </div>
       ) : videos.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-white">
           <Play className="w-16 h-16 mb-4 opacity-40" />
           <p className="text-lg font-bold">কোনো Reels নেই</p>
-          <p className="text-sm text-white/60 mt-1">Feed এ ভিডিও পোস্ট করলে এখানে দেখাবে</p>
+          <p className="text-sm text-white/60 mt-1">অন্য ক্যাটাগরি দেখুন</p>
         </div>
       ) : (
         <div
@@ -243,24 +407,31 @@ export default function ShortReels() {
               style={{ scrollSnapAlign: "start" }}
             >
               {/* Video */}
-              <video
-                ref={(el) => { videoRefs.current[index] = el; }}
-                src={video.video_url}
-                loop
-                muted={false}
-                playsInline
-                className="w-full h-full object-cover"
-                style={{ pointerEvents: "none" }}
-              />
-              {/* Tap overlay for pause/love */}
-              <div
-                className="absolute inset-0 z-10"
-                onClick={handleVideoTap}
-              />
+              {video.isYouTube ? (
+                <YouTubeReelPlayer
+                  videoId={video.videoId!}
+                  thumbnail={(video as any).thumbnail || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`}
+                  isActive={Math.abs(index - currentIndex) <= 1}
+                  paused={paused && index === currentIndex}
+                  videoRef={(el) => { videoRefs.current[index] = el; }}
+                />
+              ) : (
+                <video
+                  ref={(el) => { videoRefs.current[index] = el; }}
+                  src={video.video_url}
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                  style={{ pointerEvents: "none" }}
+                />
+              )}
+
+              {/* Tap overlay */}
+              <div className="absolute inset-0 z-10" onClick={handleVideoTap} />
 
               {/* Pause indicator */}
               {paused && index === currentIndex && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-15">
                   <div className="w-16 h-16 rounded-full bg-black/40 grid place-items-center">
                     <Play className="w-8 h-8 text-white ml-1" />
                   </div>
@@ -275,7 +446,7 @@ export default function ShortReels() {
                     animate={{ scale: 1.5, opacity: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.8 }}
-                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none z-15"
                   >
                     <span className="text-8xl">❤️</span>
                   </motion.div>
@@ -284,8 +455,7 @@ export default function ShortReels() {
 
               {/* Right side actions */}
               <div className="absolute right-3 bottom-28 flex flex-col items-center gap-5 z-20">
-                {/* Avatar */}
-                <button onClick={() => navigate(`/user/${video.user_id}`)} className="relative">
+                <button onClick={() => !video.isSample && navigate(`/user/${video.user_id}`)} className="relative">
                   <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white">
                     {video.user?.avatar_url ? (
                       <img src={video.user.avatar_url} className="w-full h-full object-cover" />
@@ -297,10 +467,9 @@ export default function ShortReels() {
                   </div>
                 </button>
 
-                {/* Like */}
                 <button
                   onClick={() => {
-                    if (!currentVideo) return;
+                    if (!currentVideo || currentVideo.isSample) return;
                     const isLiked = !!userReactions[currentVideo.id];
                     toggleReaction(currentVideo.id, user.id, "love").then(() => {
                       if (isLiked) {
@@ -308,7 +477,7 @@ export default function ShortReels() {
                       } else {
                         setUserReactions((prev) => ({ ...prev, [currentVideo.id]: "love" }));
                       }
-                      queryClient.invalidateQueries({ queryKey: ["short-reels"] });
+                      queryClient.invalidateQueries({ queryKey: ["short-reels-user"] });
                     });
                   }}
                   className="flex flex-col items-center gap-1"
@@ -322,22 +491,23 @@ export default function ShortReels() {
                   <span className="text-white text-[11px] font-semibold">{video.likes_count || 0}</span>
                 </button>
 
-                {/* Comment */}
-                <button
-                  onClick={() => {
-                    setShowComments(true);
-                    loadComments(video.id);
-                  }}
-                  className="flex flex-col items-center gap-1"
-                >
-                  <MessageCircle className="w-8 h-8 text-white" />
-                  <span className="text-white text-[11px] font-semibold">{video.comments_count || 0}</span>
-                </button>
+                {!video.isSample && (
+                  <button
+                    onClick={() => {
+                      setShowComments(true);
+                      loadComments(video.id);
+                    }}
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <MessageCircle className="w-8 h-8 text-white" />
+                    <span className="text-white text-[11px] font-semibold">{video.comments_count || 0}</span>
+                  </button>
+                )}
               </div>
 
               {/* Bottom info */}
               <div className="absolute bottom-4 left-3 right-16 z-20">
-                <button onClick={() => navigate(`/user/${video.user_id}`)} className="inline-flex items-center gap-2 mb-2">
+                <button onClick={() => !video.isSample && navigate(`/user/${video.user_id}`)} className="inline-flex items-center gap-2 mb-2">
                   <span className="text-white font-bold text-[14px]">{video.user?.display_name || "User"}</span>
                   {video.user?.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
                 </button>
@@ -355,7 +525,7 @@ export default function ShortReels() {
 
       {/* Comment Bottom Sheet */}
       <AnimatePresence>
-        {showComments && currentVideo && (
+        {showComments && currentVideo && !currentVideo.isSample && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -419,7 +589,6 @@ export default function ShortReels() {
                             Reply
                           </button>
                         </div>
-                        {/* Replies */}
                         {c.replies && c.replies.length > 0 && (
                           <div className="ml-4 mt-2 space-y-2 border-l-2 border-gray-200 dark:border-border/30 pl-3">
                             {c.replies.map((r) => (
