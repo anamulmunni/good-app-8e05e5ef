@@ -40,22 +40,25 @@ type ShortVideo = {
   videoId?: string;
 };
 
-// YouTube Reel Player - only renders iframe for the ACTIVE video to prevent multiple audio
+// YouTube Reel Player - pre-buffers nearby reels, only active one has autoplay+sound
 function YouTubeReelPlayer({
   videoId,
   isActive,
+  isNearby,
 }: {
   videoId: string;
   isActive: boolean;
+  isNearby: boolean; // within ±2 of current - pre-buffer iframe
 }) {
   const [loaded, setLoaded] = useState(false);
 
-  // Reset loaded state when becoming inactive
+  // Reset loaded state when going far away
   useEffect(() => {
-    if (!isActive) setLoaded(false);
-  }, [isActive]);
+    if (!isActive && !isNearby) setLoaded(false);
+  }, [isActive, isNearby]);
 
-  if (!isActive) {
+  // Far away - just show thumbnail
+  if (!isActive && !isNearby) {
     return (
       <div className="w-full h-full relative bg-black">
         <img
@@ -73,6 +76,7 @@ function YouTubeReelPlayer({
     );
   }
 
+  // Active = autoplay + sound, nearby = muted pre-buffer (hidden)
   return (
     <div className="w-full h-full relative bg-black">
       {!loaded && (
@@ -86,12 +90,12 @@ function YouTubeReelPlayer({
         </div>
       )}
       <iframe
-        key={videoId}
-        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=0&enablejsapi=0`}
+        key={`${videoId}-${isActive ? "active" : "buffer"}`}
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=${isActive ? 1 : 0}&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=${isActive ? 0 : 1}&enablejsapi=0`}
         className="w-full h-full border-0"
         allow="autoplay; encrypted-media; picture-in-picture"
         allowFullScreen
-        style={{ pointerEvents: "auto" }}
+        style={{ pointerEvents: isActive ? "auto" : "none" }}
         onLoad={() => setLoaded(true)}
       />
     </div>
@@ -195,9 +199,18 @@ export default function ShortReels() {
     enabled: !!user,
   });
 
-  // Combine: user videos first, then YouTube shorts
+  // Randomly interleave uploaded videos among YouTube shorts
   const videos = useMemo(() => {
-    return [...userVideos, ...youtubeShorts];
+    if (userVideos.length === 0) return youtubeShorts;
+    if (youtubeShorts.length === 0) return userVideos;
+    // Spread uploaded videos randomly among YouTube shorts
+    const result: ShortVideo[] = [...youtubeShorts];
+    const shuffledUploads = [...userVideos].sort(() => Math.random() - 0.5);
+    for (const uv of shuffledUploads) {
+      const pos = Math.floor(Math.random() * (result.length + 1));
+      result.splice(pos, 0, uv);
+    }
+    return result;
   }, [userVideos, youtubeShorts]);
 
   const videosLoading = userLoading || ytLoading;
@@ -367,6 +380,7 @@ export default function ShortReels() {
                 <YouTubeReelPlayer
                   videoId={video.videoId!}
                   isActive={index === currentIndex}
+                  isNearby={Math.abs(index - currentIndex) <= 2}
                 />
               ) : (
                 <video

@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const cache = new Map<string, { data: any; ts: number }>();
-const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000; // 5 min cache for more variety
 
 function getCached(key: string) {
   const entry = cache.get(key);
@@ -78,44 +78,69 @@ async function searchYouTubeOfficial(
 }
 
 // Trending/Most Popular videos via YouTube Data API
+// Uses multiple category IDs and shuffles for variety
 async function getTrendingVideos(
   apiKey: string,
   maxResults = 25,
   categoryId?: string,
 ): Promise<{ results: any[] }> {
-  const params = new URLSearchParams({
-    part: "snippet,contentDetails",
-    chart: "mostPopular",
-    regionCode: "BD",
-    maxResults: String(maxResults),
-    key: apiKey,
-  });
-  if (categoryId) params.set("videoCategoryId", categoryId);
+  // If no specific category, fetch from multiple categories for variety
+  const categories = categoryId ? [categoryId] : ["10", "24", "1", "22"]; // Music, Entertainment, Film, People
+  const perCategory = categoryId ? maxResults : Math.ceil(maxResults / categories.length) + 5;
+  
+  const allResults: any[] = [];
 
-  const url = `https://www.googleapis.com/youtube/v3/videos?${params}`;
-  const res = await withTimeout(fetch(url), 8000);
+  for (const catId of categories) {
+    const params = new URLSearchParams({
+      part: "snippet,contentDetails",
+      chart: "mostPopular",
+      regionCode: "BD",
+      maxResults: String(perCategory),
+      key: apiKey,
+      videoCategoryId: catId,
+    });
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error("YouTube Trending API error:", res.status, errBody);
-    return { results: [] };
+    const url = `https://www.googleapis.com/youtube/v3/videos?${params}`;
+    try {
+      const res = await withTimeout(fetch(url), 8000);
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+
+      const results = items
+        .filter((item: any) => item?.id)
+        .map((item: any) => ({
+          videoId: item.id,
+          title: item.snippet?.title || "",
+          author: item.snippet?.channelTitle || "",
+          channelId: item.snippet?.channelId || "",
+          thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+          publishedAt: item.snippet?.publishedAt || "",
+          viewCount: item.statistics?.viewCount || "0",
+        }));
+
+      allResults.push(...results);
+    } catch {
+      continue;
+    }
   }
 
-  const data = await res.json();
-  const items = Array.isArray(data?.items) ? data.items : [];
+  // Shuffle results for variety on each load
+  for (let i = allResults.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allResults[i], allResults[j]] = [allResults[j], allResults[i]];
+  }
 
-  const results = items
-    .filter((item: any) => item?.id)
-    .map((item: any) => ({
-      videoId: item.id,
-      title: item.snippet?.title || "",
-      author: item.snippet?.channelTitle || "",
-      channelId: item.snippet?.channelId || "",
-      thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
-      publishedAt: item.snippet?.publishedAt || "",
-    }));
+  // Dedupe by videoId
+  const seen = new Set<string>();
+  const deduped = allResults.filter(r => {
+    if (seen.has(r.videoId)) return false;
+    seen.add(r.videoId);
+    return true;
+  });
 
-  return { results };
+  return { results: deduped.slice(0, maxResults) };
 }
 
 serve(async (req) => {
