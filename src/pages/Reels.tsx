@@ -17,8 +17,8 @@ import {
   markReelsSeen,
   uploadPostMedia,
   getPostComments,
-  addPostComment,
-  togglePostLike,
+  addComment,
+  toggleLike,
   type PostComment,
 } from "@/lib/feed-api";
 
