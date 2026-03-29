@@ -694,16 +694,13 @@ export default function Reels() {
               <button
                 onClick={async () => {
                   const channelUrl = `${window.location.origin}/channel/${user.id}`;
-                  try {
-                    if (navigator.share) {
-                      await navigator.share({ title: "My channel", url: channelUrl });
-                    } else {
-                      await navigator.clipboard.writeText(channelUrl);
-                      alert("Channel link copied");
-                    }
-                  } catch {
-                    // user cancelled share
+                  if (navigator.share) {
+                    try { await navigator.share({ title: "My channel", url: channelUrl }); return; } catch (e: any) { if (e?.name === "AbortError") return; }
                   }
+                  try { await navigator.clipboard.writeText(channelUrl); } catch {
+                    const ta = document.createElement("textarea"); ta.value = channelUrl; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+                  }
+                  alert("Channel link copied: " + channelUrl);
                 }}
                 className="h-10 w-10 grid place-items-center rounded-full"
                 title="Share my channel"
