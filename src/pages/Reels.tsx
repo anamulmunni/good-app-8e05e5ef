@@ -797,10 +797,16 @@ export default function Reels() {
               />
             )}
             {playerLoading && (
-              <div className="absolute inset-0 z-20 grid place-items-center bg-background/70">
-                <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-card-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>ভিডিও লোড হচ্ছে...</span>
+              <div className="absolute inset-0 z-20 grid place-items-center" style={{ background: "#000" }}>
+                {selectedVideo.thumbnail_url && (
+                  <img src={selectedVideo.thumbnail_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 blur-sm" />
+                )}
+                <div className="absolute top-0 left-0 right-0 h-1 overflow-hidden">
+                  <div className="h-full bg-red-600 animate-pulse" style={{ width: "60%", animation: "loading-bar 1.5s ease-in-out infinite" }} />
+                </div>
+                <div className="flex flex-col items-center gap-2 z-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                  <span className="text-sm text-white/80">ভিডিও লোড হচ্ছে...</span>
                 </div>
               </div>
             )}
