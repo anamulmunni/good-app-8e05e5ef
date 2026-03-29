@@ -131,7 +131,7 @@ async function searchPiped(query: string): Promise<any[]> {
 async function searchNoKeyApi(query: string): Promise<any[]> {
   try {
     const url = `https://yt.lemnoslife.com/noKey/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(query)}`;
-    const res = await withTimeout(fetch(url), 3800);
+    const res = await withTimeout(fetch(url), 6000);
     if (!res.ok) return [];
     const data = await res.json();
     const items = Array.isArray(data?.items) ? data.items : [];
