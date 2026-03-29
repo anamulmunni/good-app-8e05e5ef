@@ -12,6 +12,7 @@ import {
 import { getUser } from "@/lib/api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker from "@/components/EmojiPicker";
