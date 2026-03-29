@@ -732,28 +732,50 @@ export default function Reels() {
           <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto scrollbar-hide" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
             <button
               onClick={async () => {
-                if (!selectedVideo.local_post_id || !user) return;
-                const result = await toggleReaction(selectedVideo.local_post_id, user.id, "like");
-                setLiked(result.reacted);
-                setDisliked(false);
-                const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
-                setEngagementStats(stats);
+                if (liked) {
+                  setLiked(false);
+                  if (selectedVideo.local_post_id && user) {
+                    toggleReaction(selectedVideo.local_post_id, user.id, "like").catch(() => {});
+                    getLocalVideoEngagement(selectedVideo.local_post_id).then(setEngagementStats);
+                  } else {
+                    setExternalReactions(prev => {
+                      const cur = prev[selectedVideo.id] || { reaction: null, likes: 0 };
+                      return { ...prev, [selectedVideo.id]: { reaction: null, likes: Math.max(0, cur.likes - 1) } };
+                    });
+                  }
+                } else {
+                  setLiked(true);
+                  setDisliked(false);
+                  if (selectedVideo.local_post_id && user) {
+                    toggleReaction(selectedVideo.local_post_id, user.id, "like").catch(() => {});
+                    getLocalVideoEngagement(selectedVideo.local_post_id).then(setEngagementStats);
+                  } else {
+                    setExternalReactions(prev => {
+                      const cur = prev[selectedVideo.id] || { reaction: null, likes: selectedVideo.likes_count || 0 };
+                      return { ...prev, [selectedVideo.id]: { reaction: "like", likes: cur.likes + 1 } };
+                    });
+                  }
+                }
               }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
               style={{ background: "#272727", color: liked ? "#3ea6ff" : "#f1f1f1" }}
             >
               <ThumbsUp className="w-5 h-5" />
-              <span>{engagementStats?.likes_count ?? selectedVideo.likes_count ?? 0}</span>
+              <span>{engagementStats?.likes_count ?? externalReactions[selectedVideo.id]?.likes ?? selectedVideo.likes_count ?? 0}</span>
             </button>
 
             <button
-              onClick={async () => {
-                if (!selectedVideo.local_post_id || !user) return;
-                const result = await toggleReaction(selectedVideo.local_post_id, user.id, "dislike");
-                setDisliked(result.reacted);
-                setLiked(false);
-                const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
-                setEngagementStats(stats);
+              onClick={() => {
+                if (disliked) {
+                  setDisliked(false);
+                } else {
+                  setDisliked(true);
+                  setLiked(false);
+                  if (selectedVideo.local_post_id && user) {
+                    toggleReaction(selectedVideo.local_post_id, user.id, "dislike").catch(() => {});
+                    getLocalVideoEngagement(selectedVideo.local_post_id).then(setEngagementStats);
+                  }
+                }
               }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
               style={{ background: "#272727", color: disliked ? "#3ea6ff" : "#f1f1f1" }}
@@ -765,10 +787,18 @@ export default function Reels() {
             <button
               className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
               style={{ background: "#272727", color: "#f1f1f1" }}
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({ title: selectedVideo.title, url: window.location.href });
-                }
+              onClick={async () => {
+                const shareUrl = selectedVideo.isExternal
+                  ? (selectedVideo as any).watch_url || selectedVideo.video_url
+                  : `${window.location.origin}/reels?play=${selectedVideo.local_post_id || selectedVideo.id}`;
+                try {
+                  if (navigator.share) {
+                    await navigator.share({ title: selectedVideo.title, url: shareUrl });
+                  } else {
+                    await navigator.clipboard.writeText(shareUrl);
+                    alert("Link copied!");
+                  }
+                } catch {}
               }}
             >
               <Share2 className="w-5 h-5" />
