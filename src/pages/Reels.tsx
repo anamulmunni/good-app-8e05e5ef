@@ -549,7 +549,12 @@ export default function Reels() {
           getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
-        let merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+        // Interleave local videos randomly
+        let merged = dedupeVideos([...externalResult.videos]);
+        for (const lv of dedupeVideos(localResult.videos)) {
+          const pos = Math.floor(Math.random() * (merged.length + 1));
+          merged.splice(pos, 0, lv);
+        }
 
         if (!activeQuery && merged.length === 0 && externalStartPage !== 1) {
           externalStartPage = 1;
@@ -557,7 +562,11 @@ export default function Reels() {
             getBangladeshExternalVideos(1, 20, undefined, undefined, "long", refreshTick),
             getUploadedLongVideos(1, 10),
           ]);
-          merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+          merged = dedupeVideos([...externalResult.videos]);
+          for (const lv of dedupeVideos(localResult.videos)) {
+            const pos = Math.floor(Math.random() * (merged.length + 1));
+            merged.splice(pos, 0, lv);
+          }
         }
 
         setExtVideos(merged);
