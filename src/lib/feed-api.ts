@@ -449,45 +449,39 @@ function getFallbackYouTubeVideos(searchQuery?: string, rows = 20): ExternalReel
 
 async function fetchYouTubeVideos(
   searchQuery?: string,
-  page = 1,
-  rows = 20,
-  freshnessToken = 0,
+  rows = 30,
+  order = "relevance",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const defaultQueries = [
-    "bangla new song 2026 full hd",
-    "bangla latest song official video 1080p",
-    "new bangla music video 2026 hd",
-    "বাংলা নতুন গান ২০২৬ full hd",
-    "bangla trending new release song hd",
-  ];
-  const query = (searchQuery || "").trim() || defaultQueries[Math.floor(Date.now() / 120000) % defaultQueries.length];
   try {
-    const raw = await fetchYouTubeViaEdge(query, page, freshnessToken);
-    let videos = raw
+    const trimmed = (searchQuery || "").trim();
+    let raw: any[];
+
+    if (trimmed) {
+      // User searched something - use search API
+      raw = await fetchYouTubeViaEdge(trimmed, "search", order, rows);
+    } else {
+      // No query - fetch trending videos
+      raw = await fetchYouTubeViaEdge("", "trending", "relevance", rows);
+    }
+
+    const videos = raw
       .map(youtubeResultToExternal)
       .filter(Boolean) as ExternalReelVideo[];
-
-    if (searchQuery?.trim()) {
-      const strict = buildStrictQueryRegex(searchQuery);
-      videos = videos.filter((video) => strict.test(normalizeForMatch(video.title || "")) || strict.test(normalizeForMatch(video.creator || "")));
-    }
 
     if (videos.length > 0) {
       return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
     }
 
-    if (searchQuery?.trim()) {
-      return { videos: [], hasMore: false };
+    // If trending returned nothing, try a default search
+    if (!trimmed) {
+      const fallbackRaw = await fetchYouTubeViaEdge("bangla new song 2026", "search", "viewCount", rows);
+      const fallbackVideos = fallbackRaw.map(youtubeResultToExternal).filter(Boolean) as ExternalReelVideo[];
+      return { videos: fallbackVideos.slice(0, rows), hasMore: false };
     }
 
-    const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
-    return { videos: fallbackVideos, hasMore: false };
+    return { videos: [], hasMore: false };
   } catch {
-    if (searchQuery?.trim()) {
-      return { videos: [], hasMore: false };
-    }
-    const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
-    return { videos: fallbackVideos, hasMore: false };
+    return { videos: [], hasMore: false };
   }
 }
 
