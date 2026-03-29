@@ -198,48 +198,44 @@ function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
   return fallbackUrl || "";
 }
 
-// ── YouTube search via Invidious public API ──────────────────────────────
+// ── YouTube search via Edge Function proxy ──────────────────────────────
 
-const INVIDIOUS_INSTANCES = [
-  "https://inv.tux.pizza",
-  "https://invidious.nerdvpn.de",
-  "https://iv.ggtyler.dev",
-  "https://invidious.privacyredirect.com",
-  "https://invidious.jing.rocks",
-];
+async function fetchYouTubeViaEdge(query: string, page = 1): Promise<any[]> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl) return [];
 
-async function fetchInvidiousSearch(
-  query: string,
-  page = 1,
-): Promise<any[]> {
-  for (const instance of INVIDIOUS_INSTANCES) {
-    try {
-      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${page}&type=video&sort_by=relevance&region=BD`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) return data;
-    } catch {
-      continue;
-    }
+  try {
+    const url = `${supabaseUrl}/functions/v1/youtube-search?q=${encodeURIComponent(query)}&page=${page}`;
+    const res = await fetch(url, {
+      headers: {
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.results) ? data.results : [];
+  } catch {
+    return [];
   }
-  return [];
 }
 
 function youtubeResultToExternal(item: any): ExternalReelVideo | null {
   const videoId = item?.videoId;
   if (!videoId) return null;
   const duration = Number(item?.lengthSeconds || 0);
-  if (duration < 30) return null; // skip very short
+  if (duration < 30) return null;
 
   return {
     id: `yt-${videoId}`,
     title: String(item?.title || "YouTube Video"),
-    source: "dailymotion" as const, // reuse existing type
+    source: "dailymotion" as const,
     video_url: `https://www.youtube.com/embed/${videoId}`,
     watch_url: `https://www.youtube.com/watch?v=${videoId}`,
     creator: item?.author || null,
-    thumbnail_url: item?.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    thumbnail_url: item?.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     video_id: videoId,
     duration,
     category: detectExternalCategory(String(item?.title || "")),
@@ -264,16 +260,13 @@ async function fetchYouTubeVideos(
         "bangla hit song 2025",
       ];
 
-  // Shift queries based on freshnessToken for variety
   const shift = canonical ? 0 : Math.abs(freshnessToken % queries.length);
   const ordered = shift > 0 ? [...queries.slice(shift), ...queries.slice(0, shift)] : queries;
 
-  const results: any[] = [];
-  for (const q of ordered.slice(0, 3)) {
-    const items = await fetchInvidiousSearch(q, page);
-    results.push(...items);
-    if (results.length >= rows * 2) break;
-  }
+  // Fetch in parallel for speed
+  const fetchPromises = ordered.slice(0, 3).map((q) => fetchYouTubeViaEdge(q, page));
+  const allResults = await Promise.all(fetchPromises);
+  const results = allResults.flat();
 
   const seen = new Set<string>();
   const queryWords = getQueryWords(canonical);
