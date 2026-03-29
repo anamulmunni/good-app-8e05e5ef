@@ -275,6 +275,8 @@ export default function Reels() {
   const [searchMode, setSearchMode] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [selectedChip, setSelectedChip] = useState("All");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
