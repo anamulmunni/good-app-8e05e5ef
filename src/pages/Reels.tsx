@@ -1424,6 +1424,57 @@ export default function Reels() {
             </div>
           )}
 
+          {/* Watch History Section - show when no video is selected and not searching */}
+          {!selectedVideo && !searchQuery.trim() && watchHistory.length > 0 && (
+            <div className="px-3 py-3" style={{ borderBottom: "1px solid #272727" }}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <Clock className="w-4 h-4" style={{ color: "#aaa" }} />
+                <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>সম্প্রতি দেখা হয়েছে</span>
+              </div>
+              <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+                {watchHistory.slice(0, 10).map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => playVideo({
+                      id: h.id,
+                      title: h.title,
+                      video_url: h.video_url,
+                      watch_url: h.watch_url,
+                      thumbnail_url: h.thumbnail_url,
+                      creator: h.creator,
+                      duration: h.duration,
+                      isExternal: h.isExternal,
+                      uploader_user_id: h.uploader_user_id,
+                      uploader_guest_id: h.uploader_guest_id,
+                      uploader_avatar_url: h.uploader_avatar_url,
+                      uploader_is_verified_badge: h.uploader_is_verified_badge,
+                      local_post_id: h.local_post_id,
+                      likes_count: h.likes_count,
+                      comments_count: h.comments_count,
+                    })}
+                    className="shrink-0 w-[150px] text-left"
+                  >
+                    <div className="w-full aspect-video rounded-lg overflow-hidden relative" style={{ background: "#1a1a1a" }}>
+                      {h.thumbnail_url ? (
+                        <img src={h.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center"><Play className="w-6 h-6" style={{ color: "#555" }} /></div>
+                      )}
+                      {h.duration ? (
+                        <span className="absolute right-1 bottom-1 text-[9px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
+                          {fmt(h.duration)}
+                        </span>
+                      ) : null}
+                      <div className="absolute inset-0 bg-black/20" />
+                    </div>
+                    <p className="text-[11px] font-medium line-clamp-2 mt-1.5 leading-[14px]" style={{ color: "#f1f1f1" }}>{h.title}</p>
+                    <p className="text-[10px] mt-0.5 line-clamp-1" style={{ color: "#aaa" }}>{h.creator || "Unknown"}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {allVideos.filter((v) => v.id !== selectedVideo?.id).map((video) => (
             <button
               key={video.id}
