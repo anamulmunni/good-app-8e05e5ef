@@ -393,94 +393,13 @@ async function fetchYouTubeVideos(
   rows = 20,
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const canonical = canonicalizeSearchQuery(searchQuery || "");
-  const preferredCats = topPreferredCategories(2);
-
-  const queries = canonical
-    ? [
-        canonical,
-        `${canonical} song`,
-        `${canonical} official video`,
-        `${canonical} lyrics`,
-      ]
-    : [
-        ...preferredCats.map((cat) => `bangla ${cat} song new`),
-        "bangla new song 2025",
-        "bangla latest song official video",
-        "বাংলা নতুন গান",
-      ];
-
-  const uniqueQueries = queries.filter((q, idx, arr) => q && arr.indexOf(q) === idx);
-  const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
-  const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
-
-  const pageWindow = canonical ? 3 : 4;
-  const startPage = Math.abs((freshnessToken + page * 5) % pageWindow) + 1;
-  const fetchPromises = ordered.slice(0, 3).map((q, idx) => {
-    const queryPage = ((startPage + idx - 1) % pageWindow) + 1;
-    return fetchYouTubeViaEdge(q, queryPage, freshnessToken + idx * 67 + page * 11);
-  });
-
-  const allResults = await Promise.allSettled(fetchPromises);
-  let results = allResults
-    .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
-    .flatMap((result) => result.value);
-
-  if (results.length < rows) {
-    const fallbackCalls = ordered
-      .slice(0, 1)
-      .map((q, idx) => fetchYouTubeViaEdge(q, 1, freshnessToken + 500 + idx * 37));
-    const fallbackResults = await Promise.allSettled(fallbackCalls);
-    results = [
-      ...results,
-      ...fallbackResults
-        .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
-        .flatMap((result) => result.value),
-    ];
-  }
-
-  const queryWords = getQueryWords(canonical);
-  const normalizedQuery = normalizeForMatch(canonical);
-
-  let videos = dedupeExternalVideos(
-    results
-      .map(youtubeResultToExternal)
-      .filter((v): v is ExternalReelVideo => Boolean(v))
-  );
-
-  if (videos.length === 0) {
-    return { videos: [], hasMore: false };
-  }
-
-  videos = videos
-    .map((video) => {
-      const normalizedTitle = normalizeForMatch(video.title);
-      let score = scorePreferredCategory(video.title, video.category);
-
-      if (canonical) {
-        if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 45;
-        for (const w of queryWords) {
-          if (normalizedTitle.includes(w)) score += 10;
-        }
-        if (queryWords.length > 0 && queryWords.every((w) => normalizedTitle.includes(w))) score += 20;
-        if (isMusicIntent(canonical) && /(song|music|audio|lyrics|গান|official)/i.test(video.title)) score += 14;
-      } else {
-        if (isBanglaDefaultSuggestion(video.title, video.country)) score += 18;
-        if (hasFreshMarker(video.title)) score += 12;
-        if (hasQualityMarker(video.title)) score += 10;
-      }
-
-      return { ...video, _score: score };
-    })
-    .sort((a: any, b: any) => b._score - a._score)
-    .map(({ _score, ...rest }: any) => rest);
-
-  const varied = canonical ? videos : seededShuffle(videos, freshnessToken + page * 17);
-
-  return {
-    videos: varied.slice(0, rows),
-    hasMore: varied.length > rows,
-  };
+  // Public YouTube proxy instances are unstable and currently causing heavy loading.
+  // Keep feed fast by relying on local + Dailymotion for now.
+  void searchQuery;
+  void page;
+  void rows;
+  void freshnessToken;
+  return { videos: [], hasMore: false };
 }
 
 function buildSearchVariants(searchQuery?: string): string[] {
