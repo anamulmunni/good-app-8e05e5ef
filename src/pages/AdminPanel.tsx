@@ -951,6 +951,88 @@ export default function AdminPanel() {
           </div>
         </Section>
 
+        {/* ═══════════════════════════════════════ */}
+        {/* 🎬 YouTube API Keys */}
+        <Section icon={Youtube} title="YouTube API Keys" color="destructive">
+          <div className="space-y-4 pt-3">
+            <p className="text-xs text-muted-foreground">প্রতিটি API key আলাদা লাইনে দিন। একাধিক key দিলে কোটা শেষ হলে অটো পরের key ব্যবহার হবে।</p>
+            <textarea
+              value={youtubeApiKeys}
+              onChange={(e) => setYoutubeApiKeys(e.target.value)}
+              placeholder={"AIzaSy...\nAIzaSy...\nAIzaSy..."}
+              className="input-field min-h-[120px] font-mono text-xs"
+              rows={5}
+            />
+            <div className="flex gap-2">
+              <button
+                disabled={youtubeKeysLoading}
+                onClick={async () => {
+                  setYoutubeKeysLoading(true);
+                  try {
+                    // Load current keys from settings
+                    const { data } = await supabase.from("settings").select("value").eq("key", "youtube_api_keys").single();
+                    setYoutubeApiKeys(data?.value || "");
+                    toast({ title: "লোড হয়েছে" });
+                  } catch { toast({ title: "লোড ব্যর্থ", variant: "destructive" }); }
+                  finally { setYoutubeKeysLoading(false); }
+                }}
+                className="px-4 py-2 bg-secondary text-secondary-foreground rounded-xl text-sm font-bold"
+              >
+                {youtubeKeysLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "লোড"}
+              </button>
+              <button
+                disabled={youtubeKeysLoading}
+                onClick={async () => {
+                  setYoutubeKeysLoading(true);
+                  try {
+                    const trimmedKeys = youtubeApiKeys.split("\n").map(k => k.trim()).filter(k => k.length > 10).join("\n");
+                    // Upsert into settings
+                    const { data: existing } = await supabase.from("settings").select("id").eq("key", "youtube_api_keys").single();
+                    if (existing) {
+                      await supabase.from("settings").update({ value: trimmedKeys }).eq("key", "youtube_api_keys");
+                    } else {
+                      await supabase.from("settings").insert({ key: "youtube_api_keys", value: trimmedKeys });
+                    }
+                    toast({ title: `${trimmedKeys.split("\n").length} টি API key সেভ হয়েছে ✓` });
+                  } catch (e: any) { toast({ title: "সেভ ব্যর্থ", description: e.message, variant: "destructive" }); }
+                  finally { setYoutubeKeysLoading(false); }
+                }}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold flex-1"
+              >
+                সেভ করুন
+              </button>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+                  const res = await fetch(`${supabaseUrl}/functions/v1/youtube-search?action=key-status`, {
+                    headers: { "Authorization": `Bearer ${supabaseKey}` },
+                  });
+                  const data = await res.json();
+                  setYoutubeKeyStatus(data);
+                } catch { toast({ title: "স্ট্যাটাস চেক ব্যর্থ", variant: "destructive" }); }
+              }}
+              className="text-xs text-[hsl(var(--cyan))] hover:underline"
+            >
+              🔍 Key স্ট্যাটাস চেক করুন
+            </button>
+            {youtubeKeyStatus && (
+              <div className="bg-secondary/50 rounded-xl p-3 text-xs space-y-1">
+                <p className="font-bold">মোট: {youtubeKeyStatus.totalKeys} টি key | সক্রিয়: {youtubeKeyStatus.available} টি</p>
+                {youtubeKeyStatus.keys?.map((k: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${k.available ? "bg-green-500" : "bg-red-500"}`} />
+                    <span className="font-mono">{k.prefix}</span>
+                    {!k.available && <span className="text-destructive">({k.exhaustedMinAgo} মিনিট আগে শেষ)</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Section>
+
       </div>
     </div>
   );
