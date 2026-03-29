@@ -450,15 +450,6 @@ async function fetchYouTubeVideos(
 
 // Dailymotion removed - YouTube only via edge function
 
-) {
-  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_1080_url,thumbnail_720_url,thumbnail_480_url,thumbnail_360_url,thumbnail_url,duration,owner.screenname,country&sort=${sort}&longer_than=0&_=${freshnessToken}`;
-  const res = await fetch(dmUrl);
-  if (!res.ok) return [];
-  const data = await res.json();
-  return Array.isArray(data?.list) ? data.list : [];
-}
-
-function normalizeExternalVideo(raw: any): ExternalReelVideo | null {
   const rawId = String(raw?.id || "");
   const cleanId = rawId.startsWith("dm-") ? rawId.replace("dm-", "") : (raw?.video_id || rawId);
   const embedUrl = toDailymotionEmbed(cleanId, raw?.embed_url || raw?.video_url);
