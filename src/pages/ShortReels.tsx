@@ -362,11 +362,11 @@ export default function ShortReels() {
               className="h-full w-full relative snap-start snap-always"
               style={{ scrollSnapAlign: "start" }}
             >
-              {/* Video */}
+              {/* Video - only active index gets iframe to prevent multiple audio */}
               {video.isYouTube ? (
                 <YouTubeReelPlayer
                   videoId={video.videoId!}
-                  isActive={Math.abs(index - currentIndex) <= 1}
+                  isActive={index === currentIndex}
                 />
               ) : (
                 <video
