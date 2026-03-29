@@ -368,7 +368,7 @@ async function fetchYouTubeViaEdge(query: string, page = 1, seed = 0): Promise<a
         "Authorization": `Bearer ${supabaseKey}`,
         "Content-Type": "application/json",
       },
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(9500),
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -471,9 +471,16 @@ async function fetchYouTubeVideos(
       return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
     }
 
+    if (searchQuery?.trim()) {
+      return { videos: [], hasMore: false };
+    }
+
     const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
     return { videos: fallbackVideos, hasMore: false };
   } catch {
+    if (searchQuery?.trim()) {
+      return { videos: [], hasMore: false };
+    }
     const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
     return { videos: fallbackVideos, hasMore: false };
   }
@@ -875,7 +882,7 @@ export async function getBangladeshExternalVideos(
         const strictMatch = strict.test(normalizedTitle) || strict.test(normalizedCreator);
         const coverage = getQueryCoverage(words, normalizedTitle);
 
-        if (!strictMatch && coverage < 0.9) {
+        if (!strictMatch && coverage < 0.6) {
           return null;
         }
 
