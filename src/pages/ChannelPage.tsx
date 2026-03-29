@@ -11,8 +11,37 @@ import {
   type ChannelStats,
   type ExternalReelVideo,
 } from "@/lib/feed-api";
-import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X, Share2 } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X, Share2, Copy, Check } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
+
+async function shareOrCopy(title: string, url: string) {
+  // Try native share first
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url });
+      return;
+    } catch (e: any) {
+      if (e?.name === "AbortError") return; // user cancelled
+    }
+  }
+  // Fallback: copy to clipboard
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copied!", { description: url });
+  } catch {
+    // Final fallback: prompt
+    const input = document.createElement("textarea");
+    input.value = url;
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand("copy");
+    document.body.removeChild(input);
+    toast.success("Link copied!", { description: url });
+  }
+}
 
 function parseLongVideoMeta(content?: string | null): { title: string; duration?: number } | null {
   if (!content || !content.startsWith(LONG_VIDEO_MARKER)) return null;
