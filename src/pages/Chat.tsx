@@ -873,6 +873,40 @@ export default function Chat() {
           );
         })}
       </div>
+
+      {/* Conversation Delete Modal */}
+      <AnimatePresence>
+        {deleteConvoTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[220] bg-black/40" onClick={() => setDeleteConvoTarget(null)}>
+            <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
+              className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-4 space-y-2"
+              style={{ background: "#fff" }}
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-3">
+                <Trash2 size={20} style={{ color: "#ef4444" }} />
+                <p className="font-bold text-[16px]" style={{ color: "#111827" }}>Chat মুছে ফেলবেন?</p>
+              </div>
+              <p className="text-[13px] mb-3" style={{ color: "#6b7280" }}>এই কথোপকথন মুছে ফেলা হবে। আপনি আবার মেসেজ পাঠালে নতুন কথোপকথন তৈরি হবে।</p>
+              <button onClick={async () => {
+                try {
+                  await (supabase.from("conversations").delete().eq("id", deleteConvoTarget.id) as any);
+                  queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
+                  toast({ title: "Chat মুছে ফেলা হয়েছে" });
+                } catch { toast({ title: "মুছতে পারা যায়নি", variant: "destructive" }); }
+                setDeleteConvoTarget(null);
+              }}
+                className="w-full h-11 rounded-xl bg-red-500 text-white text-sm font-semibold">
+                Delete
+              </button>
+              <button onClick={() => setDeleteConvoTarget(null)}
+                className="w-full h-11 rounded-xl text-sm font-medium" style={{ background: "#f3f4f6", color: "#6b7280" }}>
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
