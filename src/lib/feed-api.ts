@@ -110,8 +110,16 @@ function hasFreshMarker(title: string): boolean {
   return /(\bnew\b|\blatest\b|202[4-9]|নতুন)/i.test(title);
 }
 
+function hasVeryFreshMarker(title: string): boolean {
+  return /(202[5-9]|\b2026\b|\b2027\b|\bnew release\b|\bjust released\b|\btoday\b|সদ্য|এইমাত্র|নতুন)/i.test(title);
+}
+
 function hasQualityMarker(title: string): boolean {
   return /(full\s*hd|1080|4k|\bhd\b)/i.test(title);
+}
+
+function hasStrongQualityMarker(title: string): boolean {
+  return /(1080p|full\s*hd|4k|2160p|hq|high\s*quality|hd\s*video)/i.test(title);
 }
 
 function isBanglaSongTitle(title: string): boolean {
@@ -163,6 +171,13 @@ export function isLongVideoPostContent(content?: string | null): boolean {
 function isMusicIntent(searchQuery?: string): boolean {
   const q = canonicalizeSearchQuery(searchQuery || "");
   return /(song|music|audio|lyrics|gan|gaan|gana|গান|nazrul|rabindra|hindi song|bangla song|album|mp3|dj mix|sad song|love song|bhojpuri)/.test(q);
+}
+
+function buildStrictQueryRegex(searchQuery: string): RegExp {
+  const escaped = canonicalizeSearchQuery(searchQuery)
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\s+/g, "\\s+");
+  return new RegExp(escaped, "i");
 }
 
 export const REACTION_EMOJIS: Record<string, string> = {
@@ -353,7 +368,7 @@ async function fetchYouTubeViaEdge(query: string, page = 1, seed = 0): Promise<a
         "Authorization": `Bearer ${supabaseKey}`,
         "Content-Type": "application/json",
       },
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(9500),
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -433,21 +448,39 @@ async function fetchYouTubeVideos(
   rows = 20,
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const defaultQueries = ["bangla new song 2026", "bangla hit song latest", "bangla trending song", "new bengali song hd", "bangla pop song 2026"];
+  const defaultQueries = [
+    "bangla new song 2026 full hd",
+    "bangla latest song official video 1080p",
+    "new bangla music video 2026 hd",
+    "বাংলা নতুন গান ২০২৬ full hd",
+    "bangla trending new release song hd",
+  ];
   const query = (searchQuery || "").trim() || defaultQueries[Math.floor(Date.now() / 120000) % defaultQueries.length];
   try {
     const raw = await fetchYouTubeViaEdge(query, page, freshnessToken);
-    const videos = raw
+    let videos = raw
       .map(youtubeResultToExternal)
       .filter(Boolean) as ExternalReelVideo[];
+
+    if (searchQuery?.trim()) {
+      const strict = buildStrictQueryRegex(searchQuery);
+      videos = videos.filter((video) => strict.test(normalizeForMatch(video.title || "")) || strict.test(normalizeForMatch(video.creator || "")));
+    }
 
     if (videos.length > 0) {
       return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
     }
 
+    if (searchQuery?.trim()) {
+      return { videos: [], hasMore: false };
+    }
+
     const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
     return { videos: fallbackVideos, hasMore: false };
   } catch {
+    if (searchQuery?.trim()) {
+      return { videos: [], hasMore: false };
+    }
     const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
     return { videos: fallbackVideos, hasMore: false };
   }
@@ -458,10 +491,13 @@ function buildSearchVariants(searchQuery?: string): string[] {
   const canonical = canonicalizeSearchQuery(raw);
 
   if (!canonical) {
-    // Much more variety - rotate through different Bengali music styles
+    // Fresh HD Bangla songs first, then variety
     const allDefaults = [
       "bangla new song 2026 full hd",
+      "bangla new release song 2026 1080p",
+      "বাংলা নতুন গান ২০২৬ hd official",
       "bangla latest song official video",
+      "bangla latest music video 1080p",
       "bangla romantic song full hd",
       "বাংলা নতুন গান hd 2026",
       "bangla trending song 2026",
@@ -837,16 +873,24 @@ export async function getBangladeshExternalVideos(
   if (trimmedQuery) {
     const canonical = canonicalizeSearchQuery(trimmedQuery);
     const words = getQueryWords(canonical);
+    const strict = buildStrictQueryRegex(trimmedQuery);
 
     merged = merged
       .map((video) => {
         const normalizedTitle = normalizeForMatch(video.title);
         const normalizedCreator = normalizeForMatch(video.creator || "");
+        const strictMatch = strict.test(normalizedTitle) || strict.test(normalizedCreator);
+        const coverage = getQueryCoverage(words, normalizedTitle);
+
+        if (!strictMatch && coverage < 0.6) {
+          return null;
+        }
 
         let score = scoreFallbackVideo(video.title, words, canonical)
           + scorePreferredCategory(video.title, video.category)
           + (video.source === "youtube" ? 8 : 0)
-          + (video.duration && video.duration >= 120 ? 2 : 0);
+          + (video.duration && video.duration >= 120 ? 2 : 0)
+          + (strictMatch ? 70 : 0);
 
         if (normalizedTitle.includes(canonical)) score += 26;
         if (words.length > 0 && words.every((w) => normalizedTitle.includes(w) || normalizedCreator.includes(w))) {
@@ -855,6 +899,7 @@ export async function getBangladeshExternalVideos(
 
         return { ...video, _score: score };
       })
+      .filter(Boolean)
       .sort((a: any, b: any) => b._score - a._score)
       .map(({ _score, ...rest }: any) => rest);
   } else {
@@ -863,10 +908,16 @@ export async function getBangladeshExternalVideos(
         let score = scorePreferredCategory(video.title, video.category)
           + (isBanglaDefaultSuggestion(video.title, video.country) ? 16 : 0)
           + (hasFreshMarker(video.title) ? 11 : 0)
+          + (hasVeryFreshMarker(video.title) ? 22 : 0)
           + (hasQualityMarker(video.title) ? 9 : 0)
+          + (hasStrongQualityMarker(video.title) ? 16 : 0)
           + (video.source === "youtube" ? 6 : 0)
           + (hardBlock.has(video.id) ? -220 : 0)
           + (softBlock.has(video.id) ? -70 : 0);
+
+        if (!isBanglaDefaultSuggestion(video.title, video.country)) {
+          score -= 40;
+        }
 
         return { ...video, _score: score };
       })

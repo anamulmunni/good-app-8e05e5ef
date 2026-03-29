@@ -28,6 +28,7 @@ type VideoItem = {
   id: string;
   title: string;
   video_url: string;
+  watch_url?: string;
   thumbnail_url?: string | null;
   creator?: string | null;
   duration?: number;
@@ -94,6 +95,7 @@ function mapExternalVideoToVideoItem(v: ExternalReelVideo): VideoItem {
     id: v.id,
     title: v.title,
     video_url: v.video_url,
+    watch_url: v.watch_url,
     thumbnail_url: v.thumbnail_url,
     creator: v.creator || "",
     duration: v.duration,
@@ -209,6 +211,9 @@ export default function Reels() {
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [externalReactions, setExternalReactions] = useState<Record<string, { reaction: "like" | "dislike" | null; likes: number }>>({});
+  const [playerLoading, setPlayerLoading] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [playerReloadToken, setPlayerReloadToken] = useState(0);
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -291,9 +296,44 @@ export default function Reels() {
   }, [selectedVideo?.local_post_id]);
 
   useEffect(() => {
-    setLiked(false);
-    setDisliked(false);
-  }, [selectedVideo?.id]);
+    if (!selectedVideo) {
+      setLiked(false);
+      setDisliked(false);
+      return;
+    }
+
+    const ext = externalReactions[selectedVideo.id];
+    if (ext) {
+      setLiked(ext.reaction === "like");
+      setDisliked(ext.reaction === "dislike");
+    } else {
+      setLiked(false);
+      setDisliked(false);
+    }
+  }, [selectedVideo?.id, externalReactions]);
+
+  useEffect(() => {
+    if (!selectedVideo) {
+      setPlayerLoading(false);
+      setPlayerError(null);
+      return;
+    }
+
+    setPlayerLoading(true);
+    setPlayerError(null);
+
+    const timeoutId = window.setTimeout(() => {
+      setPlayerLoading((prev) => {
+        if (prev) {
+          setPlayerError("ভিডিও লোড হতে দেরি হচ্ছে");
+          return false;
+        }
+        return prev;
+      });
+    }, 12000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [selectedVideo?.id, playerReloadToken]);
 
   useEffect(() => {
     return () => {
@@ -401,6 +441,7 @@ export default function Reels() {
       id: v.id,
       title: v.title,
       video_url: v.video_url,
+      watch_url: v.watch_url,
       thumbnail_url: v.thumbnail_url,
       creator: v.creator || "",
       duration: v.duration,
@@ -651,6 +692,12 @@ export default function Reels() {
             </button>
           ))}
         </div>
+
+        <div className="px-3 pb-2 text-[12px] text-muted-foreground">
+          {searchQuery.trim()
+            ? `Showing search results for "${searchQuery.trim()}"`
+            : "Showing suggested new Bangla HD songs"}
+        </div>
       </header>
 
       {selectedVideo && !miniPlayer && (
@@ -658,7 +705,7 @@ export default function Reels() {
           <div ref={playerShellRef} className="w-full aspect-video relative" style={{ background: "#000" }}>
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
-                key={selectedVideo.id}
+                key={`${selectedVideo.id}-${playerReloadToken}`}
                 src={buildExternalPlayerUrl(
                   selectedVideo.video_url,
                   false,
@@ -667,10 +714,16 @@ export default function Reels() {
                 className="w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
                 allowFullScreen
+                onError={() => {
+                  setPlayerLoading(false);
+                  setPlayerError("ভিডিও লোড করা যায়নি");
+                }}
                 ref={(node) => {
                   youtubeIframeRef.current = node;
                 }}
                 onLoad={() => {
+                  setPlayerLoading(false);
+                  setPlayerError(null);
                   if (selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url)) {
                     window.setTimeout(() => {
                       postYoutubeCommand("unMute");
@@ -681,13 +734,64 @@ export default function Reels() {
               />
             ) : (
               <video
-                key={selectedVideo.id}
+                key={`${selectedVideo.id}-${playerReloadToken}`}
                 src={selectedVideo.video_url}
                 controls
                 autoPlay
                 playsInline
+                preload="metadata"
+                onLoadedData={() => {
+                  setPlayerLoading(false);
+                  setPlayerError(null);
+                }}
+                onCanPlay={() => {
+                  setPlayerLoading(false);
+                  setPlayerError(null);
+                }}
+                onError={() => {
+                  setPlayerLoading(false);
+                  setPlayerError("ভিডিও প্লে করা যায়নি");
+                }}
                 className="w-full h-full object-contain"
               />
+            )}
+            {playerLoading && (
+              <div className="absolute inset-0 z-20 grid place-items-center bg-background/70">
+                <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-card-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>ভিডিও লোড হচ্ছে...</span>
+                </div>
+              </div>
+            )}
+            {playerError && !playerLoading && (
+              <div className="absolute inset-0 z-20 grid place-items-center bg-background/75 px-4">
+                <div className="w-full max-w-xs rounded-lg border border-border bg-card p-4 text-card-foreground">
+                  <p className="text-sm">{playerError}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPlayerError(null);
+                        setPlayerLoading(true);
+                        setPlayerReloadToken((prev) => prev + 1);
+                      }}
+                      className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-sm"
+                    >
+                      Retry
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = selectedVideo.watch_url || selectedVideo.video_url;
+                        window.open(url, "_blank", "noopener,noreferrer");
+                      }}
+                      className="h-9 flex-1 rounded-md border border-border bg-muted text-muted-foreground text-sm"
+                    >
+                      Open source
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
             {selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && showYoutubeTapToPlay && (
               <button
@@ -752,7 +856,8 @@ export default function Reels() {
                   } else {
                     setExternalReactions(prev => {
                       const cur = prev[selectedVideo.id] || { reaction: null, likes: selectedVideo.likes_count || 0 };
-                      return { ...prev, [selectedVideo.id]: { reaction: "like", likes: cur.likes + 1 } };
+                      const nextLikes = cur.reaction === "like" ? cur.likes : cur.likes + 1;
+                      return { ...prev, [selectedVideo.id]: { reaction: "like", likes: nextLikes } };
                     });
                   }
                 }
@@ -768,12 +873,24 @@ export default function Reels() {
               onClick={() => {
                 if (disliked) {
                   setDisliked(false);
+                  if (!selectedVideo.local_post_id) {
+                    setExternalReactions(prev => {
+                      const cur = prev[selectedVideo.id] || { reaction: null, likes: selectedVideo.likes_count || 0 };
+                      return { ...prev, [selectedVideo.id]: { reaction: null, likes: cur.likes } };
+                    });
+                  }
                 } else {
                   setDisliked(true);
                   setLiked(false);
                   if (selectedVideo.local_post_id && user) {
                     toggleReaction(selectedVideo.local_post_id, user.id, "dislike").catch(() => {});
                     getLocalVideoEngagement(selectedVideo.local_post_id).then(setEngagementStats);
+                  } else {
+                    setExternalReactions(prev => {
+                      const cur = prev[selectedVideo.id] || { reaction: null, likes: selectedVideo.likes_count || 0 };
+                      const nextLikes = cur.reaction === "like" ? Math.max(0, cur.likes - 1) : cur.likes;
+                      return { ...prev, [selectedVideo.id]: { reaction: "dislike", likes: nextLikes } };
+                    });
                   }
                 }
               }}
@@ -789,7 +906,7 @@ export default function Reels() {
               style={{ background: "#272727", color: "#f1f1f1" }}
               onClick={async () => {
                 const shareUrl = selectedVideo.isExternal
-                  ? (selectedVideo as any).watch_url || selectedVideo.video_url
+                  ? selectedVideo.watch_url || selectedVideo.video_url
                   : `${window.location.origin}/reels?play=${selectedVideo.local_post_id || selectedVideo.id}`;
                 try {
                   if (navigator.share) {
@@ -865,7 +982,7 @@ export default function Reels() {
           <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
             <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
             <span className="text-[12px]" style={{ color: "#aaa" }}>
-              • {activeQuery ? `results for "${activeQuery}"` : "suggested for you"}
+              • {searchQuery.trim() ? `search results for "${searchQuery.trim()}"` : "suggested new Bangla HD songs"}
             </span>
           </div>
         </div>
@@ -1075,7 +1192,7 @@ export default function Reels() {
 
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
-              {activeQuery ? `No results for "${activeQuery}"` : "Loading videos..."}
+              {searchQuery.trim() ? `No search results for "${searchQuery.trim()}"` : "নতুন বাংলা HD গান লোড হচ্ছে..."}
             </div>
           )}
 
