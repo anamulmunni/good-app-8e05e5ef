@@ -198,6 +198,126 @@ function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
   return fallbackUrl || "";
 }
 
+// ── YouTube search via Invidious public API ──────────────────────────────
+
+const INVIDIOUS_INSTANCES = [
+  "https://inv.tux.pizza",
+  "https://invidious.nerdvpn.de",
+  "https://iv.ggtyler.dev",
+  "https://invidious.privacyredirect.com",
+  "https://invidious.jing.rocks",
+];
+
+async function fetchInvidiousSearch(
+  query: string,
+  page = 1,
+): Promise<any[]> {
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${page}&type=video&sort_by=relevance&region=BD`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    } catch {
+      continue;
+    }
+  }
+  return [];
+}
+
+function youtubeResultToExternal(item: any): ExternalReelVideo | null {
+  const videoId = item?.videoId;
+  if (!videoId) return null;
+  const duration = Number(item?.lengthSeconds || 0);
+  if (duration < 30) return null; // skip very short
+
+  return {
+    id: `yt-${videoId}`,
+    title: String(item?.title || "YouTube Video"),
+    source: "dailymotion" as const, // reuse existing type
+    video_url: `https://www.youtube.com/embed/${videoId}`,
+    watch_url: `https://www.youtube.com/watch?v=${videoId}`,
+    creator: item?.author || null,
+    thumbnail_url: item?.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    video_id: videoId,
+    duration,
+    category: detectExternalCategory(String(item?.title || "")),
+    country: "BD",
+  };
+}
+
+async function fetchYouTubeVideos(
+  searchQuery?: string,
+  page = 1,
+  rows = 20,
+  freshnessToken = 0,
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
+  const canonical = canonicalizeSearchQuery(searchQuery || "");
+  const queries = canonical
+    ? [canonical, `${canonical} song`, `${canonical} official video`]
+    : [
+        "bangla new song 2025",
+        "bangla latest song official video",
+        "bangla romantic song new",
+        "বাংলা নতুন গান",
+        "bangla hit song 2025",
+      ];
+
+  // Shift queries based on freshnessToken for variety
+  const shift = canonical ? 0 : Math.abs(freshnessToken % queries.length);
+  const ordered = shift > 0 ? [...queries.slice(shift), ...queries.slice(0, shift)] : queries;
+
+  const results: any[] = [];
+  for (const q of ordered.slice(0, 3)) {
+    const items = await fetchInvidiousSearch(q, page);
+    results.push(...items);
+    if (results.length >= rows * 2) break;
+  }
+
+  const seen = new Set<string>();
+  const queryWords = getQueryWords(canonical);
+  const normalizedQuery = normalizeForMatch(canonical);
+
+  let videos = results
+    .map(youtubeResultToExternal)
+    .filter((v): v is ExternalReelVideo => {
+      if (!v) return false;
+      if (seen.has(v.id)) return false;
+      seen.add(v.id);
+      return true;
+    });
+
+  // For search queries, score and sort by relevance
+  if (canonical) {
+    videos = videos
+      .map((v) => {
+        const normalizedTitle = normalizeForMatch(v.title);
+        let score = 0;
+        if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 40;
+        for (const w of queryWords) {
+          if (normalizedTitle.includes(w)) score += 8;
+        }
+        if (queryWords.every((w) => normalizedTitle.includes(w))) score += 15;
+        return { ...v, _score: score };
+      })
+      .sort((a: any, b: any) => b._score - a._score)
+      .map(({ _score, ...rest }: any) => rest);
+  } else {
+    // Default feed: prefer Bangla songs
+    videos = videos.filter((v) => {
+      const lower = v.title.toLowerCase();
+      const hasNonMusic = /(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower);
+      return !hasNonMusic;
+    });
+  }
+
+  return {
+    videos: videos.slice(0, rows),
+    hasMore: results.length > rows,
+  };
+}
+
 function buildSearchVariants(searchQuery?: string): string[] {
   const raw = (searchQuery || "").trim();
   const canonical = canonicalizeSearchQuery(raw);
@@ -485,6 +605,17 @@ export async function getBangladeshExternalVideos(
   mode: "short" | "long" = "long",
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
+  // Try YouTube (via Invidious) first — it has the best Bangla music catalog
+  try {
+    const ytResult = await fetchYouTubeVideos(searchQuery, page, rows, freshnessToken);
+    if (ytResult.videos.length > 0) {
+      return ytResult;
+    }
+  } catch (e) {
+    console.warn("YouTube/Invidious search failed, falling back to Dailymotion:", e);
+  }
+
+  // Fallback to Dailymotion
   const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
   if ((searchQuery && searchQuery.trim()) || direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
     return direct;
