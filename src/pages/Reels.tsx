@@ -807,30 +807,19 @@ export default function Reels() {
             {playerError && !playerLoading && (
               <div className="absolute inset-0 z-20 grid place-items-center bg-background/75 px-4">
                 <div className="w-full max-w-xs rounded-lg border border-border bg-card p-4 text-card-foreground">
-                  <p className="text-sm">{playerError}</p>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPlayerError(null);
-                        setPlayerLoading(true);
-                        setPlayerReloadToken((prev) => prev + 1);
-                      }}
-                      className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-sm"
-                    >
-                      Retry
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const url = selectedVideo.watch_url || selectedVideo.video_url;
-                        window.open(url, "_blank", "noopener,noreferrer");
-                      }}
-                      className="h-9 flex-1 rounded-md border border-border bg-muted text-muted-foreground text-sm"
-                    >
-                      Open source
-                    </button>
-                  </div>
+                  <p className="text-sm mb-1">{playerError}</p>
+                  <p className="text-xs text-muted-foreground mb-3">ইন্টারনেট সংযোগ চেক করুন এবং আবার চেষ্টা করুন</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayerError(null);
+                      setPlayerLoading(true);
+                      setPlayerReloadToken((prev) => prev + 1);
+                    }}
+                    className="h-10 w-full rounded-md bg-primary text-primary-foreground text-sm font-semibold"
+                  >
+                    🔄 আবার চেষ্টা করুন
+                  </button>
                 </div>
               </div>
             )}
