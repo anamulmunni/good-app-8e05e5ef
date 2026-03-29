@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowRight, Lock, User, Phone, PlayCircle, CheckCircle2, MessageCircle, Video, Users, Shield, Sparkles, ChevronDown, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import loginBg from "@/assets/login-bg.jpg";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -161,21 +162,30 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Animated background */}
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Premium background image */}
+      <div className="fixed inset-0 z-0">
+        <img src={loginBg} alt="" className="w-full h-full object-cover" width={1080} height={1920} />
+        <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
+      </div>
+
+      {/* Floating particles */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={i}
+            animate={{
+              y: [0, -40, 0],
+              x: [0, (i % 2 === 0 ? 15 : -15), 0],
+              opacity: [0.3, 0.7, 0.3],
+            }}
+            transition={{ duration: 4 + i * 1.2, repeat: Infinity, delay: i * 0.8 }}
+            className="absolute w-2 h-2 rounded-full bg-primary/40"
+            style={{ top: `${15 + i * 14}%`, left: `${10 + i * 15}%` }}
+          />
+        ))}
         <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-          className="absolute top-[-30%] right-[-20%] w-[600px] h-[600px] bg-primary/15 rounded-full blur-[100px]"
-        />
-        <motion.div
-          animate={{ rotate: -360 }}
-          transition={{ duration: 80, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-[-20%] left-[-20%] w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px]"
-        />
-        <motion.div
-          animate={{ y: [0, -30, 0], opacity: [0.05, 0.1, 0.05] }}
+          animate={{ y: [0, -20, 0], opacity: [0.03, 0.08, 0.03] }}
           transition={{ duration: 8, repeat: Infinity }}
           className="absolute inset-0 flex items-center justify-center"
         >
