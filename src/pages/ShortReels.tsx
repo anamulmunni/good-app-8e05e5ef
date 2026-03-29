@@ -352,11 +352,13 @@ export default function ShortReels() {
                 />
               )}
 
-              {/* Tap overlay */}
-              <div className="absolute inset-0 z-10" onClick={handleVideoTap} />
+              {/* Tap overlay - only for non-YouTube videos */}
+              {!video.isYouTube && (
+                <div className="absolute inset-0 z-10" onClick={handleVideoTap} />
+              )}
 
-              {/* Pause indicator */}
-              {paused && index === currentIndex && (
+              {/* Pause indicator - only for non-YouTube */}
+              {!video.isYouTube && paused && index === currentIndex && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-15">
                   <div className="w-16 h-16 rounded-full bg-black/40 grid place-items-center">
                     <Play className="w-8 h-8 text-white ml-1" />
