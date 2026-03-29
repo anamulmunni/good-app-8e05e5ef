@@ -748,6 +748,7 @@ export default function Reels() {
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#0f0f0f", color: "#fff" }}>
       <header className="sticky top-0 z-20" style={{ background: "#0f0f0f" }}>
         {searchMode ? (
+          <>
           <div className="flex items-center gap-2 px-2 py-2">
             <button onClick={() => setSearchMode(false)} className="h-10 w-10 shrink-0 grid place-items-center">
               <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
