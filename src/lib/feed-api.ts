@@ -270,6 +270,42 @@ function seededShuffle<T>(items: T[], seed = 0): T[] {
   return arr;
 }
 
+function diversifyByCreator(videos: ExternalReelVideo[], maxPerCreator = 2): ExternalReelVideo[] {
+  const counter = new Map<string, number>();
+  return videos.filter((video) => {
+    const creator = normalizeForMatch(video.creator || "unknown");
+    const count = counter.get(creator) || 0;
+    if (count >= maxPerCreator) return false;
+    counter.set(creator, count + 1);
+    return true;
+  });
+}
+
+const VIDEO_RECENT_KEY = "goodapp-video-recent-v1";
+
+function readRecentVideoIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(VIDEO_RECENT_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeRecentVideoIds(newIds: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = Array.from(readRecentVideoIds());
+    const merged = Array.from(new Set([...newIds, ...existing])).slice(0, 500);
+    window.localStorage.setItem(VIDEO_RECENT_KEY, JSON.stringify(merged));
+  } catch {
+    // no-op
+  }
+}
+
 export function trackVideoPreference(input: { title?: string; category?: string | null }): void {
   if (typeof window === "undefined") return;
   try {
@@ -291,13 +327,14 @@ export function trackVideoPreference(input: { title?: string; category?: string 
 
 // ── YouTube search via Edge Function proxy ──────────────────────────────
 
-async function fetchYouTubeViaEdge(query: string, page = 1): Promise<any[]> {
+async function fetchYouTubeViaEdge(query: string, page = 1, seed = 0): Promise<any[]> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!supabaseUrl) return [];
 
   try {
-    const url = `${supabaseUrl}/functions/v1/youtube-search?q=${encodeURIComponent(query)}&page=${page}`;
+    const nonce = Math.abs(seed || Date.now()) % 1000000;
+    const url = `${supabaseUrl}/functions/v1/youtube-search?q=${encodeURIComponent(query)}&page=${page}&seed=${nonce}`;
     const res = await fetch(url, {
       headers: {
         "Authorization": `Bearer ${supabaseKey}`,
@@ -347,7 +384,15 @@ async function fetchYouTubeVideos(
   const preferredCats = topPreferredCategories(2);
 
   const queries = canonical
-    ? [canonical, `${canonical} song`, `${canonical} official video`, `${canonical} lyrics`, `${canonical} full hd`]
+    ? [
+        canonical,
+        `${canonical} song`,
+        `${canonical} official video`,
+        `${canonical} lyrics`,
+        `${canonical} full hd`,
+        `${canonical} bangla`,
+        `${canonical} audio`,
+      ]
     : [
         ...preferredCats.map((cat) => `bangla ${cat} song new`),
         "bangla new song 2025",
@@ -361,7 +406,7 @@ async function fetchYouTubeVideos(
   const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
   const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
 
-  const fetchPromises = ordered.slice(0, 4).map((q) => fetchYouTubeViaEdge(q, page));
+  const fetchPromises = ordered.slice(0, 6).map((q, idx) => fetchYouTubeViaEdge(q, page + (idx % 2), freshnessToken + idx * 97));
   const allResults = await Promise.all(fetchPromises);
   const results = allResults.flat();
 
@@ -697,7 +742,7 @@ export async function getBangladeshExternalVideos(
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   const trimmedQuery = searchQuery?.trim();
-  const safeRows = Math.max(rows, 12);
+  const safeRows = Math.max(rows * 2, 24);
 
   const [ytResult, dmResult] = await Promise.allSettled([
     fetchYouTubeVideos(trimmedQuery, page, safeRows, freshnessToken + page),
@@ -709,7 +754,14 @@ export async function getBangladeshExternalVideos(
   const ytHasMore = ytResult.status === "fulfilled" ? ytResult.value.hasMore : false;
   const dmHasMore = dmResult.status === "fulfilled" ? dmResult.value.hasMore : false;
 
+  const recentIds = readRecentVideoIds();
   let merged = dedupeExternalVideos([...ytVideos, ...dmVideos]);
+
+  // Avoid repeating recently shown videos in default suggestion mode
+  if (!trimmedQuery) {
+    const unseen = merged.filter((video) => !recentIds.has(video.id));
+    merged = unseen.length >= rows ? unseen : [...unseen, ...merged.filter((video) => recentIds.has(video.id))];
+  }
 
   if (trimmedQuery) {
     const canonical = canonicalizeSearchQuery(trimmedQuery);
@@ -722,12 +774,12 @@ export async function getBangladeshExternalVideos(
 
         let score = scoreFallbackVideo(video.title, words, canonical)
           + scorePreferredCategory(video.title, video.category)
-          + (video.source === "youtube" ? 6 : 0)
+          + (video.source === "youtube" ? 8 : 0)
           + (video.duration && video.duration >= 120 ? 2 : 0);
 
-        if (normalizedTitle.includes(canonical)) score += 24;
+        if (normalizedTitle.includes(canonical)) score += 26;
         if (words.length > 0 && words.every((w) => normalizedTitle.includes(w) || normalizedCreator.includes(w))) {
-          score += 16;
+          score += 18;
         }
 
         return { ...video, _score: score };
@@ -741,22 +793,26 @@ export async function getBangladeshExternalVideos(
           + (isBanglaDefaultSuggestion(video.title, video.country) ? 16 : 0)
           + (hasFreshMarker(video.title) ? 11 : 0)
           + (hasQualityMarker(video.title) ? 9 : 0)
-          + (video.source === "youtube" ? 5 : 0);
+          + (video.source === "youtube" ? 6 : 0)
+          + (recentIds.has(video.id) ? -20 : 0);
 
         return { ...video, _score: score };
       })
       .sort((a: any, b: any) => b._score - a._score)
       .map(({ _score, ...rest }: any) => rest);
 
-    merged = seededShuffle(merged, freshnessToken + page * 31);
+    merged = diversifyByCreator(seededShuffle(merged, freshnessToken + page * 31), 2);
   }
 
   if (merged.length === 0) {
     return { videos: [], hasMore: false };
   }
 
+  const finalVideos = merged.slice(0, rows);
+  writeRecentVideoIds(finalVideos.map((video) => video.id));
+
   return {
-    videos: merged.slice(0, rows),
+    videos: finalVideos,
     hasMore: merged.length > rows || ytHasMore || dmHasMore,
   };
 }
