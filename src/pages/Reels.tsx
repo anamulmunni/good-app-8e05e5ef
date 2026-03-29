@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
@@ -486,11 +486,13 @@ export default function Reels() {
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
+        try { await (screen.orientation as any).unlock?.(); } catch {}
         return;
       }
 
       if (shell.requestFullscreen) {
         await shell.requestFullscreen();
+        try { await (screen.orientation as any).lock?.("landscape"); } catch {}
         return;
       }
 
@@ -566,8 +568,12 @@ export default function Reels() {
               <button onClick={handleRefreshFeed} className="h-10 w-10 grid place-items-center rounded-full">
                 <RefreshCcw className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
-              <button className="h-10 w-10 grid place-items-center rounded-full">
-                <Cast className="w-5 h-5" style={{ color: "#fff" }} />
+              <button onClick={() => navigate(`/channel/${user.id}`)} className="h-10 w-10 grid place-items-center rounded-full overflow-hidden" title="My Channel">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                ) : (
+                  <User className="w-5 h-5" style={{ color: "#fff" }} />
+                )}
               </button>
               <button className="h-10 w-10 grid place-items-center rounded-full relative">
                 <Bell className="w-5 h-5" style={{ color: "#fff" }} />
@@ -650,7 +656,7 @@ export default function Reels() {
             )}
             <button
               onClick={requestFullscreen}
-              className="absolute top-2 right-2 w-9 h-9 rounded-full grid place-items-center"
+              className="absolute bottom-2 right-2 w-9 h-9 rounded-full grid place-items-center z-10"
               style={{ background: "rgba(0,0,0,0.7)" }}
             >
               <Maximize className="w-4 h-4" style={{ color: "#fff" }} />

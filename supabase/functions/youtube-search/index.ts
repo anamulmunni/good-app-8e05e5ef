@@ -6,19 +6,21 @@ const corsHeaders = {
 };
 
 const INVIDIOUS_INSTANCES = [
-  "https://inv.tux.pizza",
+  "https://inv.nadeko.net",
   "https://invidious.nerdvpn.de",
-  "https://iv.ggtyler.dev",
-  "https://invidious.privacyredirect.com",
-  "https://invidious.jing.rocks",
-  "https://vid.puffyan.us",
-  "https://invidious.lunar.icu",
+  "https://yewtu.be",
+  "https://iv.nbonn.ch",
+  "https://invidious.protokoll-departed.de",
+  "https://invidious.privacydev.net",
+  "https://inv.us.projectsegfau.lt",
 ];
 
 const PIPED_INSTANCES = [
   "https://pipedapi.kavin.rocks",
   "https://pipedapi.adminforge.de",
   "https://api.piped.projectsegfau.lt",
+  "https://pipedapi.in.projectsegfau.lt",
+  "https://pipedapi.us.projectsegfau.lt",
 ];
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -63,7 +65,7 @@ function normalizeVideo(item: any): any | null {
 async function tryInvidiousInstance(instance: string, query: string, page: number): Promise<any[]> {
   const queryPage = normalizePage(page, 7);
   const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${queryPage}&type=video&sort_by=relevance&region=BD`;
-  const res = await withTimeout(fetch(url), 3200);
+  const res = await withTimeout(fetch(url), 6000);
   if (!res.ok) return [];
   const data = await res.json();
   if (!Array.isArray(data)) return [];
@@ -93,7 +95,7 @@ async function searchInvidious(query: string, page: number): Promise<any[]> {
 
 async function tryPipedInstance(instance: string, query: string): Promise<any[]> {
   const url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
-  const res = await withTimeout(fetch(url), 3200);
+  const res = await withTimeout(fetch(url), 6000);
   if (!res.ok) return [];
 
   const data = await res.json();
@@ -129,7 +131,7 @@ async function searchPiped(query: string): Promise<any[]> {
 async function searchNoKeyApi(query: string): Promise<any[]> {
   try {
     const url = `https://yt.lemnoslife.com/noKey/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(query)}`;
-    const res = await withTimeout(fetch(url), 3800);
+    const res = await withTimeout(fetch(url), 6000);
     if (!res.ok) return [];
     const data = await res.json();
     const items = Array.isArray(data?.items) ? data.items : [];
