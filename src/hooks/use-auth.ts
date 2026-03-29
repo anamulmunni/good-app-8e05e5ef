@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User as AppUser } from "@/lib/api";
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs = 12000, message = "Request timeout") {
+function withTimeout(promise: any, timeoutMs = 12000, message = "Request timeout") {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<T>((_, reject) => {
+  const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
 
-  return Promise.race([promise, timeoutPromise]).finally(() => {
+  return Promise.race([Promise.resolve(promise), timeoutPromise]).finally(() => {
     if (timer) clearTimeout(timer);
   });
 }
