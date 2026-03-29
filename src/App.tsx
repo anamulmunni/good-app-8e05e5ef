@@ -51,6 +51,7 @@ function AppInner() {
         <Route path="/chat" element={<Chat />} />
         <Route path="/feed" element={<Feed />} />
         <Route path="/reels" element={<Reels />} />
+        <Route path="/short-reels" element={<ShortReels />} />
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/channel/:userId" element={<ChannelPage />} />
         <Route path="/call/:userId" element={<CallPage />} />
