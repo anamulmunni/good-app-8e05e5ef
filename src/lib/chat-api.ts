@@ -219,7 +219,7 @@ export async function uploadChatMedia(file: File | Blob, fileName: string): Prom
 export async function searchUsers(query: string) {
   const { data } = await (supabase
     .from("users")
-    .select("id, guest_id, display_name, avatar_url") as any)
+    .select("id, guest_id, display_name, avatar_url, is_verified_badge") as any)
     .or(`guest_id.ilike.%${query}%,display_name.ilike.%${query}%`)
     .limit(10);
 

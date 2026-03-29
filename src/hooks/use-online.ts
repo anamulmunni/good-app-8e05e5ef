@@ -28,7 +28,7 @@ export function isUserOnline(onlineAt: string | null): boolean {
 // Fetch online users (active within last 2 minutes)
 export async function getOnlineUsers(excludeUserId?: number) {
   const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  let query = (supabase.from("users").select("id, guest_id, display_name, avatar_url, online_at") as any)
+  let query = (supabase.from("users").select("id, guest_id, display_name, avatar_url, online_at, is_verified_badge") as any)
     .gt("online_at", twoMinAgo)
     .order("online_at", { ascending: false })
     .limit(20);
