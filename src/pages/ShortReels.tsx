@@ -7,7 +7,7 @@ import {
   toggleReaction, getUserReactions, getPostComments, addComment,
   type PostComment,
 } from "@/lib/feed-api";
-import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play, RefreshCw } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
@@ -40,103 +40,33 @@ type ShortVideo = {
   videoId?: string;
 };
 
-// Fetch stream URL from our edge function
-async function getYouTubeStreamUrl(videoId: string): Promise<string | null> {
-  try {
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const res = await fetch(
-      `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=stream&videoId=${videoId}`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.streamUrl || null;
-  } catch {
-    return null;
-  }
-}
-
-// YouTube video player component with lazy stream loading
+// YouTube Reel Player using iframe embed (reliable, always works)
 function YouTubeReelPlayer({
   videoId,
-  thumbnail,
   isActive,
-  paused,
-  videoRef,
 }: {
   videoId: string;
-  thumbnail: string;
   isActive: boolean;
-  paused: boolean;
-  videoRef: (el: HTMLVideoElement | null) => void;
 }) {
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!isActive || streamUrl) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(false);
-    getYouTubeStreamUrl(videoId).then((url) => {
-      if (cancelled) return;
-      if (url) {
-        setStreamUrl(url);
-      } else {
-        setError(true);
-      }
-      setLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [isActive, videoId, streamUrl]);
-
-  if (loading || (!streamUrl && !error)) {
+  if (!isActive) {
     return (
-      <div className="w-full h-full relative">
-        <img src={thumbnail} className="w-full h-full object-cover" alt="" />
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-10 h-10 text-white animate-spin" />
-            <p className="text-white/80 text-sm">লোড হচ্ছে...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full h-full relative">
-        <img src={thumbnail} className="w-full h-full object-cover" alt="" />
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <RefreshCw className="w-8 h-8 text-white/70" />
-            <p className="text-white/70 text-sm">ভিডিও লোড হয়নি</p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setStreamUrl(null);
-                setError(false);
-              }}
-              className="px-4 py-2 bg-white/20 rounded-full text-white text-sm"
-            >
-              আবার চেষ্টা করুন
-            </button>
-          </div>
-        </div>
+      <div className="w-full h-full relative bg-black">
+        <img
+          src={`https://i.ytimg.com/vi/${videoId}/hq720.jpg`}
+          className="w-full h-full object-cover"
+          alt=""
+        />
       </div>
     );
   }
 
   return (
-    <video
-      ref={videoRef}
-      src={streamUrl!}
-      loop
-      playsInline
-      className="w-full h-full object-cover"
-      style={{ pointerEvents: "none" }}
-      poster={thumbnail}
+    <iframe
+      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=0&enablejsapi=0`}
+      className="w-full h-full border-0"
+      allow="autoplay; encrypted-media; picture-in-picture"
+      allowFullScreen
+      style={{ pointerEvents: "auto" }}
     />
   );
 }
@@ -409,10 +339,7 @@ export default function ShortReels() {
               {video.isYouTube ? (
                 <YouTubeReelPlayer
                   videoId={video.videoId!}
-                  thumbnail={(video as any).thumbnail || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`}
                   isActive={Math.abs(index - currentIndex) <= 1}
-                  paused={paused && index === currentIndex}
-                  videoRef={(el) => { videoRefs.current[index] = el; }}
                 />
               ) : (
                 <video
@@ -425,11 +352,13 @@ export default function ShortReels() {
                 />
               )}
 
-              {/* Tap overlay */}
-              <div className="absolute inset-0 z-10" onClick={handleVideoTap} />
+              {/* Tap overlay - only for non-YouTube videos */}
+              {!video.isYouTube && (
+                <div className="absolute inset-0 z-10" onClick={handleVideoTap} />
+              )}
 
-              {/* Pause indicator */}
-              {paused && index === currentIndex && (
+              {/* Pause indicator - only for non-YouTube */}
+              {!video.isYouTube && paused && index === currentIndex && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-15">
                   <div className="w-16 h-16 rounded-full bg-black/40 grid place-items-center">
                     <Play className="w-8 h-8 text-white ml-1" />
