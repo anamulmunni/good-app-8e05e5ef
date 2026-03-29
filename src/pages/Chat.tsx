@@ -289,6 +289,7 @@ export default function Chat() {
     const text = messageText.trim();
     if (!text) return;
     setMessageText("");
+    playUiSound("message");
     sendMutation.mutate({ type: "text", content: text });
   };
 

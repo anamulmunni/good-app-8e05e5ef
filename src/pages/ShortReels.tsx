@@ -211,8 +211,14 @@ export default function ShortReels() {
                 ref={(el) => { videoRefs.current[index] = el; }}
                 src={video.video_url}
                 loop
+                muted={false}
                 playsInline
                 className="w-full h-full object-cover"
+                style={{ pointerEvents: "none" }}
+              />
+              {/* Tap overlay for pause/love */}
+              <div
+                className="absolute inset-0 z-10"
                 onClick={handleVideoTap}
               />
 
