@@ -714,10 +714,6 @@ export default function Reels() {
                 className="w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
                 allowFullScreen
-                onLoad={() => {
-                  setPlayerLoading(false);
-                  setPlayerError(null);
-                }}
                 onError={() => {
                   setPlayerLoading(false);
                   setPlayerError("ভিডিও লোড করা যায়নি");
