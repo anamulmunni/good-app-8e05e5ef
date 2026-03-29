@@ -23,6 +23,7 @@ import {
   toggleReaction,
   getUserReactions,
   type PostComment,
+  fetchYouTubeSuggestions,
 } from "@/lib/feed-api";
 
 type VideoItem = {
