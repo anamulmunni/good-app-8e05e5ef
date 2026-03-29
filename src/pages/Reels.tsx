@@ -796,52 +796,61 @@ export default function Reels() {
               <Search className="w-5 h-5" style={{ color: "#fff" }} />
             </button>
           </div>
-          {/* Search history dropdown */}
-          {searchHistory.length > 0 && (
-            <div className="px-2 pb-2 space-y-0.5" style={{ maxHeight: "60vh", overflowY: "auto" }}>
-              <div className="flex items-center justify-between px-2 py-1.5">
-                <span className="text-[13px] font-medium" style={{ color: "#aaa" }}>সার্চ হিস্ট্রি</span>
-                <button
-                  onClick={() => {
-                    window.localStorage.removeItem(SEARCH_HISTORY_KEY);
-                    setSearchHistory([]);
-                  }}
-                  className="text-[11px] px-2 py-1 rounded"
-                  style={{ color: "#3ea6ff" }}
-                >
-                  Clear all
-                </button>
-              </div>
-              {searchHistory.map((q) => (
-                <div key={q} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
-                  <History className="w-4 h-4 shrink-0" style={{ color: "#717171" }} />
-                  <button
-                    className="flex-1 text-left text-[14px] truncate"
-                    style={{ color: "#f1f1f1" }}
-                    onClick={() => {
-                      setSearchInput(q);
-                      setSearchQuery(q);
-                      setSelectedChip("All");
-                      setSearchMode(false);
-                      saveSearchHistory(q);
-                      setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
-                    }}
-                  >
-                    {q}
-                  </button>
-                  <button
-                    onClick={() => {
-                      removeSearchHistoryItem(q);
-                      setSearchHistory(readSearchHistory());
-                    }}
-                    className="shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
-                  </button>
+          {/* Search suggestions - filter as user types */}
+          {(() => {
+            const q = searchInput.trim().toLowerCase();
+            const filtered = q
+              ? searchHistory.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+              : searchHistory;
+            if (filtered.length === 0) return null;
+            return (
+              <div className="px-2 pb-2 space-y-0.5" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-[13px] font-medium" style={{ color: "#aaa" }}>{q ? "সাজেশন" : "সার্চ হিস্ট্রি"}</span>
+                  {!q && (
+                    <button
+                      onClick={() => {
+                        window.localStorage.removeItem(SEARCH_HISTORY_KEY);
+                        setSearchHistory([]);
+                      }}
+                      className="text-[11px] px-2 py-1 rounded"
+                      style={{ color: "#3ea6ff" }}
+                    >
+                      Clear all
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+                {filtered.map((item) => (
+                  <div key={item} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
+                    {q ? <Search className="w-4 h-4 shrink-0" style={{ color: "#717171" }} /> : <History className="w-4 h-4 shrink-0" style={{ color: "#717171" }} />}
+                    <button
+                      className="flex-1 text-left text-[14px] truncate"
+                      style={{ color: "#f1f1f1" }}
+                      onClick={() => {
+                        setSearchInput(item);
+                        setSearchQuery(item);
+                        setSelectedChip("All");
+                        setSearchMode(false);
+                        saveSearchHistory(item);
+                        setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
+                      }}
+                    >
+                      {item}
+                    </button>
+                    <button
+                      onClick={() => {
+                        removeSearchHistoryItem(item);
+                        setSearchHistory(readSearchHistory());
+                      }}
+                      className="shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           </>
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
