@@ -387,6 +387,46 @@ function youtubeResultToExternal(item: any): ExternalReelVideo | null {
   };
 }
 
+const FALLBACK_YOUTUBE_VIDEOS: Array<{
+  videoId: string;
+  title: string;
+  creator: string;
+  duration: number;
+}> = [
+  { videoId: "Q4yUlJV31Rk", title: "Best of Bangla Songs Mix", creator: "Bangla Music", duration: 248 },
+  { videoId: "r2M4kAxyQkI", title: "New Bangla Song 2026", creator: "BD Hits", duration: 212 },
+  { videoId: "vTIIMJ9tUc8", title: "Bangla Romantic Song Collection", creator: "Bangla Tune", duration: 265 },
+  { videoId: "9zM6PqA4dP8", title: "Bangla Sad Song Clip", creator: "Music Zone", duration: 188 },
+  { videoId: "5qap5aO4i9A", title: "Bangla Lofi Live Radio", creator: "Lofi Girl", duration: 7200 },
+];
+
+function getFallbackYouTubeVideos(searchQuery?: string, rows = 20): ExternalReelVideo[] {
+  const q = canonicalizeSearchQuery(searchQuery || "");
+  const words = getQueryWords(q);
+
+  const scored = FALLBACK_YOUTUBE_VIDEOS
+    .map((item) => {
+      const title = item.title;
+      const normalizedTitle = normalizeForMatch(title);
+      const score = scoreFallbackVideo(title, words, q) + (words.length === 0 ? 12 : 0);
+      return {
+        score,
+        video: youtubeResultToExternal({
+          videoId: item.videoId,
+          title: item.title,
+          author: item.creator,
+          lengthSeconds: item.duration,
+          thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
+        }),
+      };
+    })
+    .filter((item): item is { score: number; video: ExternalReelVideo } => Boolean(item.video))
+    .sort((a, b) => b.score - a.score)
+    .map((item) => item.video);
+
+  return scored.slice(0, rows);
+}
+
 async function fetchYouTubeVideos(
   searchQuery?: string,
   page = 1,
@@ -399,9 +439,16 @@ async function fetchYouTubeVideos(
     const videos = raw
       .map(youtubeResultToExternal)
       .filter(Boolean) as ExternalReelVideo[];
-    return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
+
+    if (videos.length > 0) {
+      return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
+    }
+
+    const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
+    return { videos: fallbackVideos, hasMore: false };
   } catch {
-    return { videos: [], hasMore: false };
+    const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
+    return { videos: fallbackVideos, hasMore: false };
   }
 }
 
