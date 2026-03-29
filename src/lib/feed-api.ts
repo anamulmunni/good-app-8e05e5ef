@@ -605,6 +605,17 @@ export async function getBangladeshExternalVideos(
   mode: "short" | "long" = "long",
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
+  // Try YouTube (via Invidious) first — it has the best Bangla music catalog
+  try {
+    const ytResult = await fetchYouTubeVideos(searchQuery, page, rows, freshnessToken);
+    if (ytResult.videos.length > 0) {
+      return ytResult;
+    }
+  } catch (e) {
+    console.warn("YouTube/Invidious search failed, falling back to Dailymotion:", e);
+  }
+
+  // Fallback to Dailymotion
   const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
   if ((searchQuery && searchQuery.trim()) || direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
     return direct;
