@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
@@ -207,7 +208,10 @@ export default function UserProfile() {
               <User className="w-12 h-12 text-gray-400" />
             )}
           </div>
-          <h2 className="text-[22px] font-black text-gray-900 dark:text-foreground mt-2">{targetUser.display_name || "User"}</h2>
+          <h2 className="text-[22px] font-black text-gray-900 dark:text-foreground mt-2 inline-flex items-center gap-1.5">
+            <span>{targetUser.display_name || "User"}</span>
+            {targetUser.is_verified_badge && <VerifiedBadge className="h-5 w-5" />}
+          </h2>
           <p className="text-[13px] text-gray-500 dark:text-muted-foreground">{targetUser.guest_id}</p>
 
           {/* Stats row */}

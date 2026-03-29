@@ -12,6 +12,7 @@ import {
 import { getUser } from "@/lib/api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
 import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Info, ThumbsUp, Smile } from "lucide-react";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker from "@/components/EmojiPicker";
@@ -488,7 +489,10 @@ export default function Chat() {
             {otherOnline && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-card" />}
           </button>
           <button onClick={() => navigate(`/user/${otherUser.id}`)} className="flex-1 text-left min-w-0">
-            <p className="font-bold text-[15px] text-gray-900 dark:text-foreground truncate">{otherUser.display_name || "User"}</p>
+            <p className="font-bold text-[15px] text-gray-900 dark:text-foreground truncate inline-flex items-center gap-1">
+              <span>{otherUser.display_name || "User"}</span>
+              {otherUser.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+            </p>
             <p className="text-[11px] text-gray-500 dark:text-muted-foreground">{otherOnline ? "Active now" : `Last seen ${lastSeenAgo(otherUser.online_at)}`}</p>
           </button>
           <button onClick={() => navigate(`/call/${otherUser.id}`)}
@@ -505,7 +509,10 @@ export default function Chat() {
               {otherUser.avatar_url ? <img src={otherUser.avatar_url} className="w-full h-full object-cover" /> :
                 <div className="w-full h-full flex items-center justify-center"><span className="text-2xl font-bold text-gray-400">{otherUser.display_name?.[0]?.toUpperCase() || "?"}</span></div>}
             </div>
-            <p className="font-bold text-gray-900 text-[15px]">{otherUser.display_name || "User"}</p>
+            <p className="font-bold text-gray-900 text-[15px] inline-flex items-center gap-1">
+              <span>{otherUser.display_name || "User"}</span>
+              {otherUser.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+            </p>
             <p className="text-[12px] text-gray-500">Good App</p>
           </div>
 
@@ -778,7 +785,10 @@ export default function Chat() {
                           <span className="text-sm font-bold text-blue-600">{u.display_name?.[0]?.toUpperCase() || "?"}</span>}
                       </div>
                       <div>
-                        <p className="text-[14px] font-semibold text-gray-900 dark:text-foreground">{u.display_name || "User"}</p>
+                        <p className="text-[14px] font-semibold text-gray-900 dark:text-foreground inline-flex items-center gap-1">
+                          <span>{u.display_name || "User"}</span>
+                          {u.is_verified_badge && <VerifiedBadge className="h-3 w-3" />}
+                        </p>
                         <p className="text-[12px] text-gray-500">{u.guest_id}</p>
                       </div>
                     </button>
@@ -804,7 +814,10 @@ export default function Chat() {
                   </div>
                   <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-[2.5px] border-white dark:border-card" />
                 </div>
-                <p className="text-[11px] text-gray-700 dark:text-foreground font-medium truncate max-w-[60px]">{u.display_name || "User"}</p>
+                <p className="text-[11px] text-gray-700 dark:text-foreground font-medium truncate max-w-[60px] inline-flex items-center gap-0.5">
+                  <span>{u.display_name || "User"}</span>
+                  {u.is_verified_badge && <VerifiedBadge className="h-2.5 w-2.5" />}
+                </p>
               </button>
             ))}
           </div>
@@ -838,7 +851,10 @@ export default function Chat() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center">
-                  <p className={`text-[15px] truncate ${hasUnread ? "font-black text-gray-900 dark:text-foreground" : "font-semibold text-gray-700 dark:text-foreground/80"}`}>{other?.display_name || `User #${otherId}`}</p>
+                  <p className={`text-[15px] truncate inline-flex items-center gap-1 ${hasUnread ? "font-black text-gray-900 dark:text-foreground" : "font-semibold text-gray-700 dark:text-foreground/80"}`}>
+                    <span>{other?.display_name || `User #${otherId}`}</span>
+                    {other?.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+                  </p>
                   <span className={`text-[11px] whitespace-nowrap ml-2 ${hasUnread ? "text-blue-600 dark:text-primary font-bold" : "text-gray-400"}`}>
                     {timeAgo(convo.last_message_at)}
                   </span>
