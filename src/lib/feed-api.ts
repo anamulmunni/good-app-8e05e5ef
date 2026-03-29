@@ -222,6 +222,7 @@ function scoreFallbackVideo(title: string, queryWords: string[], searchQuery?: s
 }
 
 function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
+  // Kept for backward compatibility with existing local data
   if (videoId) return `https://www.dailymotion.com/embed/video/${videoId}`;
   return fallbackUrl || "";
 }
@@ -355,14 +356,19 @@ export function trackVideoPreference(input: { title?: string; category?: string 
 
 // ── YouTube search via Edge Function proxy ──────────────────────────────
 
-async function fetchYouTubeViaEdge(query: string, page = 1, seed = 0): Promise<any[]> {
+async function fetchYouTubeViaEdge(query: string, action = "search", order = "relevance", maxResults = 25): Promise<any[]> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!supabaseUrl) return [];
 
   try {
-    const nonce = Math.abs(seed || Date.now()) % 1000000;
-    const url = `${supabaseUrl}/functions/v1/youtube-search?q=${encodeURIComponent(query)}&page=${page}&seed=${nonce}`;
+    const params = new URLSearchParams({ maxResults: String(maxResults), order });
+    if (action === "trending") {
+      params.set("action", "trending");
+    } else if (query) {
+      params.set("q", query);
+    }
+    const url = `${supabaseUrl}/functions/v1/youtube-search?${params}`;
     const res = await fetch(url, {
       headers: {
         "Authorization": `Bearer ${supabaseKey}`,
@@ -402,324 +408,48 @@ function youtubeResultToExternal(item: any): ExternalReelVideo | null {
   };
 }
 
-const FALLBACK_YOUTUBE_VIDEOS: Array<{
-  videoId: string;
-  title: string;
-  creator: string;
-  duration: number;
-}> = [
-  { videoId: "Q4yUlJV31Rk", title: "Best of Bangla Songs Mix", creator: "Bangla Music", duration: 248 },
-  { videoId: "r2M4kAxyQkI", title: "New Bangla Song 2026", creator: "BD Hits", duration: 212 },
-  { videoId: "vTIIMJ9tUc8", title: "Bangla Romantic Song Collection", creator: "Bangla Tune", duration: 265 },
-  { videoId: "9zM6PqA4dP8", title: "Bangla Sad Song Clip", creator: "Music Zone", duration: 188 },
-  { videoId: "5qap5aO4i9A", title: "Bangla Lofi Live Radio", creator: "Lofi Girl", duration: 7200 },
-];
-
-function getFallbackYouTubeVideos(searchQuery?: string, rows = 20): ExternalReelVideo[] {
-  const q = canonicalizeSearchQuery(searchQuery || "");
-  const words = getQueryWords(q);
-
-  const scored = FALLBACK_YOUTUBE_VIDEOS
-    .map((item) => {
-      const title = item.title;
-      const normalizedTitle = normalizeForMatch(title);
-      const score = scoreFallbackVideo(title, words, q) + (words.length === 0 ? 12 : 0);
-      return {
-        score,
-        video: youtubeResultToExternal({
-          videoId: item.videoId,
-          title: item.title,
-          author: item.creator,
-          lengthSeconds: item.duration,
-          thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
-        }),
-      };
-    })
-    .filter((item): item is { score: number; video: ExternalReelVideo } => Boolean(item.video))
-    .sort((a, b) => b.score - a.score)
-    .map((item) => item.video);
-
-  return scored.slice(0, rows);
-}
+// Fallback YouTube videos removed - using only live YouTube API
 
 async function fetchYouTubeVideos(
   searchQuery?: string,
-  page = 1,
-  rows = 20,
-  freshnessToken = 0,
+  rows = 30,
+  order = "relevance",
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const defaultQueries = [
-    "bangla new song 2026 full hd",
-    "bangla latest song official video 1080p",
-    "new bangla music video 2026 hd",
-    "বাংলা নতুন গান ২০২৬ full hd",
-    "bangla trending new release song hd",
-  ];
-  const query = (searchQuery || "").trim() || defaultQueries[Math.floor(Date.now() / 120000) % defaultQueries.length];
   try {
-    const raw = await fetchYouTubeViaEdge(query, page, freshnessToken);
-    let videos = raw
+    const trimmed = (searchQuery || "").trim();
+    let raw: any[];
+
+    if (trimmed) {
+      // User searched something - use search API
+      raw = await fetchYouTubeViaEdge(trimmed, "search", order, rows);
+    } else {
+      // No query - fetch trending videos
+      raw = await fetchYouTubeViaEdge("", "trending", "relevance", rows);
+    }
+
+    const videos = raw
       .map(youtubeResultToExternal)
       .filter(Boolean) as ExternalReelVideo[];
-
-    if (searchQuery?.trim()) {
-      const strict = buildStrictQueryRegex(searchQuery);
-      videos = videos.filter((video) => strict.test(normalizeForMatch(video.title || "")) || strict.test(normalizeForMatch(video.creator || "")));
-    }
 
     if (videos.length > 0) {
       return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
     }
 
-    if (searchQuery?.trim()) {
-      return { videos: [], hasMore: false };
+    // If trending returned nothing, try a default search
+    if (!trimmed) {
+      const fallbackRaw = await fetchYouTubeViaEdge("bangla new song 2026", "search", "viewCount", rows);
+      const fallbackVideos = fallbackRaw.map(youtubeResultToExternal).filter(Boolean) as ExternalReelVideo[];
+      return { videos: fallbackVideos.slice(0, rows), hasMore: false };
     }
 
-    const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
-    return { videos: fallbackVideos, hasMore: false };
+    return { videos: [], hasMore: false };
   } catch {
-    if (searchQuery?.trim()) {
-      return { videos: [], hasMore: false };
-    }
-    const fallbackVideos = getFallbackYouTubeVideos(searchQuery, rows);
-    return { videos: fallbackVideos, hasMore: false };
+    return { videos: [], hasMore: false };
   }
 }
 
-function buildSearchVariants(searchQuery?: string): string[] {
-  const raw = (searchQuery || "").trim();
-  const canonical = canonicalizeSearchQuery(raw);
+// Dailymotion removed - YouTube only via edge function
 
-  if (!canonical) {
-    // Fresh HD Bangla songs first, then variety
-    const allDefaults = [
-      "bangla new song 2026 full hd",
-      "bangla new release song 2026 1080p",
-      "বাংলা নতুন গান ২০২৬ hd official",
-      "bangla latest song official video",
-      "bangla latest music video 1080p",
-      "bangla romantic song full hd",
-      "বাংলা নতুন গান hd 2026",
-      "bangla trending song 2026",
-      "bangla hit song new release",
-      "bangla lofi song",
-      "bangla sad song new",
-      "bangla pop song trending",
-      "bangla rap song new 2026",
-      "bangla band song latest",
-      "bangla folk song modern remix",
-      "bangla unplugged song hd",
-      "new bengali movie song 2026",
-      "bangla indie music video",
-      "bangla dj remix song 2026",
-    ];
-    // Pick a rotating subset based on time to ensure variety
-    const offset = Math.floor(Date.now() / 60000) % allDefaults.length;
-    const picked: string[] = [];
-    for (let i = 0; i < 5; i++) {
-      picked.push(allDefaults[(offset + i * 3) % allDefaults.length]);
-    }
-    return picked;
-  }
-
-  const words = getQueryWords(canonical);
-  const compact = words.slice(0, 4).join(" ");
-  return [
-    canonical,
-    `${canonical} song`,
-    `${canonical} official song`,
-    `${canonical} music video`,
-    `${canonical} lyrics`,
-    compact && compact !== canonical ? compact : "",
-  ]
-    .filter(Boolean)
-    .filter((q, idx, arr) => arr.indexOf(q) === idx);
-}
-
-async function fetchDailymotionByQuery(
-  query: string,
-  page: number,
-  limit: number,
-  sort: "relevance" | "recent" = "relevance",
-  freshnessToken = 0,
-) {
-  const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_1080_url,thumbnail_720_url,thumbnail_480_url,thumbnail_360_url,thumbnail_url,duration,owner.screenname,country&sort=${sort}&longer_than=0&_=${freshnessToken}`;
-  const res = await fetch(dmUrl);
-  if (!res.ok) return [];
-  const data = await res.json();
-  return Array.isArray(data?.list) ? data.list : [];
-}
-
-function normalizeExternalVideo(raw: any): ExternalReelVideo | null {
-  const rawId = String(raw?.id || "");
-  const cleanId = rawId.startsWith("dm-") ? rawId.replace("dm-", "") : (raw?.video_id || rawId);
-  const embedUrl = toDailymotionEmbed(cleanId, raw?.embed_url || raw?.video_url);
-  if (!embedUrl) return null;
-
-  return {
-    id: rawId || `dm-${cleanId}`,
-    title: String(raw?.title || "বাংলা ভিডিও"),
-    source: "dailymotion",
-    video_url: embedUrl,
-    watch_url: raw?.watch_url || (cleanId ? `https://www.dailymotion.com/video/${cleanId}` : undefined),
-    creator: raw?.creator || null,
-    thumbnail_url: raw?.thumbnail_url || null,
-    video_id: cleanId || undefined,
-    duration: Number(raw?.duration || 0) || undefined,
-    category: raw?.category || detectExternalCategory(String(raw?.title || "")),
-    country: raw?.country || null,
-  };
-}
-
-async function fetchDailymotionFallback(
-  page: number,
-  rows: number,
-  searchQuery?: string,
-  mode: "short" | "long" = "long",
-  freshnessToken = 0,
-): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const canonicalQuery = canonicalizeSearchQuery(searchQuery || "");
-  const variants = buildSearchVariants(canonicalQuery);
-  const shift = canonicalQuery ? 0 : Math.abs((freshnessToken || page) % Math.max(variants.length, 1));
-  const orderedVariants = shift > 0
-    ? [...variants.slice(shift), ...variants.slice(0, shift)]
-    : variants;
-  const perQueryLimit = Math.max(Math.ceil((rows * 3) / variants.length) + 10, 14);
-  const sort = canonicalQuery ? "relevance" : "recent";
-
-  const responses = await Promise.all(
-    orderedVariants.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, sort, freshnessToken))
-  );
-
-  let list = responses.flat();
-
-  if (list.length === 0 && canonicalQuery) {
-    const fallbackQueries = [
-      `${canonicalQuery} song`,
-      `${getQueryWords(canonicalQuery).slice(0, 3).join(" ")} song`.trim(),
-      `${canonicalQuery} official`,
-      `${canonicalQuery} lyrics`,
-    ].filter((q, idx, arr) => q.length > 3 && arr.indexOf(q) === idx);
-    const fallbackResponses = await Promise.all(fallbackQueries.map((q) => fetchDailymotionByQuery(q, page, perQueryLimit, "relevance", freshnessToken)));
-    list = fallbackResponses.flat();
-  }
-
-  const queryWords = getQueryWords(canonicalQuery);
-  const normalizedQuery = normalizeForMatch(canonicalQuery);
-  const isMusicSearch = isMusicIntent(canonicalQuery);
-  const seen = new Set<string>();
-  const seenTitleCreator = new Set<string>();
-
-  const filtered = list
-    .map((v: any) => {
-      const duration = Number(v?.duration || 0);
-      const durationOk = duration >= 3;
-      if (!v?.id || !durationOk) return null;
-      if (seen.has(v.id)) return null;
-      seen.add(v.id);
-
-      const title = String(v?.title || "বাংলা ভিডিও");
-      const normalizedTitle = normalizeForMatch(title);
-      const creator = String(v?.["owner.screenname"] || "").toLowerCase().trim();
-      const titleCreatorKey = `${normalizedTitle}::${creator}`;
-      if (seenTitleCreator.has(titleCreatorKey)) return null;
-      seenTitleCreator.add(titleCreatorKey);
-      const coverage = getQueryCoverage(queryWords, normalizedTitle);
-      const hasMusicMarker = /(song|music|audio|lyrics|গান|mp3|album|official|bhojpuri)/i.test(title);
-      const hasNonMusicMarker = /(natok|drama|movie|serial|episode|cartoon)/i.test(title);
-      const isBanglaDefault = isBanglaDefaultSuggestion(title, v?.country);
-
-      if (canonicalQuery) {
-        const exactPhrase = normalizedQuery.length > 3 && normalizedTitle.includes(normalizedQuery);
-        const allWordsMatch = queryWords.length === 0 || queryWords.every((word) => normalizedTitle.includes(word));
-
-        if (isMusicSearch) {
-          if (!exactPhrase && !allWordsMatch) return null;
-          if (hasNonMusicMarker && !hasMusicMarker && !exactPhrase) return null;
-        } else {
-          if (!exactPhrase && !allWordsMatch) return null;
-        }
-      } else if (!isBanglaDefault) {
-        return null;
-      }
-
-      let score = scoreFallbackVideo(title, queryWords, canonicalQuery)
-        + (duration >= 600 ? 3 : 0)
-        + (duration >= 300 ? 2 : 0)
-        + (duration >= 60 ? 1 : 0)
-        + ((v.thumbnail_1080_url || v.thumbnail_720_url) ? 2 : 0);
-
-      if (!canonicalQuery) {
-        if (hasFreshMarker(title)) score += 12;
-        if (hasQualityMarker(title)) score += 10;
-      }
-
-      if (!canonicalQuery && hasNonMusicMarker && !hasMusicMarker) {
-        score -= 15;
-      }
-
-      return {
-        id: `dm-${v.id}`,
-        title,
-        source: "dailymotion" as const,
-        video_url: `https://www.dailymotion.com/embed/video/${v.id}`,
-        watch_url: `https://www.dailymotion.com/video/${v.id}`,
-        creator: v["owner.screenname"] || null,
-        thumbnail_url: v.thumbnail_1080_url || v.thumbnail_720_url || v.thumbnail_480_url || v.thumbnail_360_url || v.thumbnail_url || null,
-        video_id: v.id,
-        duration,
-        category: detectExternalCategory(title),
-        country: String(v?.country || "").toUpperCase() || null,
-        _score: score,
-      };
-    })
-    .filter(Boolean)
-    .sort((a: any, b: any) => b._score - a._score)
-    .slice(0, rows)
-    .map(({ _score, ...rest }: any) => rest);
-
-  if (!canonicalQuery && filtered.length === 0) {
-    const relaxedSeen = new Set<string>();
-    const relaxed = list
-      .map((v: any) => {
-        const duration = Number(v?.duration || 0);
-        if (!v?.id || duration < 3) return null;
-        if (relaxedSeen.has(v.id)) return null;
-        relaxedSeen.add(v.id);
-
-        const title = String(v?.title || "বাংলা ভিডিও");
-        const lower = title.toLowerCase();
-        if (/(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower)) return null;
-        if (/(hindi|bollywood|punjabi|english|hollywood|tamil|telugu|korean|arabic)/i.test(lower)) return null;
-
-        return {
-          id: `dm-${v.id}`,
-          title,
-          source: "dailymotion" as const,
-          video_url: `https://www.dailymotion.com/embed/video/${v.id}`,
-          watch_url: `https://www.dailymotion.com/video/${v.id}`,
-          creator: v["owner.screenname"] || null,
-          thumbnail_url: v.thumbnail_1080_url || v.thumbnail_720_url || v.thumbnail_480_url || v.thumbnail_360_url || v.thumbnail_url || null,
-          video_id: v.id,
-          duration,
-          category: detectExternalCategory(title),
-          country: String(v?.country || "").toUpperCase() || null,
-        };
-      })
-      .filter(Boolean)
-      .slice(0, rows);
-
-    return {
-      videos: relaxed as ExternalReelVideo[],
-      hasMore: responses.some((r) => r.length >= perQueryLimit) || list.length > rows,
-    };
-  }
-
-  return {
-    videos: filtered,
-    hasMore: responses.some((r) => r.length >= perQueryLimit) || list.length > rows,
-  };
-}
 
 export async function createLongVideoUpload(userId: number, videoUrl: string, title: string, duration?: number): Promise<Post> {
   return createLongVideoUploadWithThumbnail(userId, videoUrl, title, duration);
@@ -847,105 +577,31 @@ export async function getBangladeshExternalVideos(
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   const trimmedQuery = searchQuery?.trim();
-  const safeRows = Math.max(rows * 2, 24);
 
-  const [ytResult, dmResult] = await Promise.allSettled([
-    fetchYouTubeVideos(trimmedQuery, page, safeRows, freshnessToken + page),
-    fetchDailymotionFallback(page, safeRows, trimmedQuery, mode, freshnessToken + page * 13),
-  ]);
+  // Use YouTube only - with viewCount order for trending feel when no query
+  const order = trimmedQuery ? "relevance" : "viewCount";
+  const ytResult = await fetchYouTubeVideos(trimmedQuery, Math.max(rows, 30), order);
 
-  const ytVideos = ytResult.status === "fulfilled" ? ytResult.value.videos : [];
-  const dmVideos = dmResult.status === "fulfilled" ? dmResult.value.videos : [];
-  const ytHasMore = ytResult.status === "fulfilled" ? ytResult.value.hasMore : false;
-  const dmHasMore = dmResult.status === "fulfilled" ? dmResult.value.hasMore : false;
+  let videos = ytResult.videos;
 
+  // Avoid repeating recently shown videos
   const recentIds = readRecentVideoIds();
   const recentArray = Array.from(recentIds);
   const hardBlock = new Set(recentArray.slice(0, 220));
-  const softBlock = new Set(recentArray.slice(220, 700));
-  let merged = dedupeExternalVideos([...ytVideos, ...dmVideos]);
 
-  // Avoid repeating recently shown videos in default suggestion mode
   if (!trimmedQuery) {
-    const unseenHard = merged.filter((video) => !hardBlock.has(video.id));
-    const unseenSoft = unseenHard.filter((video) => !softBlock.has(video.id));
-    if (unseenSoft.length >= rows) {
-      merged = unseenSoft;
-    } else if (unseenHard.length >= rows) {
-      merged = unseenHard;
-    } else {
-      merged = unseenHard.length > 0 ? [...unseenHard, ...merged.filter((video) => !hardBlock.has(video.id) && softBlock.has(video.id))] : merged;
+    const unseen = videos.filter((v) => !hardBlock.has(v.id));
+    if (unseen.length >= Math.min(rows, 5)) {
+      videos = unseen;
     }
   }
 
-  if (trimmedQuery) {
-    const canonical = canonicalizeSearchQuery(trimmedQuery);
-    const words = getQueryWords(canonical);
-    const strict = buildStrictQueryRegex(trimmedQuery);
-
-    merged = merged
-      .map((video) => {
-        const normalizedTitle = normalizeForMatch(video.title);
-        const normalizedCreator = normalizeForMatch(video.creator || "");
-        const strictMatch = strict.test(normalizedTitle) || strict.test(normalizedCreator);
-        const coverage = getQueryCoverage(words, normalizedTitle);
-
-        if (!strictMatch && coverage < 0.6) {
-          return null;
-        }
-
-        let score = scoreFallbackVideo(video.title, words, canonical)
-          + scorePreferredCategory(video.title, video.category)
-          + (video.source === "youtube" ? 8 : 0)
-          + (video.duration && video.duration >= 120 ? 2 : 0)
-          + (strictMatch ? 70 : 0);
-
-        if (normalizedTitle.includes(canonical)) score += 26;
-        if (words.length > 0 && words.every((w) => normalizedTitle.includes(w) || normalizedCreator.includes(w))) {
-          score += 18;
-        }
-
-        return { ...video, _score: score };
-      })
-      .filter(Boolean)
-      .sort((a: any, b: any) => b._score - a._score)
-      .map(({ _score, ...rest }: any) => rest);
-  } else {
-    merged = merged
-      .map((video) => {
-        let score = scorePreferredCategory(video.title, video.category)
-          + (isBanglaDefaultSuggestion(video.title, video.country) ? 16 : 0)
-          + (hasFreshMarker(video.title) ? 11 : 0)
-          + (hasVeryFreshMarker(video.title) ? 22 : 0)
-          + (hasQualityMarker(video.title) ? 9 : 0)
-          + (hasStrongQualityMarker(video.title) ? 16 : 0)
-          + (video.source === "youtube" ? 6 : 0)
-          + (hardBlock.has(video.id) ? -220 : 0)
-          + (softBlock.has(video.id) ? -70 : 0);
-
-        if (!isBanglaDefaultSuggestion(video.title, video.country)) {
-          score -= 40;
-        }
-
-        return { ...video, _score: score };
-      })
-      .sort((a: any, b: any) => b._score - a._score)
-      .map(({ _score, ...rest }: any) => rest);
-
-    const mixedSources = seededShuffle(merged, freshnessToken + page * 31);
-    merged = diversifyByCreator(mixedSources, 1);
-  }
-
-  if (merged.length === 0) {
-    return { videos: [], hasMore: false };
-  }
-
-  const finalVideos = merged.slice(0, rows);
-  writeRecentVideoIds(finalVideos.map((video) => video.id));
+  const finalVideos = videos.slice(0, rows);
+  writeRecentVideoIds(finalVideos.map((v) => v.id));
 
   return {
     videos: finalVideos,
-    hasMore: merged.length > rows || ytHasMore || dmHasMore,
+    hasMore: ytResult.hasMore,
   };
 }
 
