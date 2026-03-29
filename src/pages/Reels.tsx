@@ -841,6 +841,7 @@ export default function Reels() {
               ))}
             </div>
           )}
+        ) : (
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1">
               <button onClick={() => { if (selectedVideo) { setSelectedVideo(null); } else { navigate("/feed"); } }} className="h-10 w-10 shrink-0 grid place-items-center">
