@@ -814,7 +814,10 @@ export default function Chat() {
                   </div>
                   <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-[2.5px] border-white dark:border-card" />
                 </div>
-                <p className="text-[11px] text-gray-700 dark:text-foreground font-medium truncate max-w-[60px]">{u.display_name || "User"}</p>
+                <p className="text-[11px] text-gray-700 dark:text-foreground font-medium truncate max-w-[60px] inline-flex items-center gap-0.5">
+                  <span>{u.display_name || "User"}</span>
+                  {u.is_verified_badge && <VerifiedBadge className="h-2.5 w-2.5" />}
+                </p>
               </button>
             ))}
           </div>
