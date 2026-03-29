@@ -128,6 +128,97 @@ function isYouTubeEmbed(url: string) {
   return url.includes("youtube.com/embed/");
 }
 
+// ── Search History ──────────────────────────────────────────────────────
+const SEARCH_HISTORY_KEY = "goodapp-search-history-v1";
+const MAX_SEARCH_HISTORY = 15;
+
+function readSearchHistory(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((s: any) => typeof s === "string" && s.trim()) : [];
+  } catch { return []; }
+}
+
+function saveSearchHistory(query: string): void {
+  if (typeof window === "undefined" || !query.trim()) return;
+  try {
+    const existing = readSearchHistory();
+    const deduped = [query.trim(), ...existing.filter(s => s.toLowerCase() !== query.trim().toLowerCase())].slice(0, MAX_SEARCH_HISTORY);
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(deduped));
+  } catch {}
+}
+
+function removeSearchHistoryItem(query: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = readSearchHistory();
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(existing.filter(s => s.toLowerCase() !== query.toLowerCase())));
+  } catch {}
+}
+
+// ── Watch History ──────────────────────────────────────────────────────
+const WATCH_HISTORY_KEY = "goodapp-watch-history-v1";
+const MAX_WATCH_HISTORY = 30;
+
+type WatchHistoryItem = {
+  id: string;
+  title: string;
+  thumbnail_url?: string | null;
+  creator?: string | null;
+  video_url: string;
+  duration?: number;
+  isExternal: boolean;
+  watchedAt: number;
+  uploader_user_id?: number | null;
+  uploader_guest_id?: string | null;
+  uploader_avatar_url?: string | null;
+  uploader_is_verified_badge?: boolean;
+  local_post_id?: string;
+  watch_url?: string;
+  likes_count?: number;
+  comments_count?: number;
+};
+
+function readWatchHistory(): WatchHistoryItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(WATCH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function saveToWatchHistory(video: VideoItem): void {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = readWatchHistory();
+    const item: WatchHistoryItem = {
+      id: video.id,
+      title: video.title,
+      thumbnail_url: video.thumbnail_url,
+      creator: video.creator,
+      video_url: video.video_url,
+      duration: video.duration,
+      isExternal: video.isExternal,
+      watchedAt: Date.now(),
+      uploader_user_id: video.uploader_user_id,
+      uploader_guest_id: video.uploader_guest_id,
+      uploader_avatar_url: video.uploader_avatar_url,
+      uploader_is_verified_badge: video.uploader_is_verified_badge,
+      local_post_id: video.local_post_id,
+      watch_url: video.watch_url,
+      likes_count: video.likes_count,
+      comments_count: video.comments_count,
+    };
+    const deduped = [item, ...existing.filter(h => h.id !== video.id)].slice(0, MAX_WATCH_HISTORY);
+    window.localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(deduped));
+  } catch {}
+}
+
 const EXTERNAL_PAGE_WINDOW = 8;
 
 function normalizeExternalPage(raw: number): number {
