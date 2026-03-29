@@ -658,13 +658,13 @@ export default function Chat() {
                 style={{ background: isDarkTheme ? "#1f2937" : "#fff" }}
                 onClick={(e) => e.stopPropagation()}>
                 <p className="text-center font-bold text-[16px]" style={{ color: isDarkTheme ? "#f9fafb" : "#111827" }}>Chat Theme</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto">
                   {CHAT_THEMES.map((t, idx) => (
                     <button key={idx} onClick={() => setTheme(idx)}
-                      className={`rounded-xl p-3 flex flex-col items-center gap-2 border-2 ${chatThemeIndex === idx ? "border-blue-500" : "border-transparent"}`}
+                      className={`rounded-xl p-2 flex flex-col items-center gap-1.5 border-2 ${chatThemeIndex === idx ? "border-blue-500" : "border-transparent"}`}
                       style={{ background: isDarkTheme ? "#374151" : "#f9fafb" }}>
-                      <div className="w-10 h-10 rounded-full" style={{ background: t.gradient }} />
-                      <span className="text-[11px] font-semibold" style={{ color: isDarkTheme ? "#d1d5db" : "#374151" }}>{t.name}</span>
+                      <div className="w-9 h-9 rounded-full" style={{ background: t.gradient }} />
+                      <span className="text-[10px] font-semibold" style={{ color: isDarkTheme ? "#d1d5db" : "#374151" }}>{t.name}</span>
                     </button>
                   ))}
                 </div>
