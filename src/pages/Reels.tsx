@@ -650,7 +650,7 @@ export default function Reels() {
             )}
             <button
               onClick={requestFullscreen}
-              className="absolute top-2 right-2 w-9 h-9 rounded-full grid place-items-center"
+              className="absolute bottom-2 right-2 w-9 h-9 rounded-full grid place-items-center z-10"
               style={{ background: "rgba(0,0,0,0.7)" }}
             >
               <Maximize className="w-4 h-4" style={{ color: "#fff" }} />

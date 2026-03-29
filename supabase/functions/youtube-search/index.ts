@@ -6,19 +6,21 @@ const corsHeaders = {
 };
 
 const INVIDIOUS_INSTANCES = [
-  "https://inv.tux.pizza",
+  "https://inv.nadeko.net",
   "https://invidious.nerdvpn.de",
-  "https://iv.ggtyler.dev",
-  "https://invidious.privacyredirect.com",
-  "https://invidious.jing.rocks",
-  "https://vid.puffyan.us",
-  "https://invidious.lunar.icu",
+  "https://yewtu.be",
+  "https://iv.nbonn.ch",
+  "https://invidious.protokoll-departed.de",
+  "https://invidious.privacydev.net",
+  "https://inv.us.projectsegfau.lt",
 ];
 
 const PIPED_INSTANCES = [
   "https://pipedapi.kavin.rocks",
   "https://pipedapi.adminforge.de",
   "https://api.piped.projectsegfau.lt",
+  "https://pipedapi.in.projectsegfau.lt",
+  "https://pipedapi.us.projectsegfau.lt",
 ];
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
