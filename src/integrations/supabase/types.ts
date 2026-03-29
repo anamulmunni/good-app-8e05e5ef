@@ -537,6 +537,45 @@ export type Database = {
           },
         ]
       }
+      story_reactions: {
+        Row: {
+          created_at: string
+          id: string
+          reaction_type: string
+          story_id: string
+          user_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reaction_type?: string
+          story_id: string
+          user_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reaction_type?: string
+          story_id?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_reactions_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       story_views: {
         Row: {
           id: string

@@ -23,6 +23,7 @@ import {
   toggleReaction,
   getUserReactions,
   type PostComment,
+  fetchYouTubeSuggestions,
 } from "@/lib/feed-api";
 
 type VideoItem = {
@@ -276,6 +277,8 @@ export default function Reels() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [ytSuggestions, setYtSuggestions] = useState<string[]>([]);
+  const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [selectedChip, setSelectedChip] = useState("All");
   const [page, setPage] = useState(1);
@@ -497,14 +500,25 @@ export default function Reels() {
         getBangladeshExternalVideos(requestPage, 30, undefined, activeQuery || undefined, "long", refreshTick + cursor * 17),
         getUploadedLongVideos(cursor, 12, activeQuery || undefined),
       ]);
-      let merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+      // Interleave local videos randomly into external results
+      let merged = dedupeVideos([...externalResult.videos]);
+      const localVideos = dedupeVideos(localResult.videos);
+      // Spread local videos randomly throughout
+      for (const lv of localVideos) {
+        const pos = Math.floor(Math.random() * (merged.length + 1));
+        merged.splice(pos, 0, lv);
+      }
 
       if (!activeQuery && merged.length === 0 && requestPage !== 1) {
         [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick),
           getUploadedLongVideos(cursor, 12),
         ]);
-        merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+        merged = dedupeVideos([...externalResult.videos]);
+        for (const lv of dedupeVideos(localResult.videos)) {
+          const pos = Math.floor(Math.random() * (merged.length + 1));
+          merged.splice(pos, 0, lv);
+        }
       }
 
       setExtVideos((prev) => {
@@ -535,7 +549,12 @@ export default function Reels() {
           getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
-        let merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+        // Interleave local videos randomly
+        let merged = dedupeVideos([...externalResult.videos]);
+        for (const lv of dedupeVideos(localResult.videos)) {
+          const pos = Math.floor(Math.random() * (merged.length + 1));
+          merged.splice(pos, 0, lv);
+        }
 
         if (!activeQuery && merged.length === 0 && externalStartPage !== 1) {
           externalStartPage = 1;
@@ -543,7 +562,11 @@ export default function Reels() {
             getBangladeshExternalVideos(1, 20, undefined, undefined, "long", refreshTick),
             getUploadedLongVideos(1, 10),
           ]);
-          merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
+          merged = dedupeVideos([...externalResult.videos]);
+          for (const lv of dedupeVideos(localResult.videos)) {
+            const pos = Math.floor(Math.random() * (merged.length + 1));
+            merged.splice(pos, 0, lv);
+          }
         }
 
         setExtVideos(merged);
@@ -758,7 +781,20 @@ export default function Reels() {
               <input
                 ref={searchRef}
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchInput(val);
+                  // Fetch YouTube suggestions with debounce
+                  if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+                  if (val.trim().length >= 2) {
+                    suggestTimerRef.current = setTimeout(async () => {
+                      const suggestions = await fetchYouTubeSuggestions(val.trim());
+                      setYtSuggestions(suggestions);
+                    }, 300);
+                  } else {
+                    setYtSuggestions([]);
+                  }
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="Search good-app"
                 className="w-full h-10 rounded-full px-4 pr-20 text-sm outline-none"
@@ -800,10 +836,13 @@ export default function Reels() {
           {/* Search suggestions - filter as user types */}
           {(() => {
             const q = searchInput.trim().toLowerCase();
-            const filtered = q
-              ? searchHistory.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
-              : searchHistory;
-            if (filtered.length === 0) return null;
+            // Show YouTube suggestions when typing, history when empty
+            const suggestions = q && ytSuggestions.length > 0
+              ? ytSuggestions.filter(s => s.toLowerCase() !== q)
+              : q
+                ? searchHistory.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+                : searchHistory;
+            if (suggestions.length === 0) return null;
             return (
               <div className="px-2 pb-2 space-y-0.5" style={{ maxHeight: "60vh", overflowY: "auto" }}>
                 <div className="flex items-center justify-between px-2 py-1.5">
@@ -821,8 +860,8 @@ export default function Reels() {
                     </button>
                   )}
                 </div>
-                {filtered.map((item) => (
-                  <div key={item} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
+                {suggestions.map((item, idx) => (
+                  <div key={`${item}-${idx}`} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
                     {q ? <Search className="w-4 h-4 shrink-0" style={{ color: "#717171" }} /> : <History className="w-4 h-4 shrink-0" style={{ color: "#717171" }} />}
                     <button
                       className="flex-1 text-left text-[14px] truncate"
@@ -833,20 +872,23 @@ export default function Reels() {
                         setSelectedChip("All");
                         setSearchMode(false);
                         saveSearchHistory(item);
+                        setYtSuggestions([]);
                         setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
                       }}
                     >
                       {item}
                     </button>
-                    <button
-                      onClick={() => {
-                        removeSearchHistoryItem(item);
-                        setSearchHistory(readSearchHistory());
-                      }}
-                      className="shrink-0"
-                    >
-                      <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
-                    </button>
+                    {!q && (
+                      <button
+                        onClick={() => {
+                          removeSearchHistoryItem(item);
+                          setSearchHistory(readSearchHistory());
+                        }}
+                        className="shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
