@@ -245,23 +245,38 @@ export default function Login() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex rounded-2xl bg-secondary/50 p-1.5 mb-5 backdrop-blur-sm border border-border/50 shadow-lg shadow-primary/10"
+          className="flex rounded-2xl bg-secondary/60 p-1.5 mb-5 backdrop-blur-md border border-border/40 shadow-xl shadow-primary/15"
         >
           {(["login", "register"] as const).map((t) => (
             <motion.button
               key={t}
               onClick={() => setTab(t)}
-              whileTap={{ scale: 0.95 }}
-              className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+              whileTap={{ scale: 0.92 }}
+              whileHover={{ scale: tab === t ? 1 : 1.02 }}
+              className={`flex-1 py-4 rounded-xl text-sm font-black tracking-wide transition-all duration-300 relative overflow-hidden ${
                 tab === t
-                  ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/30"
+                  ? "text-primary-foreground shadow-xl shadow-primary/40"
                   : "text-muted-foreground hover:text-foreground"
               }`}
+              style={tab === t ? {
+                background: "linear-gradient(135deg, hsl(152 56% 38%), hsl(152 68% 45%), hsl(152 56% 38%))",
+                backgroundSize: "200% 200%",
+                animation: "btn-shimmer 3s ease infinite",
+              } : {}}
             >
+              {tab === t && (
+                <motion.div
+                  layoutId="tab-glow"
+                  className="absolute inset-0 rounded-xl"
+                  style={{ background: "linear-gradient(90deg, transparent, hsla(0,0%,100%,0.1), transparent)", backgroundSize: "200%", animation: "btn-shine 3s ease-in-out infinite" }}
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
               <motion.span
                 initial={false}
-                animate={tab === t ? { scale: [1, 1.05, 1] } : {}}
-                transition={{ duration: 0.3 }}
+                animate={tab === t ? { scale: [1, 1.08, 1] } : {}}
+                transition={{ duration: 0.4 }}
+                className="relative z-10"
               >
                 {t === "login" ? "🔑 লগইন" : "✨ রেজিস্ট্রেশন"}
               </motion.span>
