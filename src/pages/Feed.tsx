@@ -505,10 +505,20 @@ export default function Feed() {
     return `${Math.floor(hrs / 24)} দি.`;
   };
 
+  // Group stories by user, own stories first, newest uploaders first
   const storyGroups = stories.reduce<Record<number, Story[]>>((acc, s) => {
     (acc[s.user_id] = acc[s.user_id] || []).push(s);
     return acc;
   }, {});
+  const sortedStoryEntries = Object.entries(storyGroups).sort(([aId, aStories], [bId, bStories]) => {
+    // Own stories always first
+    if (parseInt(aId) === user?.id) return -1;
+    if (parseInt(bId) === user?.id) return 1;
+    // Then by most recent story
+    const aTime = new Date(aStories[0].created_at || 0).getTime();
+    const bTime = new Date(bStories[0].created_at || 0).getTime();
+    return bTime - aTime;
+  });
 
   if (isLoading || !user) return null;
 
