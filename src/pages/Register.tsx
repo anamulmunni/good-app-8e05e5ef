@@ -235,20 +235,23 @@ export default function Register() {
                 </motion.button>
               )}
               <motion.button type="submit" disabled={!isStepValid() || isSubmitting}
-                whileTap={{ scale: 0.97 }}
-                whileHover={{ scale: 1.01 }}
-                className="btn-primary py-4 text-lg flex-1">
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.03, boxShadow: "0 8px 35px -4px hsl(152 56% 38% / 0.6)" }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="btn-primary py-4 text-lg flex-1 rounded-2xl">
                 {isSubmitting ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                    <Loader2 className="w-6 h-6" />
+                  </motion.div>
                 ) : step < 3 ? (
-                  <motion.span className="inline-flex items-center gap-2"
-                    animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}>
+                  <motion.span className="inline-flex items-center gap-2.5 font-black"
+                    animate={{ x: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.5 }}>
                     পরবর্তী <ArrowRight className="w-5 h-5" />
                   </motion.span>
                 ) : (
-                  <motion.span className="inline-flex items-center gap-2"
-                    animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}>
-                    রেজিস্টার করুন <ArrowRight className="w-5 h-5" />
+                  <motion.span className="inline-flex items-center gap-2.5 font-black"
+                    animate={{ x: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.5 }}>
+                    ✨ রেজিস্টার করুন <ArrowRight className="w-5 h-5" />
                   </motion.span>
                 )}
               </motion.button>
