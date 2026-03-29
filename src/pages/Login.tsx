@@ -245,20 +245,27 @@ export default function Login() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex rounded-2xl bg-secondary/50 p-1.5 mb-5 backdrop-blur-sm border border-border/50"
+          className="flex rounded-2xl bg-secondary/50 p-1.5 mb-5 backdrop-blur-sm border border-border/50 shadow-lg shadow-primary/10"
         >
           {(["login", "register"] as const).map((t) => (
-            <button
+            <motion.button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+              whileTap={{ scale: 0.95 }}
+              className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                 tab === t
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                  ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/30"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "login" ? "লগইন" : "রেজিস্ট্রেশন"}
-            </button>
+              <motion.span
+                initial={false}
+                animate={tab === t ? { scale: [1, 1.05, 1] } : {}}
+                transition={{ duration: 0.3 }}
+              >
+                {t === "login" ? "🔑 লগইন" : "✨ রেজিস্ট্রেশন"}
+              </motion.span>
+            </motion.button>
           ))}
         </motion.div>
 
@@ -305,13 +312,20 @@ export default function Login() {
                     className="input-field text-base py-3.5"
                   />
                 </div>
-                <button
+                <motion.button
                   type="submit"
                   disabled={isSubmitting || !phone || !password}
                   className="btn-primary py-3.5 text-base w-full"
+                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.01 }}
                 >
-                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <>লগইন করুন <ArrowRight className="w-5 h-5" /></>}
-                </button>
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <motion.span className="inline-flex items-center gap-2"
+                      initial={false} animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}>
+                      লগইন করুন <ArrowRight className="w-5 h-5" />
+                    </motion.span>
+                  )}
+                </motion.button>
               </motion.form>
             ) : (
               <motion.form
@@ -386,13 +400,20 @@ export default function Login() {
                   </p>
                 </div>
 
-                <button
+                <motion.button
                   type="submit"
                   disabled={isSubmitting || !displayName.trim() || !regPhone || regPassword.length < 6 || !agreedTerms}
                   className="btn-primary py-3.5 text-base w-full"
+                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.01 }}
                 >
-                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <>রেজিস্টার করুন <ArrowRight className="w-5 h-5" /></>}
-                </button>
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <motion.span className="inline-flex items-center gap-2"
+                      initial={false} animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}>
+                      রেজিস্টার করুন <ArrowRight className="w-5 h-5" />
+                    </motion.span>
+                  )}
+                </motion.button>
               </motion.form>
             )}
           </AnimatePresence>

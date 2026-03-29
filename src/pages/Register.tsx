@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowRight, Lock, User, Phone } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
@@ -139,8 +139,29 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[hsl(var(--purple))]/10 rounded-full blur-[120px]" />
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], opacity: [0.15, 0.25, 0.15] }}
+          transition={{ duration: 6, repeat: Infinity }}
+          className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px]"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], opacity: [0.08, 0.15, 0.08] }}
+          transition={{ duration: 8, repeat: Infinity, delay: 2 }}
+          className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px]"
+        />
+      </div>
+
+      {/* Floating particles */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        {[...Array(5)].map((_, i) => (
+          <motion.div
+            key={i}
+            animate={{ y: [0, -30, 0], x: [0, (i % 2 === 0 ? 12 : -12), 0], opacity: [0.2, 0.6, 0.2] }}
+            transition={{ duration: 3 + i, repeat: Infinity, delay: i * 0.6 }}
+            className="absolute w-1.5 h-1.5 rounded-full bg-primary/30"
+            style={{ top: `${20 + i * 15}%`, left: `${15 + i * 16}%` }}
+          />
+        ))}
       </div>
 
       <motion.div
@@ -150,8 +171,13 @@ export default function Register() {
         className="w-full max-w-md relative z-10"
       >
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Good App" className="w-20 h-20 mx-auto mb-6 drop-shadow-2xl" />
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60 mb-2">
+          <motion.img
+            src="/logo.png" alt="Good App"
+            className="w-20 h-20 mx-auto mb-6 drop-shadow-2xl rounded-2xl"
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          />
+          <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary/80 to-accent mb-2">
             নতুন অ্যাকাউন্ট
           </h1>
           <p className="text-muted-foreground">ধাপ {step}/3 — {stepLabels[step - 1]}</p>
@@ -159,51 +185,73 @@ export default function Register() {
 
         <div className="flex gap-2 mb-6">
           {[1, 2, 3].map(s => (
-            <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${s <= step ? "bg-primary" : "bg-secondary"}`} />
+            <motion.div
+              key={s}
+              initial={false}
+              animate={{ scaleX: s <= step ? 1 : 0.5, opacity: s <= step ? 1 : 0.3 }}
+              className={`h-2 flex-1 rounded-full transition-all ${s <= step ? "bg-gradient-to-r from-primary to-primary/70" : "bg-secondary"}`}
+            />
           ))}
         </div>
 
-        <div className="glass-card p-8 rounded-3xl">
+        <motion.div
+          layout
+          className="glass-card p-8 rounded-3xl border border-border/30 shadow-xl shadow-primary/5"
+        >
           <form onSubmit={handleSubmit} className="space-y-6">
-            <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                  <StepIcon className="w-5 h-5 text-primary" />
+            <AnimatePresence mode="wait">
+              <motion.div key={step} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center"
+                  >
+                    <StepIcon className="w-5 h-5 text-primary" />
+                  </motion.div>
+                  <label className="text-sm font-medium text-muted-foreground">{stepLabels[step - 1]}</label>
                 </div>
-                <label className="text-sm font-medium text-muted-foreground">{stepLabels[step - 1]}</label>
-              </div>
 
-              {step === 1 && (
-                <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="আপনার নাম লিখুন..." className="input-field text-lg py-4" autoFocus />
-              )}
-              {step === 2 && (
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="কমপক্ষে ৬ অক্ষর..." className="input-field text-lg py-4" autoFocus />
-              )}
-              {step === 3 && (
-                <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                  placeholder="01XXXXXXXXX" className="input-field text-lg py-4" autoFocus />
-              )}
-            </motion.div>
+                {step === 1 && (
+                  <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="আপনার নাম লিখুন..." className="input-field text-lg py-4" autoFocus />
+                )}
+                {step === 2 && (
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                    placeholder="কমপক্ষে ৬ অক্ষর..." className="input-field text-lg py-4" autoFocus />
+                )}
+                {step === 3 && (
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                    placeholder="01XXXXXXXXX" className="input-field text-lg py-4" autoFocus />
+                )}
+              </motion.div>
+            </AnimatePresence>
 
             <div className="flex gap-3">
               {step > 1 && (
-                <button type="button" onClick={() => setStep(step - 1)}
+                <motion.button type="button" onClick={() => setStep(step - 1)}
+                  whileTap={{ scale: 0.95 }}
                   className="px-6 py-4 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-all font-bold">
                   পিছনে
-                </button>
+                </motion.button>
               )}
-              <button type="submit" disabled={!isStepValid() || isSubmitting}
+              <motion.button type="submit" disabled={!isStepValid() || isSubmitting}
+                whileTap={{ scale: 0.97 }}
+                whileHover={{ scale: 1.01 }}
                 className="btn-primary py-4 text-lg flex-1">
                 {isSubmitting ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
                 ) : step < 3 ? (
-                  <> পরবর্তী <ArrowRight className="w-5 h-5" /> </>
+                  <motion.span className="inline-flex items-center gap-2"
+                    animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}>
+                    পরবর্তী <ArrowRight className="w-5 h-5" />
+                  </motion.span>
                 ) : (
-                  <> রেজিস্টার করুন <ArrowRight className="w-5 h-5" /> </>
+                  <motion.span className="inline-flex items-center gap-2"
+                    animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}>
+                    রেজিস্টার করুন <ArrowRight className="w-5 h-5" />
+                  </motion.span>
                 )}
-              </button>
+              </motion.button>
             </div>
           </form>
 
@@ -215,7 +263,7 @@ export default function Register() {
               </button>
             </p>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
     </div>
   );

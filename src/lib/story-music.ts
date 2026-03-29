@@ -34,6 +34,7 @@ const AUDIO_SAMPLES = [
 ];
 
 const BASE_LIBRARY = [
+  // Bollywood
   { id: "1", title: "Tum Hi Ho", artist: "Arijit Singh", genre: "Bollywood" },
   { id: "2", title: "Kesariya", artist: "Arijit Singh", genre: "Bollywood" },
   { id: "3", title: "Raataan Lambiyan", artist: "Jubin Nautiyal", genre: "Bollywood" },
@@ -54,10 +55,60 @@ const BASE_LIBRARY = [
   { id: "18", title: "Faded", artist: "Alan Walker", genre: "EDM" },
   { id: "19", title: "Let Me Love You", artist: "DJ Snake", genre: "EDM" },
   { id: "20", title: "On My Way", artist: "Alan Walker", genre: "EDM" },
+  // Bangla
   { id: "21", title: "বাংলা গান ১", artist: "অজানা শিল্পী", genre: "Bangla" },
   { id: "22", title: "Mon Majhi Re", artist: "Arijit Singh", genre: "Bangla" },
   { id: "23", title: "Tomake Chai", artist: "Arijit Singh", genre: "Bangla" },
   { id: "24", title: "Tumi Jake Bhalobasho", artist: "Anupam Roy", genre: "Bangla" },
+  // New Bangla songs
+  { id: "25", title: "Ami Tomar Kache Rakhbo", artist: "Minar Rahman", genre: "Bangla" },
+  { id: "26", title: "Bondhu Tumi", artist: "Habib Wahid", genre: "Bangla" },
+  { id: "27", title: "Tumi Amar Jibon", artist: "Tahsan", genre: "Bangla" },
+  { id: "28", title: "Icche Kore", artist: "Imran", genre: "Bangla" },
+  { id: "29", title: "Bolte Bolte Cholte Cholte", artist: "Imran", genre: "Bangla" },
+  { id: "30", title: "Ke Tumi Nandini", artist: "Minar", genre: "Bangla" },
+  { id: "31", title: "Meghla Dine", artist: "Tahsan", genre: "Bangla" },
+  { id: "32", title: "Ei Meghla Dine Ekla", artist: "Hemanta Mukherjee", genre: "Bangla" },
+  { id: "33", title: "Keno Piriti Barailare", artist: "Hasan Raja", genre: "Bangla" },
+  { id: "34", title: "Poran Bondhu Re", artist: "Folk Bangla", genre: "Bangla" },
+  { id: "35", title: "Ekla Cholo Re", artist: "Rabindranath Tagore", genre: "Bangla" },
+  { id: "36", title: "Amar Shonar Bangla", artist: "Rabindranath Tagore", genre: "Bangla" },
+  { id: "37", title: "Boshonto Eshe Geche", artist: "Manna Dey", genre: "Bangla" },
+  { id: "38", title: "Tumi Robe Nirobe", artist: "Rabindra Sangeet", genre: "Bangla" },
+  { id: "39", title: "Gramer Nodir Moddhikhane", artist: "Folk Song", genre: "Bangla" },
+  { id: "40", title: "Amar Ei Poth Chaoatei", artist: "Kishore Kumar", genre: "Bangla" },
+  // Gajal / Islamic
+  { id: "41", title: "লা ইলাহা ইল্লাল্লাহ", artist: "Kalarab", genre: "গজল" },
+  { id: "42", title: "আল্লাহু আল্লাহু", artist: "Kalarab", genre: "গজল" },
+  { id: "43", title: "ইয়া নবী সালাম", artist: "Kalarab", genre: "গজল" },
+  { id: "44", title: "রাসূলে পাক", artist: "Kalarab", genre: "গজল" },
+  { id: "45", title: "তোমারি নামে জাগি", artist: "Abu Ubayda", genre: "গজল" },
+  { id: "46", title: "কালো মেঘের ভেলায়", artist: "Kalarab", genre: "গজল" },
+  { id: "47", title: "ও মদিনার বুলবুলি", artist: "Islamic Song", genre: "গজল" },
+  { id: "48", title: "মা ফাতেমা", artist: "Kalarab", genre: "গজল" },
+  { id: "49", title: "আমি এক পথিক", artist: "Kalarab", genre: "গজল" },
+  { id: "50", title: "ইশকে নবী", artist: "Abu Rayhan", genre: "গজল" },
+  { id: "51", title: "তাওবা তাওবা", artist: "Abu Ubayda", genre: "গজল" },
+  { id: "52", title: "ফেরাউনের দেশে", artist: "Kalarab", genre: "গজল" },
+  { id: "53", title: "সুবহানাল্লাহ", artist: "Kalarab", genre: "গজল" },
+  { id: "54", title: "ও আল্লাহ দয়া করো", artist: "Abu Ubayda", genre: "গজল" },
+  { id: "55", title: "রমজানের ঐ রোজার শেষে", artist: "Islamic Song", genre: "গজল" },
+  { id: "56", title: "হাসবুনাল্লাহ", artist: "Kalarab", genre: "গজল" },
+  { id: "57", title: "নবীজির শানে", artist: "Abu Rayhan", genre: "গজল" },
+  { id: "58", title: "দুনিয়া ফানি", artist: "Kalarab", genre: "গজল" },
+  { id: "59", title: "কুরআনের আলো", artist: "Islamic Song", genre: "গজল" },
+  { id: "60", title: "আসমানের তারা", artist: "Abu Ubayda", genre: "গজল" },
+  // More Bollywood / Hindi
+  { id: "61", title: "Tera Hone Laga Hoon", artist: "Atif Aslam", genre: "Bollywood" },
+  { id: "62", title: "Tere Bina", artist: "A.R. Rahman", genre: "Bollywood" },
+  { id: "63", title: "Agar Tum Saath Ho", artist: "Arijit Singh", genre: "Bollywood" },
+  { id: "64", title: "Tujhe Kitna Chahne Lage", artist: "Arijit Singh", genre: "Bollywood" },
+  { id: "65", title: "Pal Pal Dil Ke Paas", artist: "Arijit Singh", genre: "Romance" },
+  { id: "66", title: "Hawayein", artist: "Arijit Singh", genre: "Bollywood" },
+  { id: "67", title: "Phir Bhi Tumko Chahunga", artist: "Arijit Singh", genre: "Romance" },
+  { id: "68", title: "Ae Dil Hai Mushkil", artist: "Arijit Singh", genre: "Bollywood" },
+  { id: "69", title: "Sanam Re", artist: "Arijit Singh", genre: "Romance" },
+  { id: "70", title: "Tum Se Hi", artist: "Mohit Chauhan", genre: "Bollywood" },
 ] as const;
 
 export const STORY_MUSIC_LIBRARY: StoryMusicTrack[] = BASE_LIBRARY.map((track, idx) => ({
@@ -99,7 +150,6 @@ export function resolveStoryMusic(storedValue: string | null | undefined): {
     return {
       track,
       label: labelPart || (track ? `${track.title} - ${track.artist}` : storedValue),
-      // Prefer current library URL for this track id so old/wrong stored URLs don't play random audio.
       audioUrl: track?.audioUrl || decodedUrl || null,
     };
   }
