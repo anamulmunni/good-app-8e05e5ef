@@ -95,7 +95,7 @@ async function searchInvidious(query: string, page: number): Promise<any[]> {
 
 async function tryPipedInstance(instance: string, query: string): Promise<any[]> {
   const url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
-  const res = await withTimeout(fetch(url), 3200);
+  const res = await withTimeout(fetch(url), 6000);
   if (!res.ok) return [];
 
   const data = await res.json();
