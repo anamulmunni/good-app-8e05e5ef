@@ -509,7 +509,10 @@ export default function Chat() {
               {otherUser.avatar_url ? <img src={otherUser.avatar_url} className="w-full h-full object-cover" /> :
                 <div className="w-full h-full flex items-center justify-center"><span className="text-2xl font-bold text-gray-400">{otherUser.display_name?.[0]?.toUpperCase() || "?"}</span></div>}
             </div>
-            <p className="font-bold text-gray-900 text-[15px]">{otherUser.display_name || "User"}</p>
+            <p className="font-bold text-gray-900 text-[15px] inline-flex items-center gap-1">
+              <span>{otherUser.display_name || "User"}</span>
+              {otherUser.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+            </p>
             <p className="text-[12px] text-gray-500">Good App</p>
           </div>
 
