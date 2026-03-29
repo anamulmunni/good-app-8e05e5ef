@@ -14,6 +14,7 @@ import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
 import Reels from "./pages/Reels";
 import UserProfile from "./pages/UserProfile";
+import ChannelPage from "./pages/ChannelPage";
 import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
 import Install from "./pages/Install";
