@@ -67,6 +67,8 @@ export default function Chat() {
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [defaultEmoji, setDefaultEmoji] = useState(() => localStorage.getItem("chat-emoji") || "❤️");
   const [showEmojiSwitch, setShowEmojiSwitch] = useState(false);
+  const [deleteConvoTarget, setDeleteConvoTarget] = useState<Conversation | null>(null);
+  const convoLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Love hold animation
   const [loveScale, setLoveScale] = useState(1);
   const [loveHolding, setLoveHolding] = useState(false);
