@@ -1043,7 +1043,7 @@ export default function Feed() {
                         <img src={userStories[0].image_url} className="w-full h-full object-cover" alt="" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
                         {userStories.length > 1 && (
-                          <span className="absolute top-2 left-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
+                          <span className="absolute top-2 right-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
                             {userStories.length}
                           </span>
                         )}
