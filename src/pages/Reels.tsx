@@ -951,7 +951,7 @@ export default function Reels() {
               onClick={async () => {
                 const shareUrl = selectedVideo.isExternal
                   ? selectedVideo.watch_url || selectedVideo.video_url
-                  : `${window.location.origin}/reels?play=${selectedVideo.local_post_id || selectedVideo.id}`;
+                  : `${window.location.origin}/watch/${selectedVideo.local_post_id || selectedVideo.id}`;
                 try {
                   if (navigator.share) {
                     await navigator.share({ title: selectedVideo.title, url: shareUrl });
