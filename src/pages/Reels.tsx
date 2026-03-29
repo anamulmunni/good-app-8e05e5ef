@@ -172,7 +172,10 @@ function viewCount() {
 
 export default function Reels() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isLoading } = useAuth();
+  const playParam = searchParams.get("play");
+  const uploadParam = searchParams.get("upload");
 
   const [searchMode, setSearchMode] = useState(false);
   const [searchInput, setSearchInput] = useState("");
