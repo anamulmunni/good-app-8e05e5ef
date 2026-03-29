@@ -328,10 +328,12 @@ export default function Feed() {
   };
 
   const storyMutation = useMutation({
-    mutationFn: async ({ file, musicName }: { file: File; musicName?: string }) => {
+    mutationFn: async ({ files, musicName }: { files: File[]; musicName?: string }) => {
       if (!user) throw new Error("Login");
-      const url = await uploadStoryMedia(file);
-      return createStory(user.id, url, musicName);
+      for (const file of files) {
+        const url = await uploadStoryMedia(file);
+        await createStory(user.id, url, musicName);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stories"] });
