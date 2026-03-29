@@ -368,7 +368,7 @@ export default function Reels() {
         }
         return prev;
       });
-    }, 12000);
+    }, 30000);
 
     return () => window.clearTimeout(timeoutId);
   }, [selectedVideo?.id, playerReloadToken]);
