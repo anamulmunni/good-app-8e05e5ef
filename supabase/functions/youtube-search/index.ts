@@ -43,7 +43,7 @@ function normalizeVideo(item: any): any | null {
   const title = String(item?.title || "").trim();
   if (!title) return null;
 
-  const duration = Number(item?.lengthSeconds || 0);
+  const duration = Number(item?.lengthSeconds || 180);
   if (!Number.isFinite(duration) || duration < 30) return null;
 
   return {
@@ -82,7 +82,7 @@ async function searchInvidious(query: string, page: number): Promise<any[]> {
   return settled
     .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
     .flatMap((result) => result.value)
-    .slice(0, 60);
+    .slice(0, 80);
 }
 
 async function tryPipedInstance(instance: string, query: string): Promise<any[]> {
@@ -117,7 +117,30 @@ async function searchPiped(query: string): Promise<any[]> {
   return settled
     .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
     .flatMap((result) => result.value)
-    .slice(0, 60);
+    .slice(0, 80);
+}
+
+async function searchNoKeyApi(query: string): Promise<any[]> {
+  try {
+    const url = `https://yt.lemnoslife.com/noKey/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(query)}`;
+    const res = await withTimeout(fetch(url), 3800);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = Array.isArray(data?.items) ? data.items : [];
+
+    return items
+      .map((item: any) => normalizeVideo({
+        videoId: item?.id?.videoId,
+        title: item?.snippet?.title,
+        author: item?.snippet?.channelTitle,
+        lengthSeconds: 180,
+        thumbnail: item?.snippet?.thumbnails?.high?.url || item?.snippet?.thumbnails?.default?.url,
+      }))
+      .filter(Boolean)
+      .slice(0, 80);
+  } catch {
+    return [];
+  }
 }
 
 function dedupeVideos(items: any[]): any[] {
@@ -130,6 +153,17 @@ function dedupeVideos(items: any[]): any[] {
   });
 }
 
+function seededShuffle<T>(items: T[], seed = 0): T[] {
+  const arr = [...items];
+  let s = Math.abs(seed) + 1;
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    s = (s * 9301 + 49297) % 233280;
+    const j = Math.floor((s / 233280) * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -139,7 +173,9 @@ serve(async (req) => {
     const url = new URL(req.url);
     const query = String(url.searchParams.get("q") || "bangla new song 2025").trim().slice(0, 140);
     const pageRaw = Number(url.searchParams.get("page") || "1");
+    const seedRaw = Number(url.searchParams.get("seed") || "0");
     const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(20, Math.floor(pageRaw))) : 1;
+    const seed = Number.isFinite(seedRaw) ? seedRaw : 0;
 
     if (!query) {
       return new Response(JSON.stringify({ results: [] }), {
@@ -147,14 +183,16 @@ serve(async (req) => {
       });
     }
 
-    const [invidiousResults, pipedResults] = await Promise.all([
+    const [invidiousResults, pipedResults, noKeyResults] = await Promise.all([
       searchInvidious(query, page),
       searchPiped(query),
+      searchNoKeyApi(query),
     ]);
 
-    const results = dedupeVideos([...invidiousResults, ...pipedResults]).slice(0, 80);
+    const merged = dedupeVideos([...invidiousResults, ...pipedResults, ...noKeyResults]);
+    const shuffled = seededShuffle(merged, seed + page * 29).slice(0, 120);
 
-    return new Response(JSON.stringify({ results }), {
+    return new Response(JSON.stringify({ results: shuffled }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

@@ -327,13 +327,14 @@ export function trackVideoPreference(input: { title?: string; category?: string 
 
 // ── YouTube search via Edge Function proxy ──────────────────────────────
 
-async function fetchYouTubeViaEdge(query: string, page = 1): Promise<any[]> {
+async function fetchYouTubeViaEdge(query: string, page = 1, seed = 0): Promise<any[]> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!supabaseUrl) return [];
 
   try {
-    const url = `${supabaseUrl}/functions/v1/youtube-search?q=${encodeURIComponent(query)}&page=${page}`;
+    const nonce = Math.abs(seed || Date.now()) % 1000000;
+    const url = `${supabaseUrl}/functions/v1/youtube-search?q=${encodeURIComponent(query)}&page=${page}&seed=${nonce}`;
     const res = await fetch(url, {
       headers: {
         "Authorization": `Bearer ${supabaseKey}`,
