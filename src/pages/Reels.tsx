@@ -88,6 +88,25 @@ function dedupeVideos(items: ExternalReelVideo[]): ExternalReelVideo[] {
   });
 }
 
+function mapExternalVideoToVideoItem(v: ExternalReelVideo): VideoItem {
+  return {
+    id: v.id,
+    title: v.title,
+    video_url: v.video_url,
+    thumbnail_url: v.thumbnail_url,
+    creator: v.creator || "",
+    duration: v.duration,
+    isExternal: v.source !== "good-app",
+    uploader_user_id: v.uploader_user_id,
+    uploader_guest_id: v.uploader_guest_id,
+    uploader_avatar_url: v.uploader_avatar_url,
+    uploader_is_verified_badge: v.uploader_is_verified_badge,
+    local_post_id: v.local_post_id,
+    likes_count: v.likes_count,
+    comments_count: v.comments_count,
+  };
+}
+
 function timeAgo(sec?: number) {
   if (!sec) return "";
   if (sec < 60) return `${sec}s ago`;
