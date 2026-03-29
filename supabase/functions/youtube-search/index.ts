@@ -48,6 +48,7 @@ async function searchYouTubeOfficial(
     key: apiKey,
     regionCode: "BD",
     relevanceLanguage: "bn",
+    videoDuration: "medium", // Exclude shorts (< 4min) - only medium (4-20min) and long videos
   });
   if (pageToken) params.set("pageToken", pageToken);
 
