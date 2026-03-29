@@ -785,7 +785,10 @@ export default function Chat() {
                           <span className="text-sm font-bold text-blue-600">{u.display_name?.[0]?.toUpperCase() || "?"}</span>}
                       </div>
                       <div>
-                        <p className="text-[14px] font-semibold text-gray-900 dark:text-foreground">{u.display_name || "User"}</p>
+                        <p className="text-[14px] font-semibold text-gray-900 dark:text-foreground inline-flex items-center gap-1">
+                          <span>{u.display_name || "User"}</span>
+                          {u.is_verified_badge && <VerifiedBadge className="h-3 w-3" />}
+                        </p>
                         <p className="text-[12px] text-gray-500">{u.guest_id}</p>
                       </div>
                     </button>
