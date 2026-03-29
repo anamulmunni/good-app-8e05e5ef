@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker from "@/components/EmojiPicker";
 import { showMessageNotification } from "@/lib/call-api";
+import { playUiSound } from "@/lib/ui-sounds";
 
 type PendingMedia = {
   id: string;
@@ -118,6 +119,7 @@ export default function Chat() {
         // Show notification for messages from others when page is hidden
         const msg = payload.new;
         if (msg && msg.sender_id !== user.id) {
+          playUiSound("message");
           const preview = msg.message_type === "text" ? (msg.content || "") : (msg.message_type === "image" ? "📷 ছবি" : "🎤 ভয়েস");
           showMessageNotification("New Message", preview);
         }

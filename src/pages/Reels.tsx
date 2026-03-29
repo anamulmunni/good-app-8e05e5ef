@@ -93,7 +93,7 @@ function buildExternalPlayerUrl(url: string, autoplay = false) {
   // YouTube autoplay with sound is often force-muted by browser policy.
   // We keep autoplay off and start playback through a user tap.
   if (isYouTubeEmbed(url)) {
-    params.set("autoplay", "0");
+    params.set("autoplay", autoplay ? "1" : "0");
     params.set("mute", "0");
     params.set("rel", "0");
     params.set("modestbranding", "1");
@@ -139,6 +139,8 @@ export default function Reels() {
   const [viewCounts] = useState<Record<string, string>>({});
   const [miniPlayer, setMiniPlayer] = useState(false);
   const [showYoutubeTapToPlay, setShowYoutubeTapToPlay] = useState(false);
+  const [youtubeAutoplayNonce, setYoutubeAutoplayNonce] = useState(0);
+  const [youtubeAutoplayEnabled, setYoutubeAutoplayEnabled] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -170,25 +172,30 @@ export default function Reels() {
     frameWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*");
   }, []);
 
-  const playYoutubeWithSound = useCallback(() => {
-    setShowYoutubeTapToPlay(false);
-
+  const kickYoutubeSoundPlayback = useCallback((includePlay = true) => {
     postYoutubeCommand("unMute");
     postYoutubeCommand("setVolume", [100]);
-    postYoutubeCommand("playVideo");
+    if (includePlay) postYoutubeCommand("playVideo");
 
     stopYoutubeCommandLoop();
     let tries = 0;
     youtubeCommandIntervalRef.current = window.setInterval(() => {
       postYoutubeCommand("unMute");
       postYoutubeCommand("setVolume", [100]);
-      if (tries < 2) postYoutubeCommand("playVideo");
+      if (includePlay && tries < 3) postYoutubeCommand("playVideo");
       tries += 1;
-      if (tries >= 10) {
+      if (tries >= 12) {
         stopYoutubeCommandLoop();
       }
-    }, 220);
+    }, 200);
   }, [postYoutubeCommand, stopYoutubeCommandLoop]);
+
+  const playYoutubeWithSound = useCallback(() => {
+    setShowYoutubeTapToPlay(false);
+    setYoutubeAutoplayEnabled(true);
+    setYoutubeAutoplayNonce((prev) => prev + 1);
+    window.setTimeout(() => kickYoutubeSoundPlayback(true), 120);
+  }, [kickYoutubeSoundPlayback]);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -197,6 +204,8 @@ export default function Reels() {
   useEffect(() => {
     const isYoutubeSelected = Boolean(selectedVideo?.isExternal && isYouTubeEmbed(selectedVideo.video_url));
     setShowYoutubeTapToPlay(isYoutubeSelected);
+    setYoutubeAutoplayEnabled(false);
+    setYoutubeAutoplayNonce(0);
     stopYoutubeCommandLoop();
   }, [selectedVideo, stopYoutubeCommandLoop]);
 
@@ -519,14 +528,22 @@ export default function Reels() {
           <div ref={playerShellRef} className="w-full aspect-video relative" style={{ background: "#000" }}>
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
-                key={selectedVideo.id}
-                src={buildExternalPlayerUrl(selectedVideo.video_url, false)}
+                key={selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) ? `${selectedVideo.id}-yt-${youtubeAutoplayNonce}` : selectedVideo.id}
+                src={buildExternalPlayerUrl(
+                  selectedVideo.video_url,
+                  selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) ? youtubeAutoplayEnabled : false,
+                )}
                 title={selectedVideo.title}
                 className="w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
                 allowFullScreen
                 ref={(node) => {
                   youtubeIframeRef.current = node;
+                }}
+                onLoad={() => {
+                  if (selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && youtubeAutoplayEnabled) {
+                    window.setTimeout(() => kickYoutubeSoundPlayback(true), 80);
+                  }
                 }}
               />
             ) : (
