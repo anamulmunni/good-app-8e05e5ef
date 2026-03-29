@@ -266,6 +266,11 @@ export default function Reels() {
   }, [selectedVideo?.local_post_id]);
 
   useEffect(() => {
+    setLiked(false);
+    setDisliked(false);
+  }, [selectedVideo?.id]);
+
+  useEffect(() => {
     return () => {
       stopYoutubeCommandLoop();
     };
