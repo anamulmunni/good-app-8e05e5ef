@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import StoryEditor from "@/components/StoryEditor";
 import StoryViewer from "@/components/StoryViewer";
 import { playUiSound } from "@/lib/ui-sounds";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 export default function Feed() {
   const { user, isLoading } = useAuth();
@@ -526,6 +527,13 @@ export default function Feed() {
     });
   };
 
+  const NameWithBadge = ({ name, isVerified, className = "" }: { name: string; isVerified?: boolean; className?: string }) => (
+    <span className={`inline-flex items-center gap-1 ${className}`}>
+      <span>{name}</span>
+      {isVerified && <VerifiedBadge className="h-3.5 w-3.5" />}
+    </span>
+  );
+
   // Insert "People You May Know" after 3rd post
   const renderPosts = () => {
     const elements: React.ReactNode[] = [];
@@ -586,7 +594,7 @@ export default function Feed() {
             </button>
             <div className="flex-1 min-w-0">
               <button onClick={() => navigate(`/user/${post.user_id}`)} className="font-bold text-[15px] text-gray-900 dark:text-foreground hover:underline block">
-                {post.user?.display_name || "User"}
+                <NameWithBadge name={post.user?.display_name || "User"} isVerified={post.user?.is_verified_badge} />
               </button>
               <div className="flex items-center gap-1 text-[12px] text-gray-500 dark:text-muted-foreground">
                 <span>{timeAgo(post.created_at)}</span>
@@ -669,28 +677,24 @@ export default function Feed() {
           )}
 
           {/* Reaction summary - Facebook style */}
-          {(post.likes_count > 0 || post.comments_count > 0) && (
-            <div className="px-3 py-2 flex items-center justify-between text-[13px] text-gray-500 dark:text-muted-foreground">
-              <div className="flex items-center gap-1">
-                {post.likes_count > 0 && (
-                  <>
-                    <span className="flex items-center -space-x-0.5">
-                      <span className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[11px]">👍</span>
-                      {myReaction && myReaction !== "like" && (
-                        <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-[11px]">{REACTION_EMOJIS[myReaction]}</span>
-                      )}
-                    </span>
-                    <span className="text-[13px]">{post.likes_count}</span>
-                  </>
+          <div className="px-3 py-2 flex items-center justify-between text-[13px] text-gray-500 dark:text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <span className="flex items-center -space-x-0.5">
+                <span className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[11px]">👍</span>
+                {myReaction && myReaction !== "like" && (
+                  <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-[11px]">{REACTION_EMOJIS[myReaction]}</span>
                 )}
-              </div>
-              {post.comments_count > 0 && (
-                <button onClick={() => openComments(post.id)} className="hover:underline text-[13px]">
-                  {post.comments_count} মন্তব্য
-                </button>
-              )}
+              </span>
+              <span className="text-[13px]">{post.likes_count || 0}</span>
             </div>
-          )}
+            {post.comments_count > 0 ? (
+              <button onClick={() => openComments(post.id)} className="hover:underline text-[13px]">
+                {post.comments_count} মন্তব্য
+              </button>
+            ) : (
+              <span className="text-[13px]">0 মন্তব্য</span>
+            )}
+          </div>
 
           {/* Facebook-style Action buttons */}
           <div
@@ -877,7 +881,9 @@ export default function Feed() {
                           <span className="text-sm font-bold text-blue-600">{u.display_name?.[0]?.toUpperCase() || "?"}</span>}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-foreground">{u.display_name || "User"}</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-foreground">
+                          <NameWithBadge name={u.display_name || "User"} isVerified={u.is_verified_badge} />
+                        </p>
                         <p className="text-[11px] text-gray-500 dark:text-muted-foreground">{u.guest_id}</p>
                       </div>
                     </button>
@@ -907,7 +913,9 @@ export default function Feed() {
                         <User className="w-7 h-7 text-gray-400" />}
                     </button>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-bold text-gray-900 dark:text-foreground truncate">{fr.sender?.display_name || "User"}</p>
+                      <p className="text-[14px] font-bold text-gray-900 dark:text-foreground truncate">
+                        <NameWithBadge name={fr.sender?.display_name || "User"} isVerified={fr.sender?.is_verified_badge} />
+                      </p>
                       <p className="text-[11px] text-gray-500 dark:text-muted-foreground">{timeAgo(fr.created_at)}</p>
                       <div className="flex gap-2 mt-1.5">
                         <button onClick={() => acceptRequestMutation.mutate(fr.id)}
@@ -945,7 +953,9 @@ export default function Feed() {
                     </button>
                     <div className="flex-1 min-w-0">
                       <button onClick={() => navigate(`/user/${person.id}`)} className="text-left w-full">
-                        <p className="text-[14px] font-bold text-gray-900 dark:text-foreground truncate">{person.display_name || person.guest_id}</p>
+                        <p className="text-[14px] font-bold text-gray-900 dark:text-foreground truncate">
+                          <NameWithBadge name={person.display_name || person.guest_id} isVerified={person.is_verified_badge} />
+                        </p>
                       </button>
                       <div className="mt-1.5">
                         {isFriend ? (
@@ -1044,8 +1054,9 @@ export default function Feed() {
                           </div>
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 p-2">
-                          <p className="text-white text-xs font-bold drop-shadow-lg">
-                            {parseInt(uid) === user.id ? "Your story" : storyUser?.display_name || "User"}
+                          <p className="text-white text-xs font-bold drop-shadow-lg inline-flex items-center gap-1">
+                            <span>{parseInt(uid) === user.id ? "Your story" : storyUser?.display_name || "User"}</span>
+                            {storyUser?.is_verified_badge && <VerifiedBadge className="h-3 w-3" />}
                           </p>
                         </div>
                       </button>
@@ -1105,8 +1116,9 @@ export default function Feed() {
                     <button onClick={() => { if (n.reference_id) { setActiveTab("home"); openComments(n.reference_id); } }}
                       className="flex-1 min-w-0 text-left">
                       <p className="text-[13px] text-gray-900 dark:text-foreground">
-                        <span className="font-bold text-blue-600 dark:text-primary cursor-pointer" onClick={(e) => { e.stopPropagation(); if (n.from_user_id) navigate(`/user/${n.from_user_id}`); }}>
-                          {n.from_user?.display_name || "কেউ"}
+                        <span className="font-bold text-blue-600 dark:text-primary cursor-pointer inline-flex items-center gap-1" onClick={(e) => { e.stopPropagation(); if (n.from_user_id) navigate(`/user/${n.from_user_id}`); }}>
+                          <span>{n.from_user?.display_name || "কেউ"}</span>
+                          {n.from_user?.is_verified_badge && <VerifiedBadge className="h-3 w-3" />}
                         </span>
                         {n.type === "mention" && " আপনাকে মেন্টশন করেছে"}
                         {n.type === "like" && " আপনার পোস্টে লাইক দিয়েছে"}
