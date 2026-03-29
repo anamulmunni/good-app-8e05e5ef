@@ -1061,18 +1061,17 @@ export default function Feed() {
                   </button>
                   <input ref={storyInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleStorySelect} />
 
-                  {Object.entries(storyGroups).map(([uid, userStories]) => {
+                  {sortedStoryEntries.map(([uid, userStories]) => {
                     const storyUser = userStories[0].user;
                     return (
                       <button key={uid} onClick={() => setViewingStory(userStories[0])}
                         className="relative min-w-[110px] h-[170px] rounded-xl overflow-hidden shrink-0">
                         <img src={userStories[0].image_url} className="w-full h-full object-cover" alt="" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-                        {userStories.length > 1 && (
-                          <span className="absolute top-2 right-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
-                            {userStories.length}
-                          </span>
-                        )}
+                        {/* Story count badge in blue */}
+                        <span className="absolute top-2 right-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
+                          {userStories.length}
+                        </span>
                         <div className="absolute top-2 left-2 w-9 h-9 rounded-full p-[2px] bg-blue-600">
                           <div className="w-full h-full rounded-full overflow-hidden bg-white">
                             {storyUser?.avatar_url ? <img src={storyUser.avatar_url} className="w-full h-full object-cover" /> :
