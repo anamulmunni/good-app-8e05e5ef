@@ -198,6 +198,97 @@ function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
   return fallbackUrl || "";
 }
 
+const VIDEO_PREF_KEY = "goodapp-video-pref-v1";
+
+function inferCategoryFromTitle(title?: string): string {
+  const value = (title || "").toLowerCase();
+  if (/(romantic|love|valobasha|ভালোবাসা)/i.test(value)) return "romantic";
+  if (/(sad|breakup|virah|কষ্ট)/i.test(value)) return "sad";
+  if (/(slowed|reverb)/i.test(value)) return "slowed";
+  if (/(live|concert|stage)/i.test(value)) return "live";
+  if (/(natok|drama|movie|serial|episode)/i.test(value)) return "natok";
+  if (/(comedy|funny|হাসি)/i.test(value)) return "comedy";
+  if (/(song|music|audio|lyrics|গান|gaan|gan|album|official)/i.test(value)) return "music";
+  return "general";
+}
+
+function readVideoPreferences(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(VIDEO_PREF_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+function topPreferredCategories(limit = 3): string[] {
+  const prefs = readVideoPreferences();
+  return Object.entries(prefs)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([key]) => key);
+}
+
+function scorePreferredCategory(title: string, category?: string): number {
+  const preferred = topPreferredCategories(3);
+  if (preferred.length === 0) return 0;
+  const inferred = (category || inferCategoryFromTitle(title)).toLowerCase();
+  if (preferred.includes(inferred)) return 14;
+  const lower = title.toLowerCase();
+  if (preferred.some((item) => lower.includes(item))) return 8;
+  return 0;
+}
+
+function dedupeExternalVideos(items: ExternalReelVideo[]): ExternalReelVideo[] {
+  const seenId = new Set<string>();
+  const seenTitleCreator = new Set<string>();
+  return items.filter((video) => {
+    if (seenId.has(video.id)) return false;
+    seenId.add(video.id);
+    const titleKey = normalizeForMatch(video.title || "");
+    const creatorKey = normalizeForMatch(video.creator || "");
+    const key = `${titleKey}::${creatorKey}`;
+    if (!titleKey) return true;
+    if (seenTitleCreator.has(key)) return false;
+    seenTitleCreator.add(key);
+    return true;
+  });
+}
+
+function seededShuffle<T>(items: T[], seed = 0): T[] {
+  const arr = [...items];
+  let s = Math.abs(seed) + 1;
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    s = (s * 9301 + 49297) % 233280;
+    const j = Math.floor((s / 233280) * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+export function trackVideoPreference(input: { title?: string; category?: string | null }): void {
+  if (typeof window === "undefined") return;
+  try {
+    const prefs = readVideoPreferences();
+    const key = (input.category || inferCategoryFromTitle(input.title)).toLowerCase();
+    if (!key) return;
+
+    const next: Record<string, number> = {};
+    for (const [k, value] of Object.entries(prefs)) {
+      next[k] = Math.max(0, Math.round(value * 0.95));
+    }
+    next[key] = (next[key] || 0) + 10;
+
+    window.localStorage.setItem(VIDEO_PREF_KEY, JSON.stringify(next));
+  } catch {
+    // no-op
+  }
+}
+
 // ── YouTube search via Edge Function proxy ──────────────────────────────
 
 async function fetchYouTubeViaEdge(query: string, page = 1): Promise<any[]> {
