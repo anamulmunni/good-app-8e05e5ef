@@ -450,9 +450,7 @@ async function fetchYouTubeVideos(
 
 // Dailymotion removed - YouTube only via edge function
 
-  const rawId = String(raw?.id || "");
-  const cleanId = rawId.startsWith("dm-") ? rawId.replace("dm-", "") : (raw?.video_id || rawId);
-  const embedUrl = toDailymotionEmbed(cleanId, raw?.embed_url || raw?.video_url);
+
   if (!embedUrl) return null;
 
   return {
