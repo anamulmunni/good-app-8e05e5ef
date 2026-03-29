@@ -322,7 +322,7 @@ export default function ChannelPage() {
               </p>
               {isOwnChannel && (
                 <button
-                  onClick={() => navigate("/reels")}
+                  onClick={() => navigate("/reels?upload=1")}
                   className="mt-3 px-5 py-2 rounded-full text-[13px] font-semibold"
                   style={{ background: "#ff0000", color: "#fff" }}
                 >
