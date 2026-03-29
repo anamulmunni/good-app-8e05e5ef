@@ -179,9 +179,12 @@ export default function Feed() {
       .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, () => {
         queryClient.invalidateQueries({ queryKey: ["stories"] });
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
         queryClient.invalidateQueries({ queryKey: ["unread-count"] });
-        playUiSound("message");
+        const incoming = payload?.new;
+        if (incoming && incoming.sender_id !== user?.id) {
+          playUiSound("message");
+        }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["friend-request-count"] });
@@ -194,7 +197,7 @@ export default function Feed() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [queryClient, user?.id]);
 
   const createPostMutation = useMutation({
     mutationFn: async () => {
