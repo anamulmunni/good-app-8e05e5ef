@@ -835,6 +835,10 @@ export default function Chat() {
           const hasUnread = unreadCount > 0;
           return (
             <button key={convo.id} onClick={() => openConversation(convo)}
+              onContextMenu={(e) => { e.preventDefault(); setDeleteConvoTarget(convo); }}
+              onTouchStart={() => { convoLongPressRef.current = setTimeout(() => setDeleteConvoTarget(convo), 600); }}
+              onTouchEnd={() => { if (convoLongPressRef.current) clearTimeout(convoLongPressRef.current); }}
+              onTouchCancel={() => { if (convoLongPressRef.current) clearTimeout(convoLongPressRef.current); }}
               className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl text-left transition-colors"
               style={{ background: hasUnread ? "rgba(0,132,255,0.06)" : "transparent" }}>
               <div className="relative">
