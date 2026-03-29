@@ -47,7 +47,7 @@ export type ExternalReelVideo = {
   title: string;
   video_url: string;
   watch_url?: string;
-  source: "dailymotion" | "good-app";
+  source: "dailymotion" | "youtube" | "good-app";
   creator?: string | null;
   thumbnail_url?: string | null;
   video_id?: string;
