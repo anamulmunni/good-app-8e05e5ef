@@ -674,10 +674,10 @@ export default function Reels() {
                 <img
                   src={goodAppLogo}
                   alt="good-app logo"
-                  className="h-7 w-7 object-cover rounded-sm"
+                  className="h-7 w-7 object-cover rounded-sm shadow-lg"
                   loading="lazy"
                 />
-                <span className="font-bold text-[17px] tracking-tight" style={{ color: "#fff" }}>good-app</span>
+                <span className="font-black text-[18px] tracking-tight" style={{ background: "linear-gradient(90deg, #fff, #e3f0ff, #ffd600)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>good-app</span>
               </div>
             </div>
             <div className="flex items-center gap-1">

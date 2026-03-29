@@ -780,10 +780,13 @@ export default function Feed() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-background pb-14">
-      {/* ===== Header - "good-app" ===== */}
-      <header className="sticky top-0 z-50 bg-blue-600 shadow-md">
+      {/* ===== Header - "good-app" Premium ===== */}
+      <header className="sticky top-0 z-50 shadow-lg" style={{ background: "linear-gradient(135deg, #1877F2, #0d47a1, #1565c0)" }}>
         <div className="max-w-lg mx-auto px-3 py-2 flex items-center justify-between">
-          <h1 className="text-[22px] font-bold text-white tracking-tight">good-app</h1>
+          <h1 className="text-[24px] font-black text-white tracking-tight" style={{ fontFamily: "'Inter', system-ui", textShadow: "0 2px 8px rgba(0,0,0,0.3)", letterSpacing: "-0.02em" }}>
+            <span style={{ background: "linear-gradient(90deg, #fff, #e3f0ff, #fff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundSize: "200% auto", animation: "shimmer-text 3s ease-in-out infinite" }}>good</span>
+            <span style={{ color: "#ffd600", textShadow: "0 0 12px rgba(255,214,0,0.5)" }}>-app</span>
+          </h1>
           <div className="flex items-center gap-0.5">
             <button onClick={() => setShowCreatePost(true)} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
               <Plus className="w-5 h-5 text-white" />
