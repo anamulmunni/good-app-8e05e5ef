@@ -26,11 +26,20 @@ import { useOnlineHeartbeat } from "@/hooks/use-online";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5000,
-      gcTime: 10 * 60 * 1000,
-      refetchOnWindowFocus: true,
+      staleTime: 15_000,
+      gcTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
-      retry: 1,
+      retry: (failureCount, error) => {
+        const message = error instanceof Error ? error.message.toLowerCase() : "";
+        const isTransient =
+          message.includes("timeout") ||
+          message.includes("failed to fetch") ||
+          message.includes("network") ||
+          message.includes("connection");
+        return isTransient ? failureCount < 4 : failureCount < 2;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10_000),
     },
   },
 });
