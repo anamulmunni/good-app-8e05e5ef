@@ -306,7 +306,7 @@ export default function ShortReels() {
                   {video.user?.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
                 </button>
                 {video.content && !video.content.startsWith("__GOODAPP_LONG__") && (
-                  <p className="text-white text-[13px] leading-[18px] line-clamp-2 drop-shadow-lg">{video.content}</p>
+                  <ReelsCaption text={video.content} />
                 )}
               </div>
 
