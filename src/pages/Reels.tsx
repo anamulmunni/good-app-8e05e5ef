@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User, Image as ImageIcon, Copy, ExternalLink, Mic } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User, Image as ImageIcon, Copy, ExternalLink, Mic, Clock, History } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
@@ -128,6 +128,97 @@ function isYouTubeEmbed(url: string) {
   return url.includes("youtube.com/embed/");
 }
 
+// ── Search History ──────────────────────────────────────────────────────
+const SEARCH_HISTORY_KEY = "goodapp-search-history-v1";
+const MAX_SEARCH_HISTORY = 15;
+
+function readSearchHistory(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((s: any) => typeof s === "string" && s.trim()) : [];
+  } catch { return []; }
+}
+
+function saveSearchHistory(query: string): void {
+  if (typeof window === "undefined" || !query.trim()) return;
+  try {
+    const existing = readSearchHistory();
+    const deduped = [query.trim(), ...existing.filter(s => s.toLowerCase() !== query.trim().toLowerCase())].slice(0, MAX_SEARCH_HISTORY);
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(deduped));
+  } catch {}
+}
+
+function removeSearchHistoryItem(query: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = readSearchHistory();
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(existing.filter(s => s.toLowerCase() !== query.toLowerCase())));
+  } catch {}
+}
+
+// ── Watch History ──────────────────────────────────────────────────────
+const WATCH_HISTORY_KEY = "goodapp-watch-history-v1";
+const MAX_WATCH_HISTORY = 30;
+
+type WatchHistoryItem = {
+  id: string;
+  title: string;
+  thumbnail_url?: string | null;
+  creator?: string | null;
+  video_url: string;
+  duration?: number;
+  isExternal: boolean;
+  watchedAt: number;
+  uploader_user_id?: number | null;
+  uploader_guest_id?: string | null;
+  uploader_avatar_url?: string | null;
+  uploader_is_verified_badge?: boolean;
+  local_post_id?: string;
+  watch_url?: string;
+  likes_count?: number;
+  comments_count?: number;
+};
+
+function readWatchHistory(): WatchHistoryItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(WATCH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function saveToWatchHistory(video: VideoItem): void {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = readWatchHistory();
+    const item: WatchHistoryItem = {
+      id: video.id,
+      title: video.title,
+      thumbnail_url: video.thumbnail_url,
+      creator: video.creator,
+      video_url: video.video_url,
+      duration: video.duration,
+      isExternal: video.isExternal,
+      watchedAt: Date.now(),
+      uploader_user_id: video.uploader_user_id,
+      uploader_guest_id: video.uploader_guest_id,
+      uploader_avatar_url: video.uploader_avatar_url,
+      uploader_is_verified_badge: video.uploader_is_verified_badge,
+      local_post_id: video.local_post_id,
+      watch_url: video.watch_url,
+      likes_count: video.likes_count,
+      comments_count: video.comments_count,
+    };
+    const deduped = [item, ...existing.filter(h => h.id !== video.id)].slice(0, MAX_WATCH_HISTORY);
+    window.localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(deduped));
+  } catch {}
+}
+
 const EXTERNAL_PAGE_WINDOW = 8;
 
 function normalizeExternalPage(raw: number): number {
@@ -184,6 +275,8 @@ export default function Reels() {
   const [searchMode, setSearchMode] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [selectedChip, setSelectedChip] = useState("All");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -381,6 +474,8 @@ export default function Reels() {
 
   useEffect(() => {
     if (user) markReelsSeen(user.id);
+    setWatchHistory(readWatchHistory());
+    setSearchHistory(readSearchHistory());
   }, [user]);
 
   const activeQuery = useMemo(() => {
@@ -562,24 +657,37 @@ export default function Reels() {
   const handleSearch = useCallback(() => {
     const q = searchInput.trim();
     setSearchQuery(q);
-    if (q) setSelectedChip("All");
+    if (q) {
+      setSelectedChip("All");
+      saveSearchHistory(q);
+      setSearchHistory(readSearchHistory());
+    }
     setSearchMode(false);
+    // Scroll to top after search
+    setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
   }, [searchInput]);
 
   const handleChip = useCallback((chip: string) => {
     setSelectedChip(chip);
     setSearchQuery("");
     setSearchInput("");
+    setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
   }, []);
 
   const playVideo = useCallback((v: VideoItem) => {
     trackVideoPreference({ title: v.title });
+    saveToWatchHistory(v);
+    setWatchHistory(readWatchHistory());
     setSelectedVideo(v);
     setMiniPlayer(false);
-    setTimeout(() => playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setTimeout(() => {
+      playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }, 50);
   }, []);
 
   const openSearch = useCallback(() => {
+    setSearchHistory(readSearchHistory());
     setSearchMode(true);
     setTimeout(() => searchRef.current?.focus(), 100);
   }, []);
@@ -640,6 +748,7 @@ export default function Reels() {
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#0f0f0f", color: "#fff" }}>
       <header className="sticky top-0 z-20" style={{ background: "#0f0f0f" }}>
         {searchMode ? (
+          <>
           <div className="flex items-center gap-2 px-2 py-2">
             <button onClick={() => setSearchMode(false)} className="h-10 w-10 shrink-0 grid place-items-center">
               <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
@@ -687,6 +796,53 @@ export default function Reels() {
               <Search className="w-5 h-5" style={{ color: "#fff" }} />
             </button>
           </div>
+          {/* Search history dropdown */}
+          {searchHistory.length > 0 && (
+            <div className="px-2 pb-2 space-y-0.5" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <span className="text-[13px] font-medium" style={{ color: "#aaa" }}>সার্চ হিস্ট্রি</span>
+                <button
+                  onClick={() => {
+                    window.localStorage.removeItem(SEARCH_HISTORY_KEY);
+                    setSearchHistory([]);
+                  }}
+                  className="text-[11px] px-2 py-1 rounded"
+                  style={{ color: "#3ea6ff" }}
+                >
+                  Clear all
+                </button>
+              </div>
+              {searchHistory.map((q) => (
+                <div key={q} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
+                  <History className="w-4 h-4 shrink-0" style={{ color: "#717171" }} />
+                  <button
+                    className="flex-1 text-left text-[14px] truncate"
+                    style={{ color: "#f1f1f1" }}
+                    onClick={() => {
+                      setSearchInput(q);
+                      setSearchQuery(q);
+                      setSelectedChip("All");
+                      setSearchMode(false);
+                      saveSearchHistory(q);
+                      setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
+                    }}
+                  >
+                    {q}
+                  </button>
+                  <button
+                    onClick={() => {
+                      removeSearchHistoryItem(q);
+                      setSearchHistory(readSearchHistory());
+                    }}
+                    className="shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          </>
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1">
@@ -1265,6 +1421,57 @@ export default function Reels() {
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
               {searchQuery.trim() ? `No search results for "${searchQuery.trim()}"` : "নতুন বাংলা HD গান লোড হচ্ছে..."}
+            </div>
+          )}
+
+          {/* Watch History Section - show when no video is selected and not searching */}
+          {!selectedVideo && !searchQuery.trim() && watchHistory.length > 0 && (
+            <div className="px-3 py-3" style={{ borderBottom: "1px solid #272727" }}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <Clock className="w-4 h-4" style={{ color: "#aaa" }} />
+                <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>সম্প্রতি দেখা হয়েছে</span>
+              </div>
+              <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+                {watchHistory.slice(0, 10).map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => playVideo({
+                      id: h.id,
+                      title: h.title,
+                      video_url: h.video_url,
+                      watch_url: h.watch_url,
+                      thumbnail_url: h.thumbnail_url,
+                      creator: h.creator,
+                      duration: h.duration,
+                      isExternal: h.isExternal,
+                      uploader_user_id: h.uploader_user_id,
+                      uploader_guest_id: h.uploader_guest_id,
+                      uploader_avatar_url: h.uploader_avatar_url,
+                      uploader_is_verified_badge: h.uploader_is_verified_badge,
+                      local_post_id: h.local_post_id,
+                      likes_count: h.likes_count,
+                      comments_count: h.comments_count,
+                    })}
+                    className="shrink-0 w-[150px] text-left"
+                  >
+                    <div className="w-full aspect-video rounded-lg overflow-hidden relative" style={{ background: "#1a1a1a" }}>
+                      {h.thumbnail_url ? (
+                        <img src={h.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center"><Play className="w-6 h-6" style={{ color: "#555" }} /></div>
+                      )}
+                      {h.duration ? (
+                        <span className="absolute right-1 bottom-1 text-[9px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
+                          {fmt(h.duration)}
+                        </span>
+                      ) : null}
+                      <div className="absolute inset-0 bg-black/20" />
+                    </div>
+                    <p className="text-[11px] font-medium line-clamp-2 mt-1.5 leading-[14px]" style={{ color: "#f1f1f1" }}>{h.title}</p>
+                    <p className="text-[10px] mt-0.5 line-clamp-1" style={{ color: "#aaa" }}>{h.creator || "Unknown"}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
