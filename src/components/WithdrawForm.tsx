@@ -19,7 +19,8 @@ export function WithdrawForm({ balance }: { balance: number }) {
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
-    refetchInterval: 5000,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
   const minWithdraw = publicSettings?.minWithdraw || 50;
   const withdrawLockRemainingMs = getRemainingMilliseconds(publicSettings?.withdrawLockUntil, nowMs);

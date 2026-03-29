@@ -95,14 +95,14 @@ export default function Chat() {
     queryKey: ["conversations", user?.id],
     queryFn: () => getUserConversations(user!.id),
     enabled: !!user,
-    refetchInterval: 2000,
+    refetchInterval: 8000,
   });
 
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", activeConversation?.id],
     queryFn: () => getMessages(activeConversation!.id, user?.id, 200),
     enabled: !!activeConversation,
-    refetchInterval: 1200,
+    refetchInterval: 5000,
   });
 
   const { data: searchResults = [] } = useQuery({
@@ -122,7 +122,7 @@ export default function Chat() {
     queryKey: ["unread-counts-per-convo", user?.id, conversations.map(c => c.id).join(",")],
     queryFn: () => getUnreadCountsPerConversation(user!.id, conversations.map(c => c.id)),
     enabled: !!user && conversations.length > 0,
-    refetchInterval: 3000,
+    refetchInterval: 10000,
   });
 
   const orderedConversations = [...conversations].sort((a, b) => {
