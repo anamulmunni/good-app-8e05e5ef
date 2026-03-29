@@ -761,7 +761,20 @@ export default function Reels() {
               <input
                 ref={searchRef}
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchInput(val);
+                  // Fetch YouTube suggestions with debounce
+                  if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+                  if (val.trim().length >= 2) {
+                    suggestTimerRef.current = setTimeout(async () => {
+                      const suggestions = await fetchYouTubeSuggestions(val.trim());
+                      setYtSuggestions(suggestions);
+                    }, 300);
+                  } else {
+                    setYtSuggestions([]);
+                  }
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="Search good-app"
                 className="w-full h-10 rounded-full px-4 pr-20 text-sm outline-none"
