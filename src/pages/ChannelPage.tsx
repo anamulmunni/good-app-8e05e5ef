@@ -11,7 +11,7 @@ import {
   type ChannelStats,
   type ExternalReelVideo,
 } from "@/lib/feed-api";
-import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 function parseLongVideoMeta(content?: string | null): { title: string; duration?: number } | null {
