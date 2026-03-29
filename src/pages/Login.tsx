@@ -312,13 +312,20 @@ export default function Login() {
                     className="input-field text-base py-3.5"
                   />
                 </div>
-                <button
+                <motion.button
                   type="submit"
                   disabled={isSubmitting || !phone || !password}
                   className="btn-primary py-3.5 text-base w-full"
+                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.01 }}
                 >
-                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <>লগইন করুন <ArrowRight className="w-5 h-5" /></>}
-                </button>
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <motion.span className="inline-flex items-center gap-2"
+                      initial={false} animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}>
+                      লগইন করুন <ArrowRight className="w-5 h-5" />
+                    </motion.span>
+                  )}
+                </motion.button>
               </motion.form>
             ) : (
               <motion.form
