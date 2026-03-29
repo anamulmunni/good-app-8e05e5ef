@@ -177,7 +177,22 @@
 
 @keyframes btn-shine {
   0% { left: -100%; }
-  60%, 100% { left: 100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow: 
+      0 4px 15px -3px hsl(152 56% 38% / 0.5),
+      0 0 25px -5px hsl(152 56% 38% / 0.25);
+  }
+  50% {
+    box-shadow: 
+      0 4px 20px -3px hsl(152 56% 38% / 0.7),
+      0 0 40px -5px hsl(152 56% 38% / 0.4),
+      0 0 60px -10px hsl(152 56% 38% / 0.2);
+  }
 }
 
 @keyframes loading-bar {
