@@ -415,13 +415,20 @@ export default function Feed() {
   };
 
   const handleStorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setStoryEditorFile(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (files.length === 1) {
+      setStoryEditorFile(files[0]);
+    } else {
+      // Multi-file: upload all directly (max 5)
+      const fileArr = Array.from(files).slice(0, 5);
+      storyMutation.mutate({ files: fileArr });
+    }
     if (e.target) e.target.value = "";
   };
 
   const handleStoryPublish = (editedFile: File, musicName?: string) => {
-    storyMutation.mutate({ file: editedFile, musicName });
+    storyMutation.mutate({ files: [editedFile], musicName });
     setStoryEditorFile(null);
   };
 
