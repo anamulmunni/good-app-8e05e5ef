@@ -5,6 +5,7 @@ import {
   getAllUsers, getAllTransactions, getPublicSettings, getPoolStats,
   getSubmittedNumbers, getResetHistory, getPaymentUsers,
   toggleBlockUser, updateUserBalance, resetUserKeyCount,
+  updateUserVerifiedBadge,
   updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
   addResetHistory, recalculateAllBalances, resetAllBalances,
@@ -153,6 +154,15 @@ export default function AdminPanel() {
       }
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-users"] }); queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] }); toast({ title: "কাউন্ট রিসেট হয়েছে" }); },
+  });
+
+  const verifiedBadgeMutation = useMutation({
+    mutationFn: ({ id, isVerifiedBadge }: { id: number; isVerifiedBadge: boolean }) => updateUserVerifiedBadge(id, isVerifiedBadge),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
+      toast({ title: "ভেরিফাইড ব্যাজ আপডেট হয়েছে" });
+    },
   });
 
   const rateMutation = useMutation({
@@ -884,6 +894,13 @@ export default function AdminPanel() {
                       {u.email && <p className="text-[10px] text-muted-foreground">Email: {u.email}</p>}
                     </div>
                     <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => verifiedBadgeMutation.mutate({ id: u.id, isVerifiedBadge: !(u as any).is_verified_badge })}
+                        className={`p-1.5 rounded-lg transition-colors ${(u as any).is_verified_badge ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}
+                        title="Verified badge"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                      </button>
                       <button onClick={() => blockMutation.mutate({ id: u.id, isBlocked: !u.is_blocked })}
                         className={`p-1.5 rounded-lg transition-colors ${u.is_blocked ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"}`}>
                         {u.is_blocked ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}

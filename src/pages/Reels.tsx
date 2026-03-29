@@ -3,10 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import {
   createLongVideoUpload,
   getBangladeshExternalVideos,
+  getChannelStats,
+  getLocalVideoEngagement,
   getUploadedLongVideos,
+  toggleChannelSubscription,
   trackVideoPreference,
   type ExternalReelVideo,
   markReelsSeen,
@@ -21,6 +25,13 @@ type VideoItem = {
   creator?: string | null;
   duration?: number;
   isExternal: boolean;
+  uploader_user_id?: number | null;
+  uploader_guest_id?: string | null;
+  uploader_avatar_url?: string | null;
+  uploader_is_verified_badge?: boolean;
+  local_post_id?: string;
+  likes_count?: number;
+  comments_count?: number;
 };
 
 const CHIPS = [
@@ -157,6 +168,10 @@ export default function Reels() {
   const [longVideoFile, setLongVideoFile] = useState<File | null>(null);
   const [longVideoPreview, setLongVideoPreview] = useState<string | null>(null);
   const [longVideoDuration, setLongVideoDuration] = useState<number | undefined>(undefined);
+  const [channelStats, setChannelStats] = useState<{ subscriber_count: number; total_videos: number; is_subscribed: boolean } | null>(null);
+  const [channelLoading, setChannelLoading] = useState(false);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [engagementStats, setEngagementStats] = useState<{ likes_count: number; comments_count: number } | null>(null);
 
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -215,6 +230,29 @@ export default function Reels() {
     setShowYoutubeTapToPlay(isYoutubeSelected);
     stopYoutubeCommandLoop();
   }, [selectedVideo, stopYoutubeCommandLoop]);
+
+  useEffect(() => {
+    const channelUserId = selectedVideo?.uploader_user_id;
+    if (!channelUserId || !user) {
+      setChannelStats(null);
+      return;
+    }
+
+    setChannelLoading(true);
+    getChannelStats(channelUserId, user.id)
+      .then(setChannelStats)
+      .finally(() => setChannelLoading(false));
+  }, [selectedVideo?.uploader_user_id, user]);
+
+  useEffect(() => {
+    const postId = selectedVideo?.local_post_id;
+    if (!postId) {
+      setEngagementStats(null);
+      return;
+    }
+
+    getLocalVideoEngagement(postId).then(setEngagementStats);
+  }, [selectedVideo?.local_post_id]);
 
   useEffect(() => {
     return () => {
@@ -326,6 +364,13 @@ export default function Reels() {
       creator: v.creator || "",
       duration: v.duration,
       isExternal: v.source !== "good-app",
+      uploader_user_id: v.uploader_user_id,
+      uploader_guest_id: v.uploader_guest_id,
+      uploader_avatar_url: v.uploader_avatar_url,
+      uploader_is_verified_badge: v.uploader_is_verified_badge,
+      local_post_id: v.local_post_id,
+      likes_count: v.likes_count,
+      comments_count: v.comments_count,
     }));
   }, [extVideos]);
 
@@ -448,6 +493,18 @@ export default function Reels() {
       console.warn("Fullscreen request failed", error);
     }
   }, []);
+
+  const handleSubscribe = useCallback(async () => {
+    if (!user || !selectedVideo?.uploader_user_id || selectedVideo.uploader_user_id === user.id) return;
+    setSubscribeLoading(true);
+    try {
+      await toggleChannelSubscription(user.id, selectedVideo.uploader_user_id);
+      const stats = await getChannelStats(selectedVideo.uploader_user_id, user.id);
+      setChannelStats(stats);
+    } finally {
+      setSubscribeLoading(false);
+    }
+  }, [selectedVideo?.uploader_user_id, user]);
 
   if (isLoading || !user) return null;
 
@@ -600,9 +657,51 @@ export default function Reels() {
             <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
               {selectedVideo.title}
             </h2>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => selectedVideo.uploader_user_id && navigate(`/user/${selectedVideo.uploader_user_id}`)}
+                className="flex items-center gap-2 min-w-0"
+                disabled={!selectedVideo.uploader_user_id}
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden" style={{ background: "#272727" }}>
+                  {selectedVideo.uploader_avatar_url ? (
+                    <img src={selectedVideo.uploader_avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-xs font-bold" style={{ color: "#aaa" }}>
+                      {(selectedVideo.creator || "?")[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 text-left">
+                  <p className="text-[13px] font-semibold truncate flex items-center gap-1" style={{ color: "#f1f1f1" }}>
+                    <span>{selectedVideo.creator || selectedVideo.uploader_guest_id || "Unknown"}</span>
+                    {selectedVideo.uploader_is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+                  </p>
+                  <p className="text-[11px]" style={{ color: "#aaa" }}>
+                    {channelLoading ? "Loading..." : `${channelStats?.subscriber_count || 0} subscribers • ${channelStats?.total_videos || 0} videos`}
+                  </p>
+                </div>
+              </button>
+              {selectedVideo.uploader_user_id && selectedVideo.uploader_user_id !== user.id && (
+                <button
+                  onClick={handleSubscribe}
+                  disabled={subscribeLoading}
+                  className="px-3 py-1.5 rounded-full text-[12px] font-semibold"
+                  style={channelStats?.is_subscribed ? { background: "#272727", color: "#f1f1f1" } : { background: "#ff0000", color: "#fff" }}
+                >
+                  {subscribeLoading ? "..." : channelStats?.is_subscribed ? "Subscribed" : "Subscribe"}
+                </button>
+              )}
+            </div>
             <p className="text-[12px] mt-1.5" style={{ color: "#aaa" }}>
-              {selectedVideo.creator || "Unknown"} • {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
+              {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
             </p>
+            {selectedVideo.local_post_id && (
+              <p className="text-[12px] mt-1" style={{ color: "#aaa" }}>
+                👍 {engagementStats?.likes_count ?? selectedVideo.likes_count ?? 0} • 💬 {engagementStats?.comments_count ?? selectedVideo.comments_count ?? 0}
+              </p>
+            )}
           </div>
           <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
             <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>

@@ -5,6 +5,7 @@ export type User = {
   id: number;
   guest_id: string;
   display_name: string | null;
+  is_verified_badge: boolean;
   balance: number;
   key_count: number;
   is_blocked: boolean;
@@ -296,6 +297,10 @@ export async function getAllUsers(): Promise<User[]> {
 
 export async function toggleBlockUser(userId: number, isBlocked: boolean) {
   await supabase.from("users").update({ is_blocked: isBlocked }).eq("id", userId);
+}
+
+export async function updateUserVerifiedBadge(userId: number, isVerifiedBadge: boolean) {
+  await supabase.from("users").update({ is_verified_badge: isVerifiedBadge }).eq("id", userId);
 }
 
 export async function updateUserBalance(userId: number, balance: number) {

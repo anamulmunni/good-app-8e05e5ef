@@ -9,7 +9,7 @@ export type Post = {
   likes_count: number;
   comments_count: number;
   created_at: string | null;
-  user?: { display_name: string | null; avatar_url: string | null; guest_id: string };
+  user?: { display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
 };
 
 export type PostComment = {
@@ -22,7 +22,7 @@ export type PostComment = {
   likes_count?: number;
   liked_by_me?: boolean;
   replies?: PostComment[];
-  user?: { display_name: string | null; avatar_url: string | null; guest_id: string };
+  user?: { display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
 };
 
 export type Story = {
@@ -31,7 +31,7 @@ export type Story = {
   image_url: string;
   created_at: string | null;
   expires_at: string | null;
-  user?: { display_name: string | null; avatar_url: string | null; guest_id: string };
+  user?: { display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
 };
 
 export type Reaction = {
@@ -55,6 +55,19 @@ export type ExternalReelVideo = {
   category?: string;
   country?: string | null;
   created_at?: string | null;
+  local_post_id?: string;
+  uploader_user_id?: number | null;
+  uploader_guest_id?: string | null;
+  uploader_avatar_url?: string | null;
+  uploader_is_verified_badge?: boolean;
+  likes_count?: number;
+  comments_count?: number;
+};
+
+export type ChannelStats = {
+  subscriber_count: number;
+  total_videos: number;
+  is_subscribed: boolean;
 };
 
 export const LONG_VIDEO_MARKER = "__GOODAPP_LONG__::";
@@ -699,7 +712,7 @@ export async function getUploadedLongVideos(
   const from = Math.max(0, (page - 1) * rows);
   const to = from + rows - 1;
 
-  let query = (supabase.from("posts").select("id,user_id,video_url,content,created_at", { count: "exact" }) as any)
+  let query = (supabase.from("posts").select("id,user_id,video_url,content,created_at,likes_count,comments_count", { count: "exact" }) as any)
     .not("video_url", "is", null)
     .like("content", `${LONG_VIDEO_MARKER}%`)
     .order("created_at", { ascending: false })
@@ -713,22 +726,30 @@ export async function getUploadedLongVideos(
   if (!posts || posts.length === 0) return { videos: [], hasMore: false };
 
   const userIds = [...new Set(posts.map((p: any) => p.user_id))];
-  const { data: users } = await (supabase.from("users").select("id, display_name") as any).in("id", userIds);
-  const userMap: Record<number, string> = {};
-  (users || []).forEach((u: any) => { userMap[u.id] = u.display_name || "Unknown"; });
+  const { data: users } = await (supabase.from("users").select("id, display_name, guest_id, avatar_url, is_verified_badge") as any).in("id", userIds);
+  const userMap: Record<number, any> = {};
+  (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
   const videos: ExternalReelVideo[] = posts.map((p: any) => {
     const parsed = parseLongVideoMeta(p.content);
+    const owner = userMap[p.user_id];
     return {
       id: `local-${p.id}`,
       title: parsed?.title || "Long video",
       source: "good-app",
       video_url: p.video_url,
-      creator: userMap[p.user_id] || "Unknown",
+      creator: owner?.display_name || owner?.guest_id || "Unknown",
       duration: parsed?.duration,
       created_at: p.created_at,
       category: "music",
       country: "BD",
+      local_post_id: p.id,
+      uploader_user_id: p.user_id,
+      uploader_guest_id: owner?.guest_id || null,
+      uploader_avatar_url: owner?.avatar_url || null,
+      uploader_is_verified_badge: Boolean(owner?.is_verified_badge),
+      likes_count: Number(p.likes_count || 0),
+      comments_count: Number(p.comments_count || 0),
     };
   });
 
@@ -842,6 +863,65 @@ export async function getBangladeshExternalVideos(
   };
 }
 
+export async function getChannelStats(channelUserId: number, currentUserId?: number): Promise<ChannelStats> {
+  const [{ count: subscriberCount }, { count: totalVideos }] = await Promise.all([
+    (supabase.from("channel_subscriptions").select("id", { count: "exact", head: true }) as any)
+      .eq("channel_user_id", channelUserId),
+    (supabase.from("posts").select("id", { count: "exact", head: true }) as any)
+      .eq("user_id", channelUserId)
+      .like("content", `${LONG_VIDEO_MARKER}%`),
+  ]);
+
+  let isSubscribed = false;
+  if (currentUserId && currentUserId !== channelUserId) {
+    const { data } = await (supabase.from("channel_subscriptions").select("id") as any)
+      .eq("subscriber_user_id", currentUserId)
+      .eq("channel_user_id", channelUserId)
+      .limit(1);
+    isSubscribed = !!(data && data.length > 0);
+  }
+
+  return {
+    subscriber_count: subscriberCount || 0,
+    total_videos: totalVideos || 0,
+    is_subscribed: isSubscribed,
+  };
+}
+
+export async function toggleChannelSubscription(subscriberUserId: number, channelUserId: number): Promise<boolean> {
+  if (subscriberUserId === channelUserId) return false;
+
+  const { data: existing } = await (supabase.from("channel_subscriptions").select("id") as any)
+    .eq("subscriber_user_id", subscriberUserId)
+    .eq("channel_user_id", channelUserId)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    await (supabase.from("channel_subscriptions").delete() as any)
+      .eq("subscriber_user_id", subscriberUserId)
+      .eq("channel_user_id", channelUserId);
+    return false;
+  }
+
+  await (supabase.from("channel_subscriptions").insert({
+    subscriber_user_id: subscriberUserId,
+    channel_user_id: channelUserId,
+  } as any) as any);
+
+  return true;
+}
+
+export async function getLocalVideoEngagement(postId: string): Promise<{ likes_count: number; comments_count: number }> {
+  const { data } = await (supabase.from("posts").select("likes_count, comments_count") as any)
+    .eq("id", postId)
+    .single();
+
+  return {
+    likes_count: Number(data?.likes_count || 0),
+    comments_count: Number(data?.comments_count || 0),
+  };
+}
+
 // Check if user has posted at least once
 export async function hasUserPosted(userId: number): Promise<boolean> {
   const { count } = await supabase
@@ -861,7 +941,7 @@ export async function getFeedPosts(limit = 30, searchQuery?: string): Promise<Po
   if (!posts || posts.length === 0) return [];
 
   const userIds = [...new Set(posts.map((p: any) => p.user_id))];
-  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id") as any).in("id", userIds);
+  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, is_verified_badge") as any).in("id", userIds);
 
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
@@ -906,19 +986,31 @@ export async function toggleReaction(postId: string, userId: number, reactionTyp
     await (supabase.from("post_reactions").delete() as any).in("id", idsToDelete);
   }
 
+  let reacted = false;
+
   if (existing) {
     if (existing.reaction_type === reactionType) {
       await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
-      return { reacted: false, type: reactionType };
+      reacted = false;
     } else {
       await (supabase.from("post_reactions").delete() as any).eq("id", existing.id);
       await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
-      return { reacted: true, type: reactionType };
+      reacted = true;
     }
   } else {
     await (supabase.from("post_reactions").insert({ post_id: postId, user_id: userId, reaction_type: reactionType } as any) as any);
-    return { reacted: true, type: reactionType };
+    reacted = true;
   }
+
+  try {
+    const { count } = await (supabase.from("post_reactions").select("id", { count: "exact", head: true }) as any)
+      .eq("post_id", postId);
+    await (supabase.from("posts").update({ likes_count: count || 0 } as any).eq("id", postId) as any);
+  } catch {
+    // no-op
+  }
+
+  return { reacted, type: reactionType };
 }
 
 // Also keep old toggleLike for backward compat
@@ -960,7 +1052,7 @@ export async function getPostComments(postId: string, currentUserId?: number): P
   if (!comments || comments.length === 0) return [];
 
   const userIds = [...new Set(comments.map((c: any) => c.user_id))];
-  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id") as any).in("id", userIds);
+  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, is_verified_badge") as any).in("id", userIds);
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
@@ -1066,7 +1158,7 @@ export async function getNotifications(userId: number, limit = 50): Promise<any[
   const fromIds = [...new Set(data.map((n: any) => n.from_user_id).filter(Boolean))];
   const userMap: Record<number, any> = {};
   if (fromIds.length > 0) {
-    const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url") as any).in("id", fromIds);
+    const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, is_verified_badge") as any).in("id", fromIds);
     (users || []).forEach((u: any) => { userMap[u.id] = u; });
   }
 
@@ -1109,7 +1201,7 @@ export async function getActiveStories(): Promise<Story[]> {
   if (!stories || stories.length === 0) return [];
 
   const userIds = [...new Set(stories.map((s: any) => s.user_id))];
-  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id") as any).in("id", userIds);
+  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, is_verified_badge") as any).in("id", userIds);
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
@@ -1149,7 +1241,7 @@ export async function deleteStory(storyId: string, userId: number): Promise<void
 
 // Search/suggest users
 export async function searchFeedUsers(query: string) {
-  const { data } = await (supabase.from("users").select("id, guest_id, display_name, avatar_url") as any)
+  const { data } = await (supabase.from("users").select("id, guest_id, display_name, avatar_url, is_verified_badge") as any)
     .or(`guest_id.ilike.%${query}%,display_name.ilike.%${query}%`)
     .limit(8);
   return data || [];
@@ -1170,6 +1262,6 @@ export async function getSuggestedUsers(currentUserId: number, limit = 5) {
   const topIds = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, limit).map(e => parseInt(e[0]));
 
   if (topIds.length === 0) return [];
-  const { data: users } = await (supabase.from("users").select("id, guest_id, display_name, avatar_url") as any).in("id", topIds);
+  const { data: users } = await (supabase.from("users").select("id, guest_id, display_name, avatar_url, is_verified_badge") as any).in("id", topIds);
   return users || [];
 }

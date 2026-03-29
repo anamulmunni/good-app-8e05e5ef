@@ -6,8 +6,8 @@ export type FriendRequest = {
   receiver_id: number;
   status: string;
   created_at: string | null;
-  sender?: { id: number; display_name: string | null; avatar_url: string | null; guest_id: string };
-  receiver?: { id: number; display_name: string | null; avatar_url: string | null; guest_id: string };
+  sender?: { id: number; display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
+  receiver?: { id: number; display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
 };
 
 // Send friend request
@@ -37,7 +37,7 @@ export async function getReceivedRequests(userId: number): Promise<FriendRequest
   if (!requests || requests.length === 0) return [];
 
   const senderIds = requests.map((r: any) => r.sender_id);
-  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id") as any).in("id", senderIds);
+  const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, is_verified_badge") as any).in("id", senderIds);
   const userMap: Record<number, any> = {};
   (users || []).forEach((u: any) => { userMap[u.id] = u; });
 
@@ -84,7 +84,7 @@ export async function getSuggestedPeople(userId: number, limit = 6): Promise<any
     excludeIds.add(r.receiver_id);
   });
 
-  const { data: allUsers } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, cover_url") as any)
+  const { data: allUsers } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, cover_url, is_verified_badge") as any)
     .neq("id", userId)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -97,7 +97,7 @@ export async function getSuggestedPeople(userId: number, limit = 6): Promise<any
 
 // Get ALL users with friendship status for Friends tab
 export async function getAllUsersWithStatus(userId: number): Promise<any[]> {
-  const { data: allUsers } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, cover_url") as any)
+  const { data: allUsers } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, cover_url, is_verified_badge") as any)
     .neq("id", userId)
     .order("created_at", { ascending: false });
 
