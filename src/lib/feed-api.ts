@@ -356,6 +356,29 @@ export function trackVideoPreference(input: { title?: string; category?: string 
 
 // ── YouTube search via Edge Function proxy ──────────────────────────────
 
+export async function fetchYouTubeSuggestions(query: string): Promise<string[]> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !query.trim()) return [];
+
+  try {
+    const params = new URLSearchParams({ action: "suggest", q: query.trim() });
+    const url = `${supabaseUrl}/functions/v1/youtube-search?${params}`;
+    const res = await fetch(url, {
+      headers: {
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.suggestions) ? data.suggestions : [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchYouTubeViaEdge(query: string, action = "search", order = "relevance", maxResults = 25): Promise<any[]> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
