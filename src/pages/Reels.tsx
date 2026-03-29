@@ -18,7 +18,7 @@ import {
   uploadPostMedia,
   getPostComments,
   addComment,
-  toggleLike,
+  toggleReaction,
   type PostComment,
 } from "@/lib/feed-api";
 
@@ -183,6 +183,7 @@ export default function Reels() {
   const [commentText, setCommentText] = useState("");
   const [commentSending, setCommentSending] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [disliked, setDisliked] = useState(false);
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -263,6 +264,11 @@ export default function Reels() {
 
     getLocalVideoEngagement(postId).then(setEngagementStats);
   }, [selectedVideo?.local_post_id]);
+
+  useEffect(() => {
+    setLiked(false);
+    setDisliked(false);
+  }, [selectedVideo?.id]);
 
   useEffect(() => {
     return () => {
@@ -575,6 +581,25 @@ export default function Reels() {
                   <User className="w-5 h-5" style={{ color: "#fff" }} />
                 )}
               </button>
+              <button
+                onClick={async () => {
+                  const channelUrl = `${window.location.origin}/channel/${user.id}`;
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({ title: "My channel", url: channelUrl });
+                    } else {
+                      await navigator.clipboard.writeText(channelUrl);
+                      alert("Channel link copied");
+                    }
+                  } catch {
+                    // user cancelled share
+                  }
+                }}
+                className="h-10 w-10 grid place-items-center rounded-full"
+                title="Share my channel"
+              >
+                <Share2 className="w-5 h-5" style={{ color: "#fff" }} />
+              </button>
               <button className="h-10 w-10 grid place-items-center rounded-full relative">
                 <Bell className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
@@ -682,20 +707,34 @@ export default function Reels() {
           <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto scrollbar-hide" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
             <button
               onClick={async () => {
-                if (selectedVideo.local_post_id && user) {
-                  const result = await toggleLike(selectedVideo.local_post_id, user.id);
-                  setLiked(result);
-                  const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
-                  setEngagementStats(stats);
-                }
+                if (!selectedVideo.local_post_id || !user) return;
+                const result = await toggleReaction(selectedVideo.local_post_id, user.id, "like");
+                setLiked(result.reacted);
+                setDisliked(false);
+                const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
+                setEngagementStats(stats);
               }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
               style={{ background: "#272727", color: liked ? "#3ea6ff" : "#f1f1f1" }}
             >
               <ThumbsUp className="w-5 h-5" />
               <span>{engagementStats?.likes_count ?? selectedVideo.likes_count ?? 0}</span>
-              <div className="w-px h-5 mx-1" style={{ background: "#555" }} />
-              <ThumbsDown className="w-5 h-5" style={{ color: "#f1f1f1" }} />
+            </button>
+
+            <button
+              onClick={async () => {
+                if (!selectedVideo.local_post_id || !user) return;
+                const result = await toggleReaction(selectedVideo.local_post_id, user.id, "dislike");
+                setDisliked(result.reacted);
+                setLiked(false);
+                const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
+                setEngagementStats(stats);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
+              style={{ background: "#272727", color: disliked ? "#3ea6ff" : "#f1f1f1" }}
+            >
+              <ThumbsDown className="w-5 h-5" />
+              <span>Dislike</span>
             </button>
 
             <button
