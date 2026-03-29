@@ -199,9 +199,18 @@ export default function ShortReels() {
     enabled: !!user,
   });
 
-  // Combine: user videos first, then YouTube shorts
+  // Randomly interleave uploaded videos among YouTube shorts
   const videos = useMemo(() => {
-    return [...userVideos, ...youtubeShorts];
+    if (userVideos.length === 0) return youtubeShorts;
+    if (youtubeShorts.length === 0) return userVideos;
+    // Spread uploaded videos randomly among YouTube shorts
+    const result: ShortVideo[] = [...youtubeShorts];
+    const shuffledUploads = [...userVideos].sort(() => Math.random() - 0.5);
+    for (const uv of shuffledUploads) {
+      const pos = Math.floor(Math.random() * (result.length + 1));
+      result.splice(pos, 0, uv);
+    }
+    return result;
   }, [userVideos, youtubeShorts]);
 
   const videosLoading = userLoading || ytLoading;
