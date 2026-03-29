@@ -93,6 +93,9 @@ export default function AdminPanel() {
   const [withdrawLockUntilSetting, setWithdrawLockUntilSetting] = useState("");
   const [requestLockUntilSetting, setRequestLockUntilSetting] = useState("");
   const [resetHistorySearch, setResetHistorySearch] = useState("");
+  const [youtubeApiKeys, setYoutubeApiKeys] = useState("");
+  const [youtubeKeysLoading, setYoutubeKeysLoading] = useState(false);
+  const [youtubeKeyStatus, setYoutubeKeyStatus] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
