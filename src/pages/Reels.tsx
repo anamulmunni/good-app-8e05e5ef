@@ -816,10 +816,13 @@ export default function Reels() {
           {/* Search suggestions - filter as user types */}
           {(() => {
             const q = searchInput.trim().toLowerCase();
-            const filtered = q
-              ? searchHistory.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
-              : searchHistory;
-            if (filtered.length === 0) return null;
+            // Show YouTube suggestions when typing, history when empty
+            const suggestions = q && ytSuggestions.length > 0
+              ? ytSuggestions.filter(s => s.toLowerCase() !== q)
+              : q
+                ? searchHistory.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+                : searchHistory;
+            if (suggestions.length === 0) return null;
             return (
               <div className="px-2 pb-2 space-y-0.5" style={{ maxHeight: "60vh", overflowY: "auto" }}>
                 <div className="flex items-center justify-between px-2 py-1.5">
@@ -837,8 +840,8 @@ export default function Reels() {
                     </button>
                   )}
                 </div>
-                {filtered.map((item) => (
-                  <div key={item} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
+                {suggestions.map((item, idx) => (
+                  <div key={`${item}-${idx}`} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "#1a1a1a" }}>
                     {q ? <Search className="w-4 h-4 shrink-0" style={{ color: "#717171" }} /> : <History className="w-4 h-4 shrink-0" style={{ color: "#717171" }} />}
                     <button
                       className="flex-1 text-left text-[14px] truncate"
@@ -849,20 +852,23 @@ export default function Reels() {
                         setSelectedChip("All");
                         setSearchMode(false);
                         saveSearchHistory(item);
+                        setYtSuggestions([]);
                         setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
                       }}
                     >
                       {item}
                     </button>
-                    <button
-                      onClick={() => {
-                        removeSearchHistoryItem(item);
-                        setSearchHistory(readSearchHistory());
-                      }}
-                      className="shrink-0"
-                    >
-                      <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
-                    </button>
+                    {!q && (
+                      <button
+                        onClick={() => {
+                          removeSearchHistoryItem(item);
+                          setSearchHistory(readSearchHistory());
+                        }}
+                        className="shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" style={{ color: "#717171" }} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
