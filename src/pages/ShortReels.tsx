@@ -11,6 +11,21 @@ import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Music, Play, P
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
+function ReelsCaption({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > 80;
+  return (
+    <div onClick={(e) => { e.stopPropagation(); if (isLong) setExpanded(!expanded); }}>
+      <p className={`text-white text-[14px] leading-[20px] drop-shadow-lg ${expanded ? "" : "line-clamp-2"}`}>
+        {text}
+      </p>
+      {isLong && !expanded && (
+        <button className="text-white/70 text-[13px] font-semibold mt-0.5">আরো দেখুন</button>
+      )}
+    </div>
+  );
+}
+
 type ShortVideo = {
   id: string;
   user_id: number;

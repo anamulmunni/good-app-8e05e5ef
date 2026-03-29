@@ -16,7 +16,7 @@ type StoryViewerProps = {
   timeAgo: (date: string | null) => string;
 };
 
-const STORY_DURATION = 5000;
+const STORY_DURATION = 30000;
 
 export default function StoryViewer({ story, allStories, userId, onClose, onDelete, onMessage, onCall, onProfile, timeAgo }: StoryViewerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
