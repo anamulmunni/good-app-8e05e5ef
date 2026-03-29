@@ -387,8 +387,7 @@ async function fetchYouTubeViaEdge(query: string, action = "search", order = "re
 function youtubeResultToExternal(item: any): ExternalReelVideo | null {
   const videoId = item?.videoId;
   if (!videoId) return null;
-  const duration = Number(item?.lengthSeconds || 0);
-  if (duration < 30) return null;
+  const duration = Number(item?.lengthSeconds || 0) || undefined;
 
   const title = String(item?.title || "YouTube Video");
   const category = inferCategoryFromTitle(title);
