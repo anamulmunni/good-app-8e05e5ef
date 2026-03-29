@@ -153,10 +153,31 @@ export function attachRemoteAudio(stream: MediaStream): HTMLAudioElement {
   return audio;
 }
 
-// WebRTC config with free STUN servers
+// WebRTC config with STUN + TURN servers for reliable connectivity on mobile networks
 export const rtcConfig: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    {
+      urls: "turn:a.relay.metered.ca:80",
+      username: "e8dd65b92c5e139eb89a53a5",
+      credential: "hJK2Rfjfi+tkWVCA",
+    },
+    {
+      urls: "turn:a.relay.metered.ca:80?transport=tcp",
+      username: "e8dd65b92c5e139eb89a53a5",
+      credential: "hJK2Rfjfi+tkWVCA",
+    },
+    {
+      urls: "turn:a.relay.metered.ca:443",
+      username: "e8dd65b92c5e139eb89a53a5",
+      credential: "hJK2Rfjfi+tkWVCA",
+    },
+    {
+      urls: "turns:a.relay.metered.ca:443",
+      username: "e8dd65b92c5e139eb89a53a5",
+      credential: "hJK2Rfjfi+tkWVCA",
+    },
   ],
+  iceTransportPolicy: "all",
 };
