@@ -448,13 +448,8 @@ async function fetchYouTubeVideos(
   }
 }
 
-// Dailymotion functions removed - YouTube only
+// Dailymotion removed - YouTube only via edge function
 
-  query: string,
-  page: number,
-  limit: number,
-  sort: "relevance" | "recent" = "relevance",
-  freshnessToken = 0,
 ) {
   const dmUrl = `https://api.dailymotion.com/videos?search=${encodeURIComponent(query)}&limit=${limit}&page=${page}&fields=id,title,thumbnail_1080_url,thumbnail_720_url,thumbnail_480_url,thumbnail_360_url,thumbnail_url,duration,owner.screenname,country&sort=${sort}&longer_than=0&_=${freshnessToken}`;
   const res = await fetch(dmUrl);
