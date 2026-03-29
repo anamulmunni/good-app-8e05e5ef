@@ -330,18 +330,18 @@ export default function Login() {
                 <motion.button
                   type="submit"
                   disabled={isSubmitting || !phone || !password}
-                  className="btn-primary py-4 text-lg w-full rounded-2xl"
-                  whileTap={{ scale: 0.95 }}
-                  whileHover={{ scale: 1.03, boxShadow: "0 8px 35px -4px hsl(152 56% 38% / 0.6)" }}
-                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className="btn-primary btn-neon-pulse py-4 text-lg w-full rounded-2xl"
+                  whileTap={{ scale: 0.93 }}
+                  whileHover={{ scale: 1.04, y: -3 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
                 >
                   {isSubmitting ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
                       <Loader2 className="w-6 h-6" />
                     </motion.div>
                   ) : (
-                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black"
-                      initial={false} animate={{ x: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.5 }}>
+                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10"
+                      initial={false} animate={{ x: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}>
                       🚀 লগইন করুন <ArrowRight className="w-5 h-5" />
                     </motion.span>
                   )}
