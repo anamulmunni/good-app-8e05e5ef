@@ -65,7 +65,7 @@ function normalizeVideo(item: any): any | null {
 async function tryInvidiousInstance(instance: string, query: string, page: number): Promise<any[]> {
   const queryPage = normalizePage(page, 7);
   const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${queryPage}&type=video&sort_by=relevance&region=BD`;
-  const res = await withTimeout(fetch(url), 3200);
+  const res = await withTimeout(fetch(url), 6000);
   if (!res.ok) return [];
   const data = await res.json();
   if (!Array.isArray(data)) return [];
