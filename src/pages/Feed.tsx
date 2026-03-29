@@ -1286,6 +1286,7 @@ export default function Feed() {
         {viewingStory && (
           <StoryViewer
             story={viewingStory}
+            allStories={storyGroups[viewingStory.user_id] || [viewingStory]}
             userId={user.id}
             onClose={() => setViewingStory(null)}
             onDelete={(id) => deleteStoryMutation.mutate(id)}
