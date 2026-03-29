@@ -296,6 +296,7 @@ export default function Reels() {
   const [longThumbnailFile, setLongThumbnailFile] = useState<File | null>(null);
   const [longThumbnailPreview, setLongThumbnailPreview] = useState<string | null>(null);
   const [channelStats, setChannelStats] = useState<{ subscriber_count: number; total_videos: number; is_subscribed: boolean } | null>(null);
+  const [showHistorySheet, setShowHistorySheet] = useState(false);
   const [channelLoading, setChannelLoading] = useState(false);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [engagementStats, setEngagementStats] = useState<{ likes_count: number; comments_count: number } | null>(null);
