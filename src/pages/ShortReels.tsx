@@ -7,7 +7,7 @@ import {
   toggleReaction, getUserReactions, getPostComments, addComment,
   type PostComment,
 } from "@/lib/feed-api";
-import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play, RefreshCw } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
