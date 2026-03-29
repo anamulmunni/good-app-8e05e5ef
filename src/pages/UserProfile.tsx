@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
