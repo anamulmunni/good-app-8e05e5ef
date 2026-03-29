@@ -1373,7 +1373,126 @@ export default function Reels() {
         )}
       </AnimatePresence>
 
-      {selectedVideo && miniPlayer && (
+      {/* Profile & Watch History Bottom Sheet */}
+      <AnimatePresence>
+        {showHistorySheet && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100]"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={() => setShowHistorySheet(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="absolute bottom-0 left-0 right-0 rounded-t-2xl flex flex-col"
+              style={{ background: "#212121", maxHeight: "80vh" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Handle bar */}
+              <div className="flex justify-center py-2">
+                <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
+              </div>
+
+              {/* Profile section */}
+              <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: "1px solid #383838" }}>
+                <div className="w-12 h-12 rounded-full overflow-hidden" style={{ background: "#383838" }}>
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-lg font-bold" style={{ color: "#aaa" }}>
+                      {(user?.display_name || "?")[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold truncate" style={{ color: "#f1f1f1" }}>{user?.display_name || user?.guest_id}</p>
+                  <button
+                    onClick={() => { setShowHistorySheet(false); navigate(`/channel/${user.id}`); }}
+                    className="text-[13px] mt-0.5"
+                    style={{ color: "#3ea6ff" }}
+                  >
+                    View your channel
+                  </button>
+                </div>
+              </div>
+
+              {/* Watch History */}
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid #383838" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="w-4.5 h-4.5" style={{ color: "#aaa" }} />
+                  <span className="text-[15px] font-semibold" style={{ color: "#f1f1f1" }}>সম্প্রতি দেখা হয়েছে</span>
+                </div>
+                {watchHistory.length === 0 ? (
+                  <p className="text-[13px] py-4 text-center" style={{ color: "#717171" }}>কোনো ভিডিও দেখা হয়নি</p>
+                ) : (
+                  <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+                    {watchHistory.slice(0, 20).map((h) => (
+                      <button
+                        key={h.id}
+                        onClick={() => {
+                          setShowHistorySheet(false);
+                          playVideo({
+                            id: h.id,
+                            title: h.title,
+                            video_url: h.video_url,
+                            watch_url: h.watch_url,
+                            thumbnail_url: h.thumbnail_url,
+                            creator: h.creator,
+                            duration: h.duration,
+                            isExternal: h.isExternal,
+                            uploader_user_id: h.uploader_user_id,
+                            uploader_guest_id: h.uploader_guest_id,
+                            uploader_avatar_url: h.uploader_avatar_url,
+                            uploader_is_verified_badge: h.uploader_is_verified_badge,
+                            local_post_id: h.local_post_id,
+                            likes_count: h.likes_count,
+                            comments_count: h.comments_count,
+                          });
+                        }}
+                        className="flex gap-3 w-full text-left"
+                      >
+                        <div className="w-[120px] h-[68px] shrink-0 rounded-lg overflow-hidden relative" style={{ background: "#1a1a1a" }}>
+                          {h.thumbnail_url ? (
+                            <img src={h.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full grid place-items-center"><Play className="w-5 h-5" style={{ color: "#555" }} /></div>
+                          )}
+                          {h.duration ? (
+                            <span className="absolute right-1 bottom-1 text-[9px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
+                              {fmt(h.duration)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1 py-0.5">
+                          <p className="text-[13px] font-medium line-clamp-2 leading-[17px]" style={{ color: "#f1f1f1" }}>{h.title}</p>
+                          <p className="text-[11px] mt-1 truncate" style={{ color: "#aaa" }}>{h.creator || "Unknown"}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Close button */}
+              <div className="px-4 py-3">
+                <button
+                  onClick={() => setShowHistorySheet(false)}
+                  className="w-full py-2.5 rounded-full text-[14px] font-medium"
+                  style={{ background: "#383838", color: "#f1f1f1" }}
+                >
+                  বন্ধ করুন
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
         <div
           className="fixed bottom-20 right-3 w-[180px] rounded-lg overflow-hidden shadow-2xl cursor-pointer z-50"
           style={{ background: "#000" }}
