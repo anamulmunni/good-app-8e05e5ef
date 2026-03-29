@@ -406,9 +406,22 @@ async function fetchYouTubeVideos(
   const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
   const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
 
-  const fetchPromises = ordered.slice(0, 6).map((q, idx) => fetchYouTubeViaEdge(q, page + (idx % 2), freshnessToken + idx * 97));
+  const pageWindow = canonical ? 4 : 6;
+  const startPage = Math.abs((freshnessToken + page * 7) % pageWindow) + 1;
+  const fetchPromises = ordered.slice(0, 8).map((q, idx) => {
+    const queryPage = ((startPage + idx - 1) % pageWindow) + 1;
+    return fetchYouTubeViaEdge(q, queryPage, freshnessToken + idx * 97 + page * 13);
+  });
   const allResults = await Promise.all(fetchPromises);
-  const results = allResults.flat();
+  let results = allResults.flat();
+
+  if (results.length < rows) {
+    const fallbackCalls = ordered
+      .slice(0, 3)
+      .map((q, idx) => fetchYouTubeViaEdge(q, 1, freshnessToken + 500 + idx * 67));
+    const fallbackResults = await Promise.all(fallbackCalls);
+    results = [...results, ...fallbackResults.flat()];
+  }
 
   const queryWords = getQueryWords(canonical);
   const normalizedQuery = normalizeForMatch(canonical);
