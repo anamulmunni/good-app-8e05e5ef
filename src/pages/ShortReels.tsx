@@ -43,14 +43,19 @@ type ShortVideo = {
 // Fetch stream URL from our edge function
 async function getYouTubeStreamUrl(videoId: string): Promise<string | null> {
   try {
+    const { data, error } = await supabase.functions.invoke("youtube-shorts", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      body: null,
+    });
+    // Use fetch directly since functions.invoke doesn't support GET params well
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     const res = await fetch(
-      `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=stream&videoId=${videoId}`,
-      { headers: { "Content-Type": "application/json" } }
+      `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=stream&videoId=${videoId}`
     );
     if (!res.ok) return null;
-    const data = await res.json();
-    return data?.streamUrl || null;
+    const result = await res.json();
+    return result?.streamUrl || null;
   } catch {
     return null;
   }
