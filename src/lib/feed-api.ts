@@ -47,7 +47,7 @@ export type ExternalReelVideo = {
   title: string;
   video_url: string;
   watch_url?: string;
-  source: "dailymotion" | "good-app";
+  source: "dailymotion" | "youtube" | "good-app";
   creator?: string | null;
   thumbnail_url?: string | null;
   video_id?: string;
@@ -198,6 +198,97 @@ function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
   return fallbackUrl || "";
 }
 
+const VIDEO_PREF_KEY = "goodapp-video-pref-v1";
+
+function inferCategoryFromTitle(title?: string): string {
+  const value = (title || "").toLowerCase();
+  if (/(romantic|love|valobasha|ভালোবাসা)/i.test(value)) return "romantic";
+  if (/(sad|breakup|virah|কষ্ট)/i.test(value)) return "sad";
+  if (/(slowed|reverb)/i.test(value)) return "slowed";
+  if (/(live|concert|stage)/i.test(value)) return "live";
+  if (/(natok|drama|movie|serial|episode)/i.test(value)) return "natok";
+  if (/(comedy|funny|হাসি)/i.test(value)) return "comedy";
+  if (/(song|music|audio|lyrics|গান|gaan|gan|album|official)/i.test(value)) return "music";
+  return "general";
+}
+
+function readVideoPreferences(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(VIDEO_PREF_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+function topPreferredCategories(limit = 3): string[] {
+  const prefs = readVideoPreferences();
+  return Object.entries(prefs)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([key]) => key);
+}
+
+function scorePreferredCategory(title: string, category?: string): number {
+  const preferred = topPreferredCategories(3);
+  if (preferred.length === 0) return 0;
+  const inferred = (category || inferCategoryFromTitle(title)).toLowerCase();
+  if (preferred.includes(inferred)) return 14;
+  const lower = title.toLowerCase();
+  if (preferred.some((item) => lower.includes(item))) return 8;
+  return 0;
+}
+
+function dedupeExternalVideos(items: ExternalReelVideo[]): ExternalReelVideo[] {
+  const seenId = new Set<string>();
+  const seenTitleCreator = new Set<string>();
+  return items.filter((video) => {
+    if (seenId.has(video.id)) return false;
+    seenId.add(video.id);
+    const titleKey = normalizeForMatch(video.title || "");
+    const creatorKey = normalizeForMatch(video.creator || "");
+    const key = `${titleKey}::${creatorKey}`;
+    if (!titleKey) return true;
+    if (seenTitleCreator.has(key)) return false;
+    seenTitleCreator.add(key);
+    return true;
+  });
+}
+
+function seededShuffle<T>(items: T[], seed = 0): T[] {
+  const arr = [...items];
+  let s = Math.abs(seed) + 1;
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    s = (s * 9301 + 49297) % 233280;
+    const j = Math.floor((s / 233280) * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+export function trackVideoPreference(input: { title?: string; category?: string | null }): void {
+  if (typeof window === "undefined") return;
+  try {
+    const prefs = readVideoPreferences();
+    const key = (input.category || inferCategoryFromTitle(input.title)).toLowerCase();
+    if (!key) return;
+
+    const next: Record<string, number> = {};
+    for (const [k, value] of Object.entries(prefs)) {
+      next[k] = Math.max(0, Math.round(value * 0.95));
+    }
+    next[key] = (next[key] || 0) + 10;
+
+    window.localStorage.setItem(VIDEO_PREF_KEY, JSON.stringify(next));
+  } catch {
+    // no-op
+  }
+}
+
 // ── YouTube search via Edge Function proxy ──────────────────────────────
 
 async function fetchYouTubeViaEdge(query: string, page = 1): Promise<any[]> {
@@ -228,17 +319,20 @@ function youtubeResultToExternal(item: any): ExternalReelVideo | null {
   const duration = Number(item?.lengthSeconds || 0);
   if (duration < 30) return null;
 
+  const title = String(item?.title || "YouTube Video");
+  const category = inferCategoryFromTitle(title);
+
   return {
     id: `yt-${videoId}`,
-    title: String(item?.title || "YouTube Video"),
-    source: "dailymotion" as const,
+    title,
+    source: "youtube",
     video_url: `https://www.youtube.com/embed/${videoId}`,
     watch_url: `https://www.youtube.com/watch?v=${videoId}`,
     creator: item?.author || null,
     thumbnail_url: item?.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     video_id: videoId,
     duration,
-    category: detectExternalCategory(String(item?.title || "")),
+    category,
     country: "BD",
   };
 }
@@ -250,9 +344,12 @@ async function fetchYouTubeVideos(
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
   const canonical = canonicalizeSearchQuery(searchQuery || "");
+  const preferredCats = topPreferredCategories(2);
+
   const queries = canonical
-    ? [canonical, `${canonical} song`, `${canonical} official video`]
+    ? [canonical, `${canonical} song`, `${canonical} official video`, `${canonical} lyrics`, `${canonical} full hd`]
     : [
+        ...preferredCats.map((cat) => `bangla ${cat} song new`),
         "bangla new song 2025",
         "bangla latest song official video",
         "bangla romantic song new",
@@ -260,54 +357,55 @@ async function fetchYouTubeVideos(
         "bangla hit song 2025",
       ];
 
-  const shift = canonical ? 0 : Math.abs(freshnessToken % queries.length);
-  const ordered = shift > 0 ? [...queries.slice(shift), ...queries.slice(0, shift)] : queries;
+  const uniqueQueries = queries.filter((q, idx, arr) => q && arr.indexOf(q) === idx);
+  const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
+  const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
 
-  // Fetch in parallel for speed
-  const fetchPromises = ordered.slice(0, 3).map((q) => fetchYouTubeViaEdge(q, page));
+  const fetchPromises = ordered.slice(0, 4).map((q) => fetchYouTubeViaEdge(q, page));
   const allResults = await Promise.all(fetchPromises);
   const results = allResults.flat();
 
-  const seen = new Set<string>();
   const queryWords = getQueryWords(canonical);
   const normalizedQuery = normalizeForMatch(canonical);
 
-  let videos = results
-    .map(youtubeResultToExternal)
-    .filter((v): v is ExternalReelVideo => {
-      if (!v) return false;
-      if (seen.has(v.id)) return false;
-      seen.add(v.id);
-      return true;
-    });
+  let videos = dedupeExternalVideos(
+    results
+      .map(youtubeResultToExternal)
+      .filter((v): v is ExternalReelVideo => Boolean(v))
+  );
 
-  // For search queries, score and sort by relevance
-  if (canonical) {
-    videos = videos
-      .map((v) => {
-        const normalizedTitle = normalizeForMatch(v.title);
-        let score = 0;
-        if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 40;
-        for (const w of queryWords) {
-          if (normalizedTitle.includes(w)) score += 8;
-        }
-        if (queryWords.every((w) => normalizedTitle.includes(w))) score += 15;
-        return { ...v, _score: score };
-      })
-      .sort((a: any, b: any) => b._score - a._score)
-      .map(({ _score, ...rest }: any) => rest);
-  } else {
-    // Default feed: prefer Bangla songs
-    videos = videos.filter((v) => {
-      const lower = v.title.toLowerCase();
-      const hasNonMusic = /(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower);
-      return !hasNonMusic;
-    });
+  if (videos.length === 0) {
+    return { videos: [], hasMore: false };
   }
 
+  videos = videos
+    .map((video) => {
+      const normalizedTitle = normalizeForMatch(video.title);
+      let score = scorePreferredCategory(video.title, video.category);
+
+      if (canonical) {
+        if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 45;
+        for (const w of queryWords) {
+          if (normalizedTitle.includes(w)) score += 10;
+        }
+        if (queryWords.length > 0 && queryWords.every((w) => normalizedTitle.includes(w))) score += 20;
+        if (isMusicIntent(canonical) && /(song|music|audio|lyrics|গান|official)/i.test(video.title)) score += 14;
+      } else {
+        if (isBanglaDefaultSuggestion(video.title, video.country)) score += 18;
+        if (hasFreshMarker(video.title)) score += 12;
+        if (hasQualityMarker(video.title)) score += 10;
+      }
+
+      return { ...video, _score: score };
+    })
+    .sort((a: any, b: any) => b._score - a._score)
+    .map(({ _score, ...rest }: any) => rest);
+
+  const varied = canonical ? videos : seededShuffle(videos, freshnessToken + page * 17);
+
   return {
-    videos: videos.slice(0, rows),
-    hasMore: results.length > rows,
+    videos: varied.slice(0, rows),
+    hasMore: varied.length > rows,
   };
 }
 
@@ -598,82 +696,69 @@ export async function getBangladeshExternalVideos(
   mode: "short" | "long" = "long",
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
-  // Try YouTube (via Invidious) first — it has the best Bangla music catalog
-  try {
-    const ytResult = await fetchYouTubeVideos(searchQuery, page, rows, freshnessToken);
-    if (ytResult.videos.length > 0) {
-      return ytResult;
-    }
-  } catch (e) {
-    console.warn("YouTube/Invidious search failed, falling back to Dailymotion:", e);
+  const trimmedQuery = searchQuery?.trim();
+  const safeRows = Math.max(rows, 12);
+
+  const [ytResult, dmResult] = await Promise.allSettled([
+    fetchYouTubeVideos(trimmedQuery, page, safeRows, freshnessToken + page),
+    fetchDailymotionFallback(page, safeRows, trimmedQuery, mode, freshnessToken + page * 13),
+  ]);
+
+  const ytVideos = ytResult.status === "fulfilled" ? ytResult.value.videos : [];
+  const dmVideos = dmResult.status === "fulfilled" ? dmResult.value.videos : [];
+  const ytHasMore = ytResult.status === "fulfilled" ? ytResult.value.hasMore : false;
+  const dmHasMore = dmResult.status === "fulfilled" ? dmResult.value.hasMore : false;
+
+  let merged = dedupeExternalVideos([...ytVideos, ...dmVideos]);
+
+  if (trimmedQuery) {
+    const canonical = canonicalizeSearchQuery(trimmedQuery);
+    const words = getQueryWords(canonical);
+
+    merged = merged
+      .map((video) => {
+        const normalizedTitle = normalizeForMatch(video.title);
+        const normalizedCreator = normalizeForMatch(video.creator || "");
+
+        let score = scoreFallbackVideo(video.title, words, canonical)
+          + scorePreferredCategory(video.title, video.category)
+          + (video.source === "youtube" ? 6 : 0)
+          + (video.duration && video.duration >= 120 ? 2 : 0);
+
+        if (normalizedTitle.includes(canonical)) score += 24;
+        if (words.length > 0 && words.every((w) => normalizedTitle.includes(w) || normalizedCreator.includes(w))) {
+          score += 16;
+        }
+
+        return { ...video, _score: score };
+      })
+      .sort((a: any, b: any) => b._score - a._score)
+      .map(({ _score, ...rest }: any) => rest);
+  } else {
+    merged = merged
+      .map((video) => {
+        let score = scorePreferredCategory(video.title, video.category)
+          + (isBanglaDefaultSuggestion(video.title, video.country) ? 16 : 0)
+          + (hasFreshMarker(video.title) ? 11 : 0)
+          + (hasQualityMarker(video.title) ? 9 : 0)
+          + (video.source === "youtube" ? 5 : 0);
+
+        return { ...video, _score: score };
+      })
+      .sort((a: any, b: any) => b._score - a._score)
+      .map(({ _score, ...rest }: any) => rest);
+
+    merged = seededShuffle(merged, freshnessToken + page * 31);
   }
 
-  // Fallback to Dailymotion
-  const direct = await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
-  if ((searchQuery && searchQuery.trim()) || direct.videos.length > 0 || !import.meta.env.VITE_SUPABASE_URL) {
-    return direct;
+  if (merged.length === 0) {
+    return { videos: [], hasMore: false };
   }
 
-  try {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("rows", String(rows));
-    params.set("mode", mode);
-    if (preferredCategories && preferredCategories.length > 0) {
-      params.set("preferred", preferredCategories.join(","));
-    }
-    if (searchQuery && searchQuery.trim()) {
-      params.set("search", searchQuery.trim());
-    }
-
-    const res = await fetch(
-      `${supabaseUrl}/functions/v1/fetch-external-videos?${params.toString()}`,
-      {
-        headers: {
-          "Authorization": `Bearer ${supabaseKey}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!res.ok) {
-      console.warn("External videos API unavailable, using fallback:", res.status);
-      return fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
-    }
-
-    const data = await res.json();
-    const normalized = Array.isArray(data.videos)
-      ? data.videos.map(normalizeExternalVideo).filter(Boolean) as ExternalReelVideo[]
-      : [];
-
-    const normalizedForMode = searchQuery?.trim()
-      ? normalized
-      : (() => {
-          const strict = normalized.filter((video) => isBanglaDefaultSuggestion(video.title, video.country));
-          return strict.length > 0 ? strict : normalized;
-        })();
-
-    if (normalizedForMode.length === 0) {
-      return direct;
-    }
-
-    return {
-      videos: normalizedForMode,
-      hasMore: !!data.hasMore,
-      categories: data.categories,
-    };
-  } catch (e) {
-    console.warn("External videos edge failed, using fallback:", e);
-    try {
-      return await fetchDailymotionFallback(page, rows, searchQuery, mode, freshnessToken);
-    } catch (fallbackError) {
-      console.error("External videos fallback error:", fallbackError);
-      return { videos: [], hasMore: false };
-    }
-  }
+  return {
+    videos: merged.slice(0, rows),
+    hasMore: merged.length > rows || ytHasMore || dmHasMore,
+  };
 }
 
 // Check if user has posted at least once
