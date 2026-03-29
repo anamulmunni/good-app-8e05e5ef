@@ -873,7 +873,7 @@ export default function Reels() {
               <button onClick={handleRefreshFeed} className="h-10 w-10 grid place-items-center rounded-full">
                 <RefreshCcw className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
-              <button onClick={() => navigate(`/channel/${user.id}`)} className="h-10 w-10 grid place-items-center rounded-full overflow-hidden" title="My Channel">
+              <button onClick={() => { setShowHistorySheet(true); setWatchHistory(readWatchHistory()); }} className="h-10 w-10 grid place-items-center rounded-full overflow-hidden" title="My Channel & History">
                 {user.avatar_url ? (
                   <img src={user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
                 ) : (
