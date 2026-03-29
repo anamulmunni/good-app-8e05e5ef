@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import {
 import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Music, Play, Pause } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { getShuffledSampleReels } from "@/lib/sample-reels";
 
 function ReelsCaption({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -35,6 +36,7 @@ type ShortVideo = {
   comments_count: number;
   created_at: string | null;
   user?: { display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
+  isSample?: boolean;
 };
 
 export default function ShortReels() {
@@ -57,6 +59,9 @@ export default function ShortReels() {
   const lastTapRef = useRef(0);
   const doubleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Memoized sample reels (shuffled once per mount)
+  const sampleReels = useMemo(() => getShuffledSampleReels(), []);
+
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
@@ -70,20 +75,36 @@ export default function ShortReels() {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (!posts || posts.length === 0) return [];
-
-      // Filter out long videos (content starts with LONG_VIDEO_MARKER)
-      const shortPosts = posts.filter((p: any) => !p.content?.startsWith("__GOODAPP_LONG__::"));
+      const shortPosts = (posts || []).filter((p: any) => !p.content?.startsWith("__GOODAPP_LONG__::"));
 
       const userIds = [...new Set(shortPosts.map((p: any) => p.user_id))];
-      const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, is_verified_badge") as any).in("id", userIds);
-      const userMap: Record<number, any> = {};
-      (users || []).forEach((u: any) => { userMap[u.id] = u; });
+      let userMap: Record<number, any> = {};
+      if (userIds.length > 0) {
+        const { data: users } = await (supabase.from("users").select("id, display_name, avatar_url, guest_id, is_verified_badge") as any).in("id", userIds);
+        (users || []).forEach((u: any) => { userMap[u.id] = u; });
+      }
 
-      return shortPosts.map((p: any) => ({
+      const userVideos: ShortVideo[] = shortPosts.map((p: any) => ({
         ...p,
         user: userMap[p.user_id] || null,
-      })) as ShortVideo[];
+        isSample: false,
+      }));
+
+      // Add sample reels at the end (always available)
+      const sampleVideos: ShortVideo[] = sampleReels.map((s) => ({
+        id: s.id,
+        user_id: 0,
+        video_url: s.video_url,
+        content: s.caption,
+        likes_count: Math.floor(Math.random() * 500) + 50,
+        comments_count: Math.floor(Math.random() * 30),
+        created_at: new Date().toISOString(),
+        user: { display_name: s.creator, avatar_url: null, guest_id: "sample", is_verified_badge: true },
+        isSample: true,
+      }));
+
+      // User videos first, then sample
+      return [...userVideos, ...sampleVideos];
     },
     enabled: !!user,
   });
@@ -131,7 +152,7 @@ export default function ShortReels() {
       if (doubleTapTimerRef.current) { clearTimeout(doubleTapTimerRef.current); doubleTapTimerRef.current = null; }
       setShowLoveAnimation(true);
       setTimeout(() => setShowLoveAnimation(false), 1000);
-      if (currentVideo) {
+      if (currentVideo && !currentVideo.isSample) {
         // Instant UI update
         setUserReactions((prev) => ({ ...prev, [currentVideo.id]: "love" }));
         // Fire-and-forget API call

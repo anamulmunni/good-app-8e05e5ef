@@ -245,38 +245,52 @@ export default function Login() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex rounded-2xl bg-secondary/60 p-1.5 mb-5 backdrop-blur-md border border-border/40 shadow-xl shadow-primary/15"
+          className="flex rounded-2xl p-1.5 mb-5 backdrop-blur-xl border border-border/50 shadow-2xl relative overflow-hidden"
+          style={{ background: "linear-gradient(135deg, hsl(222 47% 10% / 0.9), hsl(222 47% 12% / 0.9))" }}
         >
+          {/* Animated border glow */}
+          <motion.div
+            className="absolute inset-0 rounded-2xl pointer-events-none"
+            style={{ 
+              background: tab === "login" 
+                ? "linear-gradient(135deg, hsl(152 56% 38% / 0.15), transparent, hsl(152 56% 38% / 0.1))"
+                : "linear-gradient(135deg, hsl(38 92% 50% / 0.15), transparent, hsl(38 92% 50% / 0.1))"
+            }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
           {(["login", "register"] as const).map((t) => (
             <motion.button
               key={t}
               onClick={() => setTab(t)}
-              whileTap={{ scale: 0.92 }}
-              whileHover={{ scale: tab === t ? 1 : 1.02 }}
-              className={`flex-1 py-4 rounded-xl text-sm font-black tracking-wide transition-all duration-300 relative overflow-hidden ${
+              whileTap={{ scale: 0.9 }}
+              className={`flex-1 py-4 rounded-xl text-sm font-black tracking-wide transition-all duration-300 relative overflow-hidden z-10 ${
                 tab === t
-                  ? "text-primary-foreground shadow-xl shadow-primary/40"
+                  ? "text-primary-foreground shadow-xl"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               style={tab === t ? {
-                background: "linear-gradient(135deg, hsl(152 56% 38%), hsl(152 68% 45%), hsl(152 56% 38%))",
-                backgroundSize: "200% 200%",
-                animation: "btn-shimmer 3s ease infinite",
+                background: t === "login" 
+                  ? "linear-gradient(135deg, hsl(152 56% 32%), hsl(152 68% 42%), hsl(160 60% 45%))"
+                  : "linear-gradient(135deg, hsl(38 92% 45%), hsl(30 95% 55%), hsl(45 90% 55%))",
+                boxShadow: t === "login"
+                  ? "0 4px 20px -4px hsl(152 56% 38% / 0.5), 0 0 30px -8px hsl(152 56% 38% / 0.3)"
+                  : "0 4px 20px -4px hsl(38 92% 50% / 0.5), 0 0 30px -8px hsl(38 92% 50% / 0.3)",
               } : {}}
             >
               {tab === t && (
                 <motion.div
-                  layoutId="tab-glow"
+                  layoutId="tab-active-bg"
                   className="absolute inset-0 rounded-xl"
-                  style={{ background: "linear-gradient(90deg, transparent, hsla(0,0%,100%,0.1), transparent)", backgroundSize: "200%", animation: "btn-shine 3s ease-in-out infinite" }}
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  style={{ background: "linear-gradient(90deg, transparent, hsla(0,0%,100%,0.12), transparent)" }}
+                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                 />
               )}
               <motion.span
                 initial={false}
-                animate={tab === t ? { scale: [1, 1.08, 1] } : {}}
-                transition={{ duration: 0.4 }}
-                className="relative z-10"
+                animate={tab === t ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+                transition={{ duration: 0.35 }}
+                className="relative z-10 text-[15px]"
               >
                 {t === "login" ? "🔑 লগইন" : "✨ রেজিস্ট্রেশন"}
               </motion.span>
@@ -330,18 +344,18 @@ export default function Login() {
                 <motion.button
                   type="submit"
                   disabled={isSubmitting || !phone || !password}
-                  className="btn-primary py-4 text-lg w-full rounded-2xl"
-                  whileTap={{ scale: 0.95 }}
-                  whileHover={{ scale: 1.03, boxShadow: "0 8px 35px -4px hsl(152 56% 38% / 0.6)" }}
-                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className="btn-primary btn-neon-pulse py-4 text-lg w-full rounded-2xl"
+                  whileTap={{ scale: 0.93 }}
+                  whileHover={{ scale: 1.04, y: -3 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
                 >
                   {isSubmitting ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
                       <Loader2 className="w-6 h-6" />
                     </motion.div>
                   ) : (
-                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black"
-                      initial={false} animate={{ x: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.5 }}>
+                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10"
+                      initial={false} animate={{ x: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}>
                       🚀 লগইন করুন <ArrowRight className="w-5 h-5" />
                     </motion.span>
                   )}
@@ -423,18 +437,20 @@ export default function Login() {
                 <motion.button
                   type="submit"
                   disabled={isSubmitting || !displayName.trim() || !regPhone || regPassword.length < 6 || !agreedTerms}
-                  className="btn-primary py-4 text-lg w-full rounded-2xl"
-                  whileTap={{ scale: 0.95 }}
-                  whileHover={{ scale: 1.03, boxShadow: "0 8px 35px -4px hsl(152 56% 38% / 0.6)" }}
-                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className="btn-accent py-4 text-lg w-full rounded-2xl"
+                  whileTap={{ scale: 0.93 }}
+                  whileHover={{ scale: 1.04, y: -3 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
                 >
                   {isSubmitting ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
                       <Loader2 className="w-6 h-6" />
                     </motion.div>
                   ) : (
-                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black"
-                      initial={false} animate={{ x: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.5 }}>
+                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10"
+                      initial={false}
+                      animate={{ scale: [1, 1.05, 1], x: [0, 4, 0] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut" }}>
                       ✨ রেজিস্টার করুন <ArrowRight className="w-5 h-5" />
                     </motion.span>
                   )}

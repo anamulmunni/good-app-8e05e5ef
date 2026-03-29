@@ -235,22 +235,22 @@ export default function Register() {
                 </motion.button>
               )}
               <motion.button type="submit" disabled={!isStepValid() || isSubmitting}
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.03, boxShadow: "0 8px 35px -4px hsl(152 56% 38% / 0.6)" }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                className="btn-primary py-4 text-lg flex-1 rounded-2xl">
+                whileTap={{ scale: 0.93 }}
+                whileHover={{ scale: 1.04, y: -3 }}
+                transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                className={`${step < 3 ? "btn-primary btn-neon-pulse" : "btn-accent"} py-4 text-lg flex-1 rounded-2xl`}>
                 {isSubmitting ? (
-                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
                     <Loader2 className="w-6 h-6" />
                   </motion.div>
                 ) : step < 3 ? (
-                  <motion.span className="inline-flex items-center gap-2.5 font-black"
-                    animate={{ x: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.5 }}>
+                  <motion.span className="inline-flex items-center gap-2.5 font-black relative z-10"
+                    animate={{ x: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}>
                     পরবর্তী <ArrowRight className="w-5 h-5" />
                   </motion.span>
                 ) : (
-                  <motion.span className="inline-flex items-center gap-2.5 font-black"
-                    animate={{ x: [0, 5, 0] }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.5 }}>
+                  <motion.span className="inline-flex items-center gap-2.5 font-black relative z-10"
+                    animate={{ scale: [1, 1.05, 1], x: [0, 4, 0] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut" }}>
                     ✨ রেজিস্টার করুন <ArrowRight className="w-5 h-5" />
                   </motion.span>
                 )}
