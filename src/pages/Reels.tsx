@@ -88,6 +88,17 @@ function isYouTubeEmbed(url: string) {
   return url.includes("youtube.com/embed/");
 }
 
+const EXTERNAL_PAGE_WINDOW = 8;
+
+function normalizeExternalPage(raw: number): number {
+  const safe = Math.max(1, Math.floor(raw || 1));
+  return ((safe - 1) % EXTERNAL_PAGE_WINDOW) + 1;
+}
+
+function randomExternalStartPage(seed = 0): number {
+  return (Math.abs((Date.now() + seed * 997) % EXTERNAL_PAGE_WINDOW) || 0) + 1;
+}
+
 function buildExternalPlayerUrl(url: string, autoplay = false) {
   const params = new URLSearchParams();
   // YouTube autoplay with sound is often force-muted by browser policy.
@@ -139,8 +150,6 @@ export default function Reels() {
   const [viewCounts] = useState<Record<string, string>>({});
   const [miniPlayer, setMiniPlayer] = useState(false);
   const [showYoutubeTapToPlay, setShowYoutubeTapToPlay] = useState(false);
-  const [youtubeAutoplayNonce, setYoutubeAutoplayNonce] = useState(0);
-  const [youtubeAutoplayEnabled, setYoutubeAutoplayEnabled] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -182,19 +191,19 @@ export default function Reels() {
     youtubeCommandIntervalRef.current = window.setInterval(() => {
       postYoutubeCommand("unMute");
       postYoutubeCommand("setVolume", [100]);
-      if (includePlay && tries < 3) postYoutubeCommand("playVideo");
+      if (includePlay) postYoutubeCommand("playVideo");
       tries += 1;
-      if (tries >= 12) {
+      if (tries >= 18) {
         stopYoutubeCommandLoop();
       }
-    }, 200);
+    }, 180);
   }, [postYoutubeCommand, stopYoutubeCommandLoop]);
 
   const playYoutubeWithSound = useCallback(() => {
     setShowYoutubeTapToPlay(false);
-    setYoutubeAutoplayEnabled(true);
-    setYoutubeAutoplayNonce((prev) => prev + 1);
-    window.setTimeout(() => kickYoutubeSoundPlayback(true), 120);
+    kickYoutubeSoundPlayback(true);
+    window.setTimeout(() => kickYoutubeSoundPlayback(true), 80);
+    window.setTimeout(() => kickYoutubeSoundPlayback(true), 260);
   }, [kickYoutubeSoundPlayback]);
 
   useEffect(() => {
@@ -204,8 +213,6 @@ export default function Reels() {
   useEffect(() => {
     const isYoutubeSelected = Boolean(selectedVideo?.isExternal && isYouTubeEmbed(selectedVideo.video_url));
     setShowYoutubeTapToPlay(isYoutubeSelected);
-    setYoutubeAutoplayEnabled(false);
-    setYoutubeAutoplayNonce(0);
     stopYoutubeCommandLoop();
   }, [selectedVideo, stopYoutubeCommandLoop]);
 
@@ -230,19 +237,19 @@ export default function Reels() {
     if (!reset && !hasMore) return;
     loadingRef.current = true;
     setLoading(true);
-    let p = reset ? (activeQuery ? 1 : (Math.abs((Date.now() + refreshTick * 997) % 45) + 1)) : page;
+    const cursor = reset ? 1 : page;
+    const requestPage = normalizeExternalPage(activeQuery ? cursor : cursor + refreshTick * 5);
     try {
       let [externalResult, localResult] = await Promise.all([
-        getBangladeshExternalVideos(p, 30, undefined, activeQuery || undefined, "long", refreshTick),
-        getUploadedLongVideos(p, 12, activeQuery || undefined),
+        getBangladeshExternalVideos(requestPage, 30, undefined, activeQuery || undefined, "long", refreshTick + cursor * 17),
+        getUploadedLongVideos(cursor, 12, activeQuery || undefined),
       ]);
       let merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
 
-      if (!activeQuery && merged.length === 0 && p !== 1) {
-        p = 1;
+      if (!activeQuery && merged.length === 0 && requestPage !== 1) {
         [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick),
-          getUploadedLongVideos(1, 12),
+          getUploadedLongVideos(cursor, 12),
         ]);
         merged = dedupeVideos([...localResult.videos, ...externalResult.videos]);
       }
@@ -253,7 +260,7 @@ export default function Reels() {
         return dedupeVideos([...base, ...merged.filter((v) => !seen.has(v.id))]);
       });
       setHasMore(localResult.hasMore || externalResult.hasMore);
-      setPage(p + 1);
+      setPage(cursor + 1);
     } finally {
       loadingRef.current = false;
       setLoading(false);
@@ -270,7 +277,7 @@ export default function Reels() {
       loadingRef.current = true;
       setLoading(true);
       try {
-        let externalStartPage = activeQuery ? 1 : (Math.abs((Date.now() + refreshTick * 997) % 45) + 1);
+        let externalStartPage = activeQuery ? 1 : randomExternalStartPage(refreshTick);
         let [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
@@ -288,7 +295,7 @@ export default function Reels() {
 
         setExtVideos(merged);
         setHasMore(localResult.hasMore || externalResult.hasMore);
-        setPage(externalStartPage + 1);
+        setPage(2);
       } finally {
         loadingRef.current = false;
         setLoading(false);
@@ -528,10 +535,10 @@ export default function Reels() {
           <div ref={playerShellRef} className="w-full aspect-video relative" style={{ background: "#000" }}>
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
-                key={selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) ? `${selectedVideo.id}-yt-${youtubeAutoplayNonce}` : selectedVideo.id}
+                key={selectedVideo.id}
                 src={buildExternalPlayerUrl(
                   selectedVideo.video_url,
-                  selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) ? youtubeAutoplayEnabled : false,
+                  false,
                 )}
                 title={selectedVideo.title}
                 className="w-full h-full"
@@ -541,8 +548,11 @@ export default function Reels() {
                   youtubeIframeRef.current = node;
                 }}
                 onLoad={() => {
-                  if (selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && youtubeAutoplayEnabled) {
-                    window.setTimeout(() => kickYoutubeSoundPlayback(true), 80);
+                  if (selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url)) {
+                    window.setTimeout(() => {
+                      postYoutubeCommand("unMute");
+                      postYoutubeCommand("setVolume", [100]);
+                    }, 80);
                   }
                 }}
               />
@@ -596,7 +606,9 @@ export default function Reels() {
           </div>
           <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
             <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
-            <span className="text-[12px]" style={{ color: "#aaa" }}>• suggested for you</span>
+            <span className="text-[12px]" style={{ color: "#aaa" }}>
+              • {activeQuery ? `results for "${activeQuery}"` : "suggested for you"}
+            </span>
           </div>
         </div>
       )}
