@@ -399,7 +399,7 @@ export default function ChannelPage() {
                       </button>
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
