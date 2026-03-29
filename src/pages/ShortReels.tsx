@@ -314,7 +314,7 @@ export default function ShortReels() {
           <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center">
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
-          <h1 className="text-white font-bold text-lg">Reels</h1>
+          <h1 className="font-black text-lg" style={{ background: "linear-gradient(90deg, #fff, #ffd600)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Reels</h1>
           <div className="w-10" />
         </div>
 
