@@ -287,17 +287,10 @@ export default function ChannelPage() {
           {!isOwnChannel && (
             <div className="mt-2 flex justify-end">
               <button
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
                   const channelUrl = `${window.location.origin}/channel/${channelUserId}`;
-                  try {
-                    if (navigator.share) {
-                      await navigator.share({ title: `${channelOwner.display_name || channelOwner.guest_id} - good-app`, url: channelUrl });
-                    } else {
-                      await navigator.clipboard.writeText(channelUrl);
-                      alert("Channel link copied!");
-                    }
-                  } catch {}
+                  shareOrCopy(`${channelOwner.display_name || channelOwner.guest_id} - good-app`, channelUrl);
                 }}
                 className="px-3 py-1.5 rounded-full text-[12px] font-medium flex items-center gap-1"
                 style={{ background: "#272727", color: "#aaa" }}
