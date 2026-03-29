@@ -568,8 +568,12 @@ export default function Reels() {
               <button onClick={handleRefreshFeed} className="h-10 w-10 grid place-items-center rounded-full">
                 <RefreshCcw className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
-              <button onClick={() => navigate(`/channel/${user.id}`)} className="h-10 w-10 grid place-items-center rounded-full">
-                <Cast className="w-5 h-5" style={{ color: "#fff" }} />
+              <button onClick={() => navigate(`/channel/${user.id}`)} className="h-10 w-10 grid place-items-center rounded-full overflow-hidden" title="My Channel">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                ) : (
+                  <User className="w-5 h-5" style={{ color: "#fff" }} />
+                )}
               </button>
               <button className="h-10 w-10 grid place-items-center rounded-full relative">
                 <Bell className="w-5 h-5" style={{ color: "#fff" }} />
