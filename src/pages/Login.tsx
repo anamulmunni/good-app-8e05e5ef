@@ -11,6 +11,30 @@ import { getPublicSettings } from "@/lib/api";
 
 const DEVICE_ACCOUNTS_KEY = "goodapp_device_accounts";
 
+function mapAuthErrorToBnMessage(input: unknown, fallback = "সার্ভার সমস্যার কারণে এখন লগইন/রেজিস্ট্রেশন হচ্ছে না, কিছুক্ষণ পর আবার চেষ্টা করুন") {
+  const raw = String(
+    (input as any)?.message ||
+    (input as any)?.error_description ||
+    (input as any)?.details ||
+    "",
+  ).toLowerCase();
+  const status = Number((input as any)?.status || 0);
+
+  if (raw.includes("invalid login credentials")) return "ফোন নম্বর বা পাসওয়ার্ড ভুল";
+  if (
+    status === 504 ||
+    raw.includes("timeout") ||
+    raw.includes("failed to fetch") ||
+    raw.includes("network") ||
+    raw.includes("upstream request timeout") ||
+    raw.trim() === "{}"
+  ) {
+    return fallback;
+  }
+
+  return (input as any)?.message || fallback;
+}
+
 function getDeviceAccounts(): string[] {
   try {
     return JSON.parse(localStorage.getItem(DEVICE_ACCOUNTS_KEY) || "[]");
@@ -93,10 +117,10 @@ export default function Login() {
           error = retryResult.error;
         }
       }
-      if (error) throw new Error(error.message === "Invalid login credentials" ? "ফোন নম্বর বা পাসওয়ার্ড ভুল" : error.message);
+      if (error) throw error;
       navigate("/dashboard");
-    } catch (err: any) {
-      toast({ title: "লগইন ব্যর্থ", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "লগইন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -146,8 +170,8 @@ export default function Login() {
         variant: deviceAccounts.length > 0 ? "destructive" : "default",
       });
       navigate("/dashboard");
-    } catch (err: any) {
-      toast({ title: "রেজিস্ট্রেশন ব্যর্থ", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "রেজিস্ট্রেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
