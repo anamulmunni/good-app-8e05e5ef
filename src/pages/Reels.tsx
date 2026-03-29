@@ -568,7 +568,7 @@ export default function Reels() {
               <button onClick={handleRefreshFeed} className="h-10 w-10 grid place-items-center rounded-full">
                 <RefreshCcw className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
-              <button className="h-10 w-10 grid place-items-center rounded-full">
+              <button onClick={() => navigate(`/channel/${user.id}`)} className="h-10 w-10 grid place-items-center rounded-full">
                 <Cast className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
               <button className="h-10 w-10 grid place-items-center rounded-full relative">
