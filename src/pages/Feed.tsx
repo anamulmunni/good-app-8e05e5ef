@@ -75,16 +75,18 @@ export default function Feed() {
     if (!isLoading && !user) navigate("/");
   }, [user, isLoading, navigate]);
 
-  // Unlimited posts
+  // Capped fetch to reduce backend pressure and keep feed stable
   const { data: allPosts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["feed-posts", searchQuery],
-    queryFn: () => getFeedPosts(100000, searchQuery),
+    queryFn: () => getFeedPosts(300, searchQuery),
     enabled: !!user,
+    staleTime: 20000,
   });
 
   // Paginated display
-  const posts = allPosts.filter(p => !hiddenPosts.has(p.id) && !p.video_url).slice(0, page * POSTS_PER_PAGE);
-  const hasMore = posts.length < allPosts.filter(p => !hiddenPosts.has(p.id) && !p.video_url).length;
+  const visibleNonVideoPosts = allPosts.filter((p) => !hiddenPosts.has(p.id) && !p.video_url);
+  const posts = visibleNonVideoPosts.slice(0, page * POSTS_PER_PAGE);
+  const hasMore = posts.length < visibleNonVideoPosts.length;
 
   // Infinite scroll observer
   useEffect(() => {
@@ -106,28 +108,25 @@ export default function Feed() {
     queryKey: ["unread-count"],
     queryFn: () => getUnreadCount(user!.id),
     enabled: !!user,
-    refetchInterval: 10000,
   });
 
   const { data: friendRequestCount = 0 } = useQuery({
     queryKey: ["friend-request-count"],
     queryFn: () => getFriendRequestCount(user!.id),
     enabled: !!user,
-    refetchInterval: 15000,
   });
 
   const { data: notifCount = 0 } = useQuery({
     queryKey: ["notif-count", user?.id],
     queryFn: () => getUnreadNotificationCount(user!.id),
     enabled: !!user,
-    refetchInterval: 10000,
   });
 
   const { data: newReelsCount = 0 } = useQuery({
     queryKey: ["new-reels-count", user?.id],
     queryFn: () => getNewReelsCount(user!.id),
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: notificationsList = [] } = useQuery({
