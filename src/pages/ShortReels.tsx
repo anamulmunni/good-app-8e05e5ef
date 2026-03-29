@@ -40,6 +40,7 @@ export default function ShortReels() {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const lastTapRef = useRef(0);
+  const doubleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -106,29 +107,39 @@ export default function ShortReels() {
     }
   }, [currentIndex, videos.length]);
 
-  const handleVideoTap = useCallback((e: React.MouseEvent) => {
+  const handleVideoTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
-      // Double tap = love
-      if (currentVideo && !userReactions[currentVideo.id]) {
-        toggleReaction(currentVideo.id, user!.id, "love").then(() => {
-          setUserReactions((prev) => ({ ...prev, [currentVideo.id]: "love" }));
-          queryClient.invalidateQueries({ queryKey: ["short-reels"] });
-        });
-      }
+      // Double tap = love (instant, optimistic)
+      if (doubleTapTimerRef.current) { clearTimeout(doubleTapTimerRef.current); doubleTapTimerRef.current = null; }
       setShowLoveAnimation(true);
       setTimeout(() => setShowLoveAnimation(false), 1000);
+      if (currentVideo) {
+        // Instant UI update
+        setUserReactions((prev) => ({ ...prev, [currentVideo.id]: "love" }));
+        // Fire-and-forget API call
+        toggleReaction(currentVideo.id, user!.id, "love").then(() => {
+          queryClient.invalidateQueries({ queryKey: ["short-reels"] });
+        }).catch(() => {});
+      }
       lastTapRef.current = 0;
     } else {
       lastTapRef.current = now;
-      setTimeout(() => {
+      doubleTapTimerRef.current = setTimeout(() => {
         if (lastTapRef.current === now) {
-          // Single tap = pause/play
-          setPaused((p) => !p);
+          // Single tap = instant pause/play
+          setPaused((p) => {
+            const next = !p;
+            const el = videoRefs.current[currentIndex];
+            if (el) { next ? el.pause() : el.play().catch(() => {}); }
+            return next;
+          });
         }
-      }, 310);
+      }, 250);
     }
-  }, [currentVideo, user, userReactions, queryClient]);
+  }, [currentVideo, currentIndex, user, queryClient]);
 
   const loadComments = async (postId: string) => {
     setCommentsLoading(true);
@@ -200,8 +211,14 @@ export default function ShortReels() {
                 ref={(el) => { videoRefs.current[index] = el; }}
                 src={video.video_url}
                 loop
+                muted={false}
                 playsInline
                 className="w-full h-full object-cover"
+                style={{ pointerEvents: "none" }}
+              />
+              {/* Tap overlay for pause/love */}
+              <div
+                className="absolute inset-0 z-10"
                 onClick={handleVideoTap}
               />
 
