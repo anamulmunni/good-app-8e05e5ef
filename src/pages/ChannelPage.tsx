@@ -265,7 +265,7 @@ export default function ChannelPage() {
           {isOwnChannel && (
             <div className="mt-3 flex gap-2">
               <button
-                onClick={() => navigate("/reels")}
+                onClick={() => navigate("/reels?upload=1")}
                 className="flex-1 py-2.5 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1.5"
                 style={{ background: "#272727", color: "#f1f1f1" }}
               >
@@ -322,7 +322,7 @@ export default function ChannelPage() {
               </p>
               {isOwnChannel && (
                 <button
-                  onClick={() => navigate("/reels")}
+                  onClick={() => navigate("/reels?upload=1")}
                   className="mt-3 px-5 py-2 rounded-full text-[13px] font-semibold"
                   style={{ background: "#ff0000", color: "#fff" }}
                 >

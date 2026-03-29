@@ -194,7 +194,7 @@ export default function Reels() {
   const [miniPlayer, setMiniPlayer] = useState(false);
   const [showYoutubeTapToPlay, setShowYoutubeTapToPlay] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
-  const [showUpload, setShowUpload] = useState(false);
+  const [showUpload, setShowUpload] = useState(uploadParam === "1");
   const [uploading, setUploading] = useState(false);
   const [longTitle, setLongTitle] = useState("");
   const [longVideoFile, setLongVideoFile] = useState<File | null>(null);
