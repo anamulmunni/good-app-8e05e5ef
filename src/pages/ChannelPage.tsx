@@ -247,7 +247,30 @@ export default function ChannelPage() {
                 className="flex-1 py-2.5 rounded-full text-[13px] font-semibold"
                 style={{ background: "#272727", color: "#f1f1f1" }}
               >
-                Edit Profile
+                Share Channel
+              </button>
+            </div>
+          )}
+
+          {!isOwnChannel && (
+            <div className="mt-2 flex justify-end">
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const channelUrl = `${window.location.origin}/channel/${channelUserId}`;
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({ title: `${channelOwner.display_name || channelOwner.guest_id} - good-app`, url: channelUrl });
+                    } else {
+                      await navigator.clipboard.writeText(channelUrl);
+                      alert("Channel link copied!");
+                    }
+                  } catch {}
+                }}
+                className="px-3 py-1.5 rounded-full text-[12px] font-medium flex items-center gap-1"
+                style={{ background: "#272727", color: "#aaa" }}
+              >
+                <Share2 className="w-3.5 h-3.5" /> Share
               </button>
             </div>
           )}
@@ -292,11 +315,15 @@ export default function ChannelPage() {
                 >
                   {/* Thumbnail - use video poster or placeholder */}
                   <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
-                    <video
-                      src={video.video_url}
-                      preload="metadata"
-                      className="w-full h-full object-cover pointer-events-none"
-                    />
+                    {video.thumbnail_url ? (
+                      <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <video
+                        src={video.video_url}
+                        preload="metadata"
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
+                    )}
                     {video.duration ? (
                       <span className="absolute right-1 bottom-1 text-[11px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
                         {fmt(video.duration)}
@@ -332,6 +359,25 @@ export default function ChannelPage() {
                         {video.comments_count > 0 && `${video.comments_count} comments • `}
                         {timeAgo(video.created_at)}
                       </p>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const videoUrl = `${window.location.origin}/watch/${video.post_id}`;
+                          try {
+                            if (navigator.share) {
+                              await navigator.share({ title: video.title, url: videoUrl });
+                            } else {
+                              await navigator.clipboard.writeText(videoUrl);
+                              alert("Video link copied!");
+                            }
+                          } catch {}
+                        }}
+                        className="flex items-center gap-1 mt-1 text-[11px] font-medium"
+                        style={{ color: "#3ea6ff" }}
+                      >
+                        <Share2 className="w-3 h-3" /> Share video link
+                      </button>
                     </div>
                   </div>
                 </button>
