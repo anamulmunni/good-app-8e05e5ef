@@ -333,10 +333,10 @@ export default function ChannelPage() {
           ) : (
             <div>
               {videos.map((video) => (
-                <button
+                <div
                   key={video.id}
-                  onClick={() => navigate(`/reels?play=${video.post_id}`)}
-                  className="w-full text-left"
+                  onClick={() => navigate(`/watch/${video.post_id}`)}
+                  className="w-full text-left cursor-pointer"
                 >
                   {/* Thumbnail - use video poster or placeholder */}
                   <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
