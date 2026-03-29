@@ -451,7 +451,7 @@ export default function Reels() {
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
                 key={selectedVideo.id}
-                src={buildExternalPlayerUrl(selectedVideo.video_url, true)}
+                src={buildExternalPlayerUrl(selectedVideo.video_url, false)}
                 title={selectedVideo.title}
                 className="w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
@@ -507,7 +507,7 @@ export default function Reels() {
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
                 key={`mini-${selectedVideo.id}`}
-                src={buildExternalPlayerUrl(selectedVideo.video_url, true)}
+                src={buildExternalPlayerUrl(selectedVideo.video_url, false)}
                 title={selectedVideo.title}
                 className="w-full h-full pointer-events-none"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
