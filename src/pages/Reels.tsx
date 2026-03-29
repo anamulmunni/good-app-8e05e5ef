@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User, Image as ImageIcon, Copy, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import {
   createLongVideoUpload,
+  createLongVideoUploadWithThumbnail,
   getBangladeshExternalVideos,
   getChannelStats,
   getLocalVideoEngagement,
@@ -199,6 +200,8 @@ export default function Reels() {
   const [longVideoFile, setLongVideoFile] = useState<File | null>(null);
   const [longVideoPreview, setLongVideoPreview] = useState<string | null>(null);
   const [longVideoDuration, setLongVideoDuration] = useState<number | undefined>(undefined);
+  const [longThumbnailFile, setLongThumbnailFile] = useState<File | null>(null);
+  const [longThumbnailPreview, setLongThumbnailPreview] = useState<string | null>(null);
   const [channelStats, setChannelStats] = useState<{ subscriber_count: number; total_videos: number; is_subscribed: boolean } | null>(null);
   const [channelLoading, setChannelLoading] = useState(false);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
@@ -223,6 +226,8 @@ export default function Reels() {
   const mainRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const playParamHandledRef = useRef(false);
 
   const stopYoutubeCommandLoop = useCallback(() => {
     if (youtubeCommandIntervalRef.current !== null) {
@@ -265,6 +270,39 @@ export default function Reels() {
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
+
+  // Handle ?play=postId to auto-play a specific video
+  useEffect(() => {
+    if (!playParam || !user || playParamHandledRef.current) return;
+    playParamHandledRef.current = true;
+
+    (async () => {
+      try {
+        const video = await getUploadedLongVideoByPostId(playParam);
+        if (video) {
+          const mapped: VideoItem = {
+            id: video.id,
+            title: video.title,
+            video_url: video.video_url,
+            watch_url: video.watch_url,
+            thumbnail_url: video.thumbnail_url,
+            creator: video.creator || "",
+            duration: video.duration,
+            isExternal: video.source !== "good-app",
+            uploader_user_id: video.uploader_user_id,
+            uploader_guest_id: video.uploader_guest_id,
+            uploader_avatar_url: video.uploader_avatar_url,
+            uploader_is_verified_badge: video.uploader_is_verified_badge,
+            local_post_id: video.local_post_id,
+            likes_count: video.likes_count,
+            comments_count: video.comments_count,
+          };
+          setSelectedVideo(mapped);
+          setMiniPlayer(false);
+        }
+      } catch {}
+    })();
+  }, [playParam, user]);
 
   useEffect(() => {
     const isYoutubeSelected = Boolean(selectedVideo?.isExternal && isYouTubeEmbed(selectedVideo.video_url));
@@ -485,17 +523,23 @@ export default function Reels() {
     try {
       setUploading(true);
       const videoUrl = await uploadPostMedia(longVideoFile, longVideoFile.name);
-      await createLongVideoUpload(user.id, videoUrl, longTitle.trim() || longVideoFile.name, longVideoDuration);
+      let thumbnailUrl: string | undefined;
+      if (longThumbnailFile) {
+        thumbnailUrl = await uploadPostMedia(longThumbnailFile, `thumb_${longThumbnailFile.name}`);
+      }
+      await createLongVideoUploadWithThumbnail(user.id, videoUrl, longTitle.trim() || longVideoFile.name, longVideoDuration, thumbnailUrl);
       setShowUpload(false);
       setLongVideoFile(null);
       setLongVideoPreview(null);
       setLongTitle("");
       setLongVideoDuration(undefined);
+      setLongThumbnailFile(null);
+      setLongThumbnailPreview(null);
       await loadMore(true);
     } finally {
       setUploading(false);
     }
-  }, [loadMore, longTitle, longVideoDuration, longVideoFile, user]);
+  }, [loadMore, longTitle, longVideoDuration, longVideoFile, longThumbnailFile, user]);
 
   useEffect(() => {
     if (allVideos.length === 0) {
@@ -1289,6 +1333,46 @@ export default function Reels() {
               placeholder="ভিডিও টাইটেল"
               className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm outline-none"
             />
+
+            {/* Thumbnail upload */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">থাম্বনেইল (ঐচ্ছিক)</p>
+              {longThumbnailPreview ? (
+                <div className="relative w-full aspect-video rounded-md overflow-hidden border border-border">
+                  <img src={longThumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setLongThumbnailFile(null); setLongThumbnailPreview(null); }}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-background/80 grid place-items-center"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => thumbnailInputRef.current?.click()}
+                  className="w-full h-16 border border-dashed border-border rounded-md grid place-items-center text-muted-foreground"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <ImageIcon className="w-4 h-4" />
+                    <span>থাম্বনেইল ছবি সিলেক্ট করুন</span>
+                  </div>
+                </button>
+              )}
+              <input
+                ref={thumbnailInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setLongThumbnailFile(file);
+                  setLongThumbnailPreview(URL.createObjectURL(file));
+                }}
+              />
+            </div>
 
             {longVideoPreview ? (
               <video src={longVideoPreview} controls className="w-full rounded-md max-h-56" />
