@@ -56,6 +56,27 @@ export type Database = {
           },
         ]
       }
+      channel_subscriptions: {
+        Row: {
+          channel_user_id: number
+          created_at: string
+          id: string
+          subscriber_user_id: number
+        }
+        Insert: {
+          channel_user_id: number
+          created_at?: string
+          id?: string
+          subscriber_user_id: number
+        }
+        Update: {
+          channel_user_id?: number
+          created_at?: string
+          id?: string
+          subscriber_user_id?: number
+        }
+        Relationships: []
+      }
       comment_likes: {
         Row: {
           comment_id: string
@@ -710,6 +731,7 @@ export type Database = {
           guest_id: string
           id: number
           is_blocked: boolean
+          is_verified_badge: boolean
           key_count: number
           last_reels_seen_at: string | null
           online_at: string | null
@@ -728,6 +750,7 @@ export type Database = {
           guest_id: string
           id?: number
           is_blocked?: boolean
+          is_verified_badge?: boolean
           key_count?: number
           last_reels_seen_at?: string | null
           online_at?: string | null
@@ -746,6 +769,7 @@ export type Database = {
           guest_id?: string
           id?: number
           is_blocked?: boolean
+          is_verified_badge?: boolean
           key_count?: number
           last_reels_seen_at?: string | null
           online_at?: string | null
