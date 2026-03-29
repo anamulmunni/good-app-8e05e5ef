@@ -208,6 +208,7 @@ export default function Reels() {
   const [commentSending, setCommentSending] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
+  const [externalReactions, setExternalReactions] = useState<Record<string, { reaction: "like" | "dislike" | null; likes: number }>>({});
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
