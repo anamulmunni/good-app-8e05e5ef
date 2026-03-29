@@ -368,7 +368,7 @@ export default function Reels() {
         }
         return prev;
       });
-    }, 12000);
+    }, 30000);
 
     return () => window.clearTimeout(timeoutId);
   }, [selectedVideo?.id, playerReloadToken]);
@@ -797,40 +797,35 @@ export default function Reels() {
               />
             )}
             {playerLoading && (
-              <div className="absolute inset-0 z-20 grid place-items-center bg-background/70">
-                <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-card-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>ভিডিও লোড হচ্ছে...</span>
+              <div className="absolute inset-0 z-20 grid place-items-center" style={{ background: "#000" }}>
+                {selectedVideo.thumbnail_url && (
+                  <img src={selectedVideo.thumbnail_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 blur-sm" />
+                )}
+                <div className="absolute top-0 left-0 right-0 h-1 overflow-hidden">
+                  <div className="h-full bg-red-600 animate-pulse" style={{ width: "60%", animation: "loading-bar 1.5s ease-in-out infinite" }} />
+                </div>
+                <div className="flex flex-col items-center gap-2 z-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                  <span className="text-sm text-white/80">ভিডিও লোড হচ্ছে...</span>
                 </div>
               </div>
             )}
             {playerError && !playerLoading && (
               <div className="absolute inset-0 z-20 grid place-items-center bg-background/75 px-4">
                 <div className="w-full max-w-xs rounded-lg border border-border bg-card p-4 text-card-foreground">
-                  <p className="text-sm">{playerError}</p>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPlayerError(null);
-                        setPlayerLoading(true);
-                        setPlayerReloadToken((prev) => prev + 1);
-                      }}
-                      className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-sm"
-                    >
-                      Retry
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const url = selectedVideo.watch_url || selectedVideo.video_url;
-                        window.open(url, "_blank", "noopener,noreferrer");
-                      }}
-                      className="h-9 flex-1 rounded-md border border-border bg-muted text-muted-foreground text-sm"
-                    >
-                      Open source
-                    </button>
-                  </div>
+                  <p className="text-sm mb-1">{playerError}</p>
+                  <p className="text-xs text-muted-foreground mb-3">ইন্টারনেট সংযোগ চেক করুন এবং আবার চেষ্টা করুন</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayerError(null);
+                      setPlayerLoading(true);
+                      setPlayerReloadToken((prev) => prev + 1);
+                    }}
+                    className="h-10 w-full rounded-md bg-primary text-primary-foreground text-sm font-semibold"
+                  >
+                    🔄 আবার চেষ্টা করুন
+                  </button>
                 </div>
               </div>
             )}
