@@ -277,6 +277,8 @@ export default function Reels() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [ytSuggestions, setYtSuggestions] = useState<string[]>([]);
+  const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [selectedChip, setSelectedChip] = useState("All");
   const [page, setPage] = useState(1);
