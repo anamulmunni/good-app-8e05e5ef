@@ -339,10 +339,7 @@ export default function ShortReels() {
               {video.isYouTube ? (
                 <YouTubeReelPlayer
                   videoId={video.videoId!}
-                  thumbnail={(video as any).thumbnail || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`}
                   isActive={Math.abs(index - currentIndex) <= 1}
-                  paused={paused && index === currentIndex}
-                  videoRef={(el) => { videoRefs.current[index] = el; }}
                 />
               ) : (
                 <video
