@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -15,6 +16,10 @@ import {
   type ExternalReelVideo,
   markReelsSeen,
   uploadPostMedia,
+  getPostComments,
+  addComment,
+  toggleLike,
+  type PostComment,
 } from "@/lib/feed-api";
 
 type VideoItem = {
@@ -172,7 +177,12 @@ export default function Reels() {
   const [channelLoading, setChannelLoading] = useState(false);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [engagementStats, setEngagementStats] = useState<{ likes_count: number; comments_count: number } | null>(null);
-
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commentSending, setCommentSending] = useState(false);
+  const [liked, setLiked] = useState(false);
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -653,56 +663,105 @@ export default function Reels() {
           >
             <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
           </button>
-          <div className="px-3 py-3" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
+          <div className="px-3 py-3" style={{ background: "#0f0f0f" }}>
             <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
               {selectedVideo.title}
             </h2>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => selectedVideo.uploader_user_id && navigate(`/channel/${selectedVideo.uploader_user_id}`)}
-                className="flex items-center gap-2 min-w-0"
-                disabled={!selectedVideo.uploader_user_id}
-              >
-                <div className="w-8 h-8 rounded-full overflow-hidden" style={{ background: "#272727" }}>
-                  {selectedVideo.uploader_avatar_url ? (
-                    <img src={selectedVideo.uploader_avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full grid place-items-center text-xs font-bold" style={{ color: "#aaa" }}>
-                      {(selectedVideo.creator || "?")[0]?.toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 text-left">
-                  <p className="text-[13px] font-semibold truncate flex items-center gap-1" style={{ color: "#f1f1f1" }}>
-                    <span>{selectedVideo.creator || selectedVideo.uploader_guest_id || "Unknown"}</span>
-                    {selectedVideo.uploader_is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
-                  </p>
-                  <p className="text-[11px]" style={{ color: "#aaa" }}>
-                    {channelLoading ? "Loading..." : `${channelStats?.subscriber_count || 0} subscribers • ${channelStats?.total_videos || 0} videos`}
-                  </p>
-                </div>
-              </button>
-              {selectedVideo.uploader_user_id && selectedVideo.uploader_user_id !== user.id && (
-                <button
-                  onClick={handleSubscribe}
-                  disabled={subscribeLoading}
-                  className="px-3 py-1.5 rounded-full text-[12px] font-semibold"
-                  style={channelStats?.is_subscribed ? { background: "#272727", color: "#f1f1f1" } : { background: "#ff0000", color: "#fff" }}
-                >
-                  {subscribeLoading ? "..." : channelStats?.is_subscribed ? "Subscribed" : "Subscribe"}
-                </button>
-              )}
-            </div>
-            <p className="text-[12px] mt-1.5" style={{ color: "#aaa" }}>
+            <p className="text-[12px] mt-1" style={{ color: "#aaa" }}>
               {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
             </p>
-            {selectedVideo.local_post_id && (
-              <p className="text-[12px] mt-1" style={{ color: "#aaa" }}>
-                👍 {engagementStats?.likes_count ?? selectedVideo.likes_count ?? 0} • 💬 {engagementStats?.comments_count ?? selectedVideo.comments_count ?? 0}
-              </p>
+          </div>
+
+          {/* YouTube-style action buttons */}
+          <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto scrollbar-hide" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
+            <button
+              onClick={async () => {
+                if (selectedVideo.local_post_id && user) {
+                  const result = await toggleLike(selectedVideo.local_post_id, user.id);
+                  setLiked(result);
+                  const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
+                  setEngagementStats(stats);
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
+              style={{ background: "#272727", color: liked ? "#3ea6ff" : "#f1f1f1" }}
+            >
+              <ThumbsUp className="w-5 h-5" />
+              <span>{engagementStats?.likes_count ?? selectedVideo.likes_count ?? 0}</span>
+              <div className="w-px h-5 mx-1" style={{ background: "#555" }} />
+              <ThumbsDown className="w-5 h-5" style={{ color: "#f1f1f1" }} />
+            </button>
+
+            <button
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
+              style={{ background: "#272727", color: "#f1f1f1" }}
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({ title: selectedVideo.title, url: window.location.href });
+                }
+              }}
+            >
+              <Share2 className="w-5 h-5" />
+              <span>Share</span>
+            </button>
+
+            <button
+              onClick={async () => {
+                setShowComments(true);
+                if (selectedVideo.local_post_id) {
+                  setCommentsLoading(true);
+                  const c = await getPostComments(selectedVideo.local_post_id, user?.id);
+                  setComments(c);
+                  setCommentsLoading(false);
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium"
+              style={{ background: "#272727", color: "#f1f1f1" }}
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span>{engagementStats?.comments_count ?? selectedVideo.comments_count ?? 0}</span>
+            </button>
+          </div>
+
+          {/* Channel info */}
+          <div className="px-3 py-3 flex items-center justify-between gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
+            <button
+              type="button"
+              onClick={() => selectedVideo.uploader_user_id && navigate(`/channel/${selectedVideo.uploader_user_id}`)}
+              className="flex items-center gap-2.5 min-w-0"
+              disabled={!selectedVideo.uploader_user_id}
+            >
+              <div className="w-9 h-9 rounded-full overflow-hidden" style={{ background: "#272727" }}>
+                {selectedVideo.uploader_avatar_url ? (
+                  <img src={selectedVideo.uploader_avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full grid place-items-center text-xs font-bold" style={{ color: "#aaa" }}>
+                    {(selectedVideo.creator || "?")[0]?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="text-[13px] font-semibold truncate flex items-center gap-1" style={{ color: "#f1f1f1" }}>
+                  <span>{selectedVideo.creator || selectedVideo.uploader_guest_id || "Unknown"}</span>
+                  {selectedVideo.uploader_is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+                </p>
+                <p className="text-[11px]" style={{ color: "#aaa" }}>
+                  {channelLoading ? "..." : `${channelStats?.subscriber_count || 0} subscribers`}
+                </p>
+              </div>
+            </button>
+            {selectedVideo.uploader_user_id && selectedVideo.uploader_user_id !== user.id && (
+              <button
+                onClick={handleSubscribe}
+                disabled={subscribeLoading}
+                className="px-4 py-2 rounded-full text-[13px] font-semibold"
+                style={channelStats?.is_subscribed ? { background: "#272727", color: "#f1f1f1" } : { background: "#fff", color: "#0f0f0f" }}
+              >
+                {subscribeLoading ? "..." : channelStats?.is_subscribed ? "Subscribed" : "Subscribe"}
+              </button>
             )}
           </div>
+
           <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
             <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
             <span className="text-[12px]" style={{ color: "#aaa" }}>
@@ -711,6 +770,153 @@ export default function Reels() {
           </div>
         </div>
       )}
+
+      {/* YouTube-style Comment Bottom Sheet */}
+      <AnimatePresence>
+        {showComments && selectedVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100]"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={() => setShowComments(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="absolute bottom-0 left-0 right-0 rounded-t-2xl flex flex-col"
+              style={{ background: "#212121", maxHeight: "70vh" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid #383838" }}>
+                <h3 className="text-[16px] font-bold" style={{ color: "#f1f1f1" }}>Comments</h3>
+                <button onClick={() => setShowComments(false)} className="w-9 h-9 rounded-full grid place-items-center" style={{ background: "#383838" }}>
+                  <X className="w-5 h-5" style={{ color: "#f1f1f1" }} />
+                </button>
+              </div>
+
+              {/* Sort tabs */}
+              <div className="flex gap-2 px-4 py-2" style={{ borderBottom: "1px solid #383838" }}>
+                <button className="px-3 py-1.5 rounded-lg text-[13px] font-medium" style={{ background: "#f1f1f1", color: "#0f0f0f" }}>Top</button>
+                <button className="px-3 py-1.5 rounded-lg text-[13px] font-medium" style={{ background: "#383838", color: "#f1f1f1" }}>Newest</button>
+              </div>
+
+              {/* Comments list */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                {commentsLoading ? (
+                  <div className="py-8 flex justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#aaa" }} />
+                  </div>
+                ) : comments.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <MessageSquare className="w-10 h-10 mx-auto mb-2" style={{ color: "#555" }} />
+                    <p className="text-[14px]" style={{ color: "#aaa" }}>No comments yet</p>
+                    <p className="text-[12px]" style={{ color: "#717171" }}>Be the first to comment</p>
+                  </div>
+                ) : (
+                  comments.map((c) => (
+                    <div key={c.id} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden" style={{ background: "#383838" }}>
+                        {c.user?.avatar_url ? (
+                          <img src={c.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full grid place-items-center text-[11px] font-bold" style={{ color: "#aaa" }}>
+                            {(c.user?.display_name || "?")[0]?.toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] flex items-center gap-1" style={{ color: "#aaa" }}>
+                          <span className="font-medium">@{c.user?.display_name || c.user?.guest_id || "User"}</span>
+                          {c.user?.is_verified_badge && <VerifiedBadge className="h-3 w-3" />}
+                          <span>•</span>
+                          <span>{c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}</span>
+                        </p>
+                        <p className="text-[13px] mt-0.5 leading-[18px]" style={{ color: "#f1f1f1" }}>{c.content}</p>
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <button className="flex items-center gap-1 text-[12px]" style={{ color: "#aaa" }}>
+                            <ThumbsUp className="w-4 h-4" />
+                            <span>{c.likes_count || 0}</span>
+                          </button>
+                          <button className="flex items-center gap-1 text-[12px]" style={{ color: "#aaa" }}>
+                            <ThumbsDown className="w-4 h-4" />
+                          </button>
+                          <button className="flex items-center gap-1 text-[12px]" style={{ color: "#aaa" }}>
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Reply</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Comment input */}
+              <div className="flex items-center gap-2 px-4 py-3" style={{ borderTop: "1px solid #383838", background: "#212121" }}>
+                <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden" style={{ background: "#383838" }}>
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-[11px] font-bold" style={{ color: "#aaa" }}>
+                      {(user?.display_name || "?")[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <input
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="flex-1 h-9 rounded-full px-4 text-[13px] outline-none"
+                  style={{ background: "#383838", color: "#f1f1f1", border: "none" }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && commentText.trim()) {
+                      e.preventDefault();
+                      (async () => {
+                        if (!selectedVideo.local_post_id || !user) return;
+                        setCommentSending(true);
+                        await addComment(selectedVideo.local_post_id, user.id, commentText.trim());
+                        setCommentText("");
+                        const c = await getPostComments(selectedVideo.local_post_id, user.id);
+                        setComments(c);
+                        const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
+                        setEngagementStats(stats);
+                        setCommentSending(false);
+                      })();
+                    }
+                  }}
+                />
+                <button
+                  disabled={!commentText.trim() || commentSending}
+                  onClick={async () => {
+                    if (!selectedVideo.local_post_id || !user || !commentText.trim()) return;
+                    setCommentSending(true);
+                    await addComment(selectedVideo.local_post_id, user.id, commentText.trim());
+                    setCommentText("");
+                    const c = await getPostComments(selectedVideo.local_post_id, user.id);
+                    setComments(c);
+                    const stats = await getLocalVideoEngagement(selectedVideo.local_post_id);
+                    setEngagementStats(stats);
+                    setCommentSending(false);
+                  }}
+                  className="w-9 h-9 rounded-full grid place-items-center"
+                  style={{ background: commentText.trim() ? "#3ea6ff" : "#383838" }}
+                >
+                  {commentSending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#fff" }} />
+                  ) : (
+                    <Send className="w-4 h-4" style={{ color: commentText.trim() ? "#0f0f0f" : "#717171" }} />
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {selectedVideo && miniPlayer && (
         <div
@@ -750,6 +956,23 @@ export default function Reels() {
 
       <main ref={mainRef} className="flex-1 overflow-y-auto">
         <div className="pb-20">
+          {allVideos.length === 0 && loading && (
+            <div className="space-y-4 px-3 py-3">
+              {[1,2,3].map(i => (
+                <div key={i} className="animate-pulse">
+                  <div className="w-full aspect-video rounded-xl" style={{ background: "#272727" }} />
+                  <div className="flex gap-3 mt-3">
+                    <div className="w-9 h-9 rounded-full shrink-0" style={{ background: "#272727" }} />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 rounded" style={{ background: "#272727", width: "80%" }} />
+                      <div className="h-3 rounded" style={{ background: "#272727", width: "50%" }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
               {activeQuery ? `No results for "${activeQuery}"` : "Loading videos..."}
