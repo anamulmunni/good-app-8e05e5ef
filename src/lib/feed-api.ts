@@ -722,11 +722,17 @@ async function fetchDailymotionFallback(
 }
 
 export async function createLongVideoUpload(userId: number, videoUrl: string, title: string, duration?: number): Promise<Post> {
-  const { data, error } = await (supabase.from("posts").insert({
+  return createLongVideoUploadWithThumbnail(userId, videoUrl, title, duration);
+}
+
+export async function createLongVideoUploadWithThumbnail(userId: number, videoUrl: string, title: string, duration?: number, thumbnailUrl?: string): Promise<Post> {
+  const insertData: any = {
     user_id: userId,
     content: buildLongVideoContent(title, duration),
     video_url: videoUrl,
-  } as any).select().single() as any);
+  };
+  if (thumbnailUrl) insertData.image_url = thumbnailUrl;
+  const { data, error } = await (supabase.from("posts").insert(insertData).select().single() as any);
 
   if (error) throw error;
   return data;
@@ -740,7 +746,7 @@ export async function getUploadedLongVideos(
   const from = Math.max(0, (page - 1) * rows);
   const to = from + rows - 1;
 
-  let query = (supabase.from("posts").select("id,user_id,video_url,content,created_at,likes_count,comments_count", { count: "exact" }) as any)
+  let query = (supabase.from("posts").select("id,user_id,video_url,content,created_at,likes_count,comments_count,image_url", { count: "exact" }) as any)
     .not("video_url", "is", null)
     .like("content", `${LONG_VIDEO_MARKER}%`)
     .order("created_at", { ascending: false })
@@ -778,6 +784,7 @@ export async function getUploadedLongVideos(
       uploader_is_verified_badge: Boolean(owner?.is_verified_badge),
       likes_count: Number(p.likes_count || 0),
       comments_count: Number(p.comments_count || 0),
+      thumbnail_url: p.image_url || null,
     };
   });
 
@@ -796,7 +803,7 @@ export async function getUploadedLongVideos(
 }
 
 export async function getUploadedLongVideoByPostId(postId: string): Promise<ExternalReelVideo | null> {
-  const { data: post } = await (supabase.from("posts").select("id,user_id,video_url,content,created_at,likes_count,comments_count") as any)
+  const { data: post } = await (supabase.from("posts").select("id,user_id,video_url,content,created_at,likes_count,comments_count,image_url") as any)
     .eq("id", postId)
     .not("video_url", "is", null)
     .like("content", `${LONG_VIDEO_MARKER}%`)
@@ -827,6 +834,7 @@ export async function getUploadedLongVideoByPostId(postId: string): Promise<Exte
     uploader_is_verified_badge: Boolean(owner?.is_verified_badge),
     likes_count: Number(post.likes_count || 0),
     comments_count: Number(post.comments_count || 0),
+    thumbnail_url: post.image_url || null,
   };
 }
 

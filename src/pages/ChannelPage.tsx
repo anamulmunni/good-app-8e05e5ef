@@ -11,7 +11,7 @@ import {
   type ChannelStats,
   type ExternalReelVideo,
 } from "@/lib/feed-api";
-import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Play, User, Video, Loader2, Search, X, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 function parseLongVideoMeta(content?: string | null): { title: string; duration?: number } | null {
@@ -44,6 +44,7 @@ type ChannelVideo = {
   post_id: string;
   title: string;
   video_url: string;
+  thumbnail_url?: string | null;
   duration?: number;
   likes_count: number;
   comments_count: number;
@@ -85,6 +86,7 @@ export default function ChannelPage() {
     queryKey: ["channel-videos", channelUserId],
     queryFn: async () => {
       const { data: posts } = await (supabase.from("posts").select("*") as any)
+        // selecting all fields including image_url for thumbnail
         .eq("user_id", channelUserId)
         .not("video_url", "is", null)
         .like("content", `${LONG_VIDEO_MARKER}%`)
@@ -99,6 +101,7 @@ export default function ChannelPage() {
           post_id: p.id,
           title: parsed?.title || "Video",
           video_url: p.video_url,
+          thumbnail_url: p.image_url || null,
           duration: parsed?.duration,
           likes_count: Number(p.likes_count || 0),
           comments_count: Number(p.comments_count || 0),
@@ -240,11 +243,44 @@ export default function ChannelPage() {
                 <Video className="w-4 h-4" /> Upload Video
               </button>
               <button
-                onClick={() => navigate("/profile")}
+                onClick={async () => {
+                  const channelUrl = `${window.location.origin}/channel/${channelUserId}`;
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({ title: `${channelOwner.display_name || channelOwner.guest_id} - good-app`, url: channelUrl });
+                    } else {
+                      await navigator.clipboard.writeText(channelUrl);
+                      alert("Channel link copied!");
+                    }
+                  } catch {}
+                }}
                 className="flex-1 py-2.5 rounded-full text-[13px] font-semibold"
                 style={{ background: "#272727", color: "#f1f1f1" }}
               >
-                Edit Profile
+                Share Channel
+              </button>
+            </div>
+          )}
+
+          {!isOwnChannel && (
+            <div className="mt-2 flex justify-end">
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const channelUrl = `${window.location.origin}/channel/${channelUserId}`;
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({ title: `${channelOwner.display_name || channelOwner.guest_id} - good-app`, url: channelUrl });
+                    } else {
+                      await navigator.clipboard.writeText(channelUrl);
+                      alert("Channel link copied!");
+                    }
+                  } catch {}
+                }}
+                className="px-3 py-1.5 rounded-full text-[12px] font-medium flex items-center gap-1"
+                style={{ background: "#272727", color: "#aaa" }}
+              >
+                <Share2 className="w-3.5 h-3.5" /> Share
               </button>
             </div>
           )}
@@ -289,11 +325,15 @@ export default function ChannelPage() {
                 >
                   {/* Thumbnail - use video poster or placeholder */}
                   <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
-                    <video
-                      src={video.video_url}
-                      preload="metadata"
-                      className="w-full h-full object-cover pointer-events-none"
-                    />
+                    {video.thumbnail_url ? (
+                      <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <video
+                        src={video.video_url}
+                        preload="metadata"
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
+                    )}
                     {video.duration ? (
                       <span className="absolute right-1 bottom-1 text-[11px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
                         {fmt(video.duration)}
@@ -329,6 +369,25 @@ export default function ChannelPage() {
                         {video.comments_count > 0 && `${video.comments_count} comments • `}
                         {timeAgo(video.created_at)}
                       </p>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const videoUrl = `${window.location.origin}/watch/${video.post_id}`;
+                          try {
+                            if (navigator.share) {
+                              await navigator.share({ title: video.title, url: videoUrl });
+                            } else {
+                              await navigator.clipboard.writeText(videoUrl);
+                              alert("Video link copied!");
+                            }
+                          } catch {}
+                        }}
+                        className="flex items-center gap-1 mt-1 text-[11px] font-medium"
+                        style={{ color: "#3ea6ff" }}
+                      >
+                        <Share2 className="w-3 h-3" /> Share video link
+                      </button>
                     </div>
                   </div>
                 </button>

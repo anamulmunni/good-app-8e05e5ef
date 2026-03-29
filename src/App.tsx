@@ -16,6 +16,7 @@ import Reels from "./pages/Reels";
 import ShortReels from "./pages/ShortReels";
 import UserProfile from "./pages/UserProfile";
 import ChannelPage from "./pages/ChannelPage";
+import WatchVideo from "./pages/WatchVideo";
 import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
 import Install from "./pages/Install";
@@ -54,6 +55,7 @@ function AppInner() {
         <Route path="/short-reels" element={<ShortReels />} />
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/channel/:userId" element={<ChannelPage />} />
+        <Route path="/watch/:postId" element={<WatchVideo />} />
         <Route path="/call/:userId" element={<CallPage />} />
         <Route path="/install" element={<Install />} />
         <Route path="/~oauth" element={<Login />} />
