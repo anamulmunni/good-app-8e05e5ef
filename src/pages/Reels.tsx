@@ -655,21 +655,33 @@ export default function Reels() {
   const handleSearch = useCallback(() => {
     const q = searchInput.trim();
     setSearchQuery(q);
-    if (q) setSelectedChip("All");
+    if (q) {
+      setSelectedChip("All");
+      saveSearchHistory(q);
+      setSearchHistory(readSearchHistory());
+    }
     setSearchMode(false);
+    // Scroll to top after search
+    setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
   }, [searchInput]);
 
   const handleChip = useCallback((chip: string) => {
     setSelectedChip(chip);
     setSearchQuery("");
     setSearchInput("");
+    setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
   }, []);
 
   const playVideo = useCallback((v: VideoItem) => {
     trackVideoPreference({ title: v.title });
+    saveToWatchHistory(v);
+    setWatchHistory(readWatchHistory());
     setSelectedVideo(v);
     setMiniPlayer(false);
-    setTimeout(() => playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setTimeout(() => {
+      playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }, 50);
   }, []);
 
   const openSearch = useCallback(() => {
