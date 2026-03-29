@@ -11,7 +11,7 @@ import {
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
-import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Smile, Palette } from "lucide-react";
+import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Smile, Palette, Video, Trash2 } from "lucide-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -26,14 +26,20 @@ type PendingMedia = {
   status: "uploading" | "sending" | "failed";
 };
 
-// Chat themes
+// Chat themes - Messenger-style beautiful themes
 const CHAT_THEMES = [
-  { name: "Messenger", gradient: "linear-gradient(to right, #0084ff, #0099ff)", bg: "#e8e8e8", bubbleFrom: "#0084ff", bubbleTo: "#0099ff", accent: "#0084ff" },
-  { name: "Love", gradient: "linear-gradient(to right, #ff6b6b, #ee5a24)", bg: "#fce4ec", bubbleFrom: "#ff6b6b", bubbleTo: "#ee5a24", accent: "#ff6b6b" },
-  { name: "Ocean", gradient: "linear-gradient(to right, #00b894, #00cec9)", bg: "#e0f7fa", bubbleFrom: "#00b894", bubbleTo: "#00cec9", accent: "#00b894" },
-  { name: "Purple", gradient: "linear-gradient(to right, #a855f7, #6366f1)", bg: "#f3e8ff", bubbleFrom: "#a855f7", bubbleTo: "#6366f1", accent: "#a855f7" },
-  { name: "Sunset", gradient: "linear-gradient(to right, #f97316, #ef4444)", bg: "#fff7ed", bubbleFrom: "#f97316", bubbleTo: "#ef4444", accent: "#f97316" },
-  { name: "Dark", gradient: "linear-gradient(to right, #374151, #1f2937)", bg: "#111827", bubbleFrom: "#374151", bubbleTo: "#1f2937", accent: "#6b7280" },
+  { name: "Messenger", gradient: "linear-gradient(135deg, #0084ff, #00c6ff)", bg: "#f0f2f5", bubbleFrom: "#0084ff", bubbleTo: "#00c6ff", accent: "#0084ff" },
+  { name: "Love", gradient: "linear-gradient(135deg, #ff4b6e, #ff2d55)", bg: "#fff0f3", bubbleFrom: "#ff4b6e", bubbleTo: "#ff2d55", accent: "#ff2d55" },
+  { name: "Ocean", gradient: "linear-gradient(135deg, #00d2ff, #3a7bd5)", bg: "#e8f4f8", bubbleFrom: "#00d2ff", bubbleTo: "#3a7bd5", accent: "#00d2ff" },
+  { name: "Purple", gradient: "linear-gradient(135deg, #8b5cf6, #6366f1)", bg: "#f0e6ff", bubbleFrom: "#8b5cf6", bubbleTo: "#6366f1", accent: "#8b5cf6" },
+  { name: "Sunset", gradient: "linear-gradient(135deg, #ff6b35, #f72585)", bg: "#fff5f0", bubbleFrom: "#ff6b35", bubbleTo: "#f72585", accent: "#ff6b35" },
+  { name: "Dark", gradient: "linear-gradient(135deg, #4a5568, #2d3748)", bg: "#0f172a", bubbleFrom: "#4a5568", bubbleTo: "#2d3748", accent: "#64748b" },
+  { name: "Forest", gradient: "linear-gradient(135deg, #22c55e, #16a34a)", bg: "#f0fdf4", bubbleFrom: "#22c55e", bubbleTo: "#16a34a", accent: "#22c55e" },
+  { name: "Rose Gold", gradient: "linear-gradient(135deg, #f43f5e, #e11d48)", bg: "#fff1f2", bubbleFrom: "#f43f5e", bubbleTo: "#e11d48", accent: "#f43f5e" },
+  { name: "Aurora", gradient: "linear-gradient(135deg, #06b6d4, #8b5cf6)", bg: "#ecfeff", bubbleFrom: "#06b6d4", bubbleTo: "#8b5cf6", accent: "#06b6d4" },
+  { name: "Gold", gradient: "linear-gradient(135deg, #f59e0b, #d97706)", bg: "#fffbeb", bubbleFrom: "#f59e0b", bubbleTo: "#d97706", accent: "#f59e0b" },
+  { name: "Galaxy", gradient: "linear-gradient(135deg, #6366f1, #ec4899)", bg: "#fdf2f8", bubbleFrom: "#6366f1", bubbleTo: "#ec4899", accent: "#6366f1" },
+  { name: "Neon", gradient: "linear-gradient(135deg, #00ff87, #60efff)", bg: "#f0fdf4", bubbleFrom: "#00ff87", bubbleTo: "#60efff", accent: "#00ff87" },
 ];
 
 const QUICK_EMOJIS = ["❤️", "😍", "🔥", "😂", "👍", "😘", "🥰", "💕"];
@@ -61,6 +67,8 @@ export default function Chat() {
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [defaultEmoji, setDefaultEmoji] = useState(() => localStorage.getItem("chat-emoji") || "❤️");
   const [showEmojiSwitch, setShowEmojiSwitch] = useState(false);
+  const [deleteConvoTarget, setDeleteConvoTarget] = useState<Conversation | null>(null);
+  const convoLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Love hold animation
   const [loveScale, setLoveScale] = useState(1);
   const [loveHolding, setLoveHolding] = useState(false);
@@ -464,9 +472,13 @@ export default function Chat() {
             </p>
             <p className="text-[11px]" style={{ color: isDarkTheme ? "#9ca3af" : "#6b7280" }}>{otherOnline ? "Active now" : `Last seen ${lastSeenAgo(otherUser.online_at)}`}</p>
           </button>
-          <button onClick={() => navigate(`/call/${otherUser.id}`)}
+          <button onClick={() => navigate(`/call/${otherUser.id}?auto=1`)}
             className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: theme.accent }}>
             <Phone size={20} />
+          </button>
+          <button onClick={() => navigate(`/call/${otherUser.id}?video=1&auto=1`)}
+            className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: theme.accent }}>
+            <Video size={20} />
           </button>
           <button onClick={() => setShowThemePicker(true)}
             className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: theme.accent }}>
@@ -646,13 +658,13 @@ export default function Chat() {
                 style={{ background: isDarkTheme ? "#1f2937" : "#fff" }}
                 onClick={(e) => e.stopPropagation()}>
                 <p className="text-center font-bold text-[16px]" style={{ color: isDarkTheme ? "#f9fafb" : "#111827" }}>Chat Theme</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto">
                   {CHAT_THEMES.map((t, idx) => (
                     <button key={idx} onClick={() => setTheme(idx)}
-                      className={`rounded-xl p-3 flex flex-col items-center gap-2 border-2 ${chatThemeIndex === idx ? "border-blue-500" : "border-transparent"}`}
+                      className={`rounded-xl p-2 flex flex-col items-center gap-1.5 border-2 ${chatThemeIndex === idx ? "border-blue-500" : "border-transparent"}`}
                       style={{ background: isDarkTheme ? "#374151" : "#f9fafb" }}>
-                      <div className="w-10 h-10 rounded-full" style={{ background: t.gradient }} />
-                      <span className="text-[11px] font-semibold" style={{ color: isDarkTheme ? "#d1d5db" : "#374151" }}>{t.name}</span>
+                      <div className="w-9 h-9 rounded-full" style={{ background: t.gradient }} />
+                      <span className="text-[10px] font-semibold" style={{ color: isDarkTheme ? "#d1d5db" : "#374151" }}>{t.name}</span>
                     </button>
                   ))}
                 </div>
@@ -823,6 +835,10 @@ export default function Chat() {
           const hasUnread = unreadCount > 0;
           return (
             <button key={convo.id} onClick={() => openConversation(convo)}
+              onContextMenu={(e) => { e.preventDefault(); setDeleteConvoTarget(convo); }}
+              onTouchStart={() => { convoLongPressRef.current = setTimeout(() => setDeleteConvoTarget(convo), 600); }}
+              onTouchEnd={() => { if (convoLongPressRef.current) clearTimeout(convoLongPressRef.current); }}
+              onTouchCancel={() => { if (convoLongPressRef.current) clearTimeout(convoLongPressRef.current); }}
               className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl text-left transition-colors"
               style={{ background: hasUnread ? "rgba(0,132,255,0.06)" : "transparent" }}>
               <div className="relative">
@@ -857,6 +873,40 @@ export default function Chat() {
           );
         })}
       </div>
+
+      {/* Conversation Delete Modal */}
+      <AnimatePresence>
+        {deleteConvoTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[220] bg-black/40" onClick={() => setDeleteConvoTarget(null)}>
+            <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
+              className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-4 space-y-2"
+              style={{ background: "#fff" }}
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-3">
+                <Trash2 size={20} style={{ color: "#ef4444" }} />
+                <p className="font-bold text-[16px]" style={{ color: "#111827" }}>Chat মুছে ফেলবেন?</p>
+              </div>
+              <p className="text-[13px] mb-3" style={{ color: "#6b7280" }}>এই কথোপকথন মুছে ফেলা হবে। আপনি আবার মেসেজ পাঠালে নতুন কথোপকথন তৈরি হবে।</p>
+              <button onClick={async () => {
+                try {
+                  await (supabase.from("conversations").delete().eq("id", deleteConvoTarget.id) as any);
+                  queryClient.invalidateQueries({ queryKey: ["conversations", user?.id] });
+                  toast({ title: "Chat মুছে ফেলা হয়েছে" });
+                } catch { toast({ title: "মুছতে পারা যায়নি", variant: "destructive" }); }
+                setDeleteConvoTarget(null);
+              }}
+                className="w-full h-11 rounded-xl bg-red-500 text-white text-sm font-semibold">
+                Delete
+              </button>
+              <button onClick={() => setDeleteConvoTarget(null)}
+                className="w-full h-11 rounded-xl text-sm font-medium" style={{ background: "#f3f4f6", color: "#6b7280" }}>
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -8,14 +8,17 @@ type Tone = {
   waveform: OscillatorType;
 };
 
+// Messenger-style crisp pop sounds — louder & more satisfying
 const SOUND_MAP: Record<UiSoundType, Tone[]> = {
   like: [
-    { frequency: 880, durationMs: 42, delayMs: 0, gain: 0.08, waveform: "sine" },
-    { frequency: 1318.51, durationMs: 58, delayMs: 48, gain: 0.09, waveform: "triangle" },
+    { frequency: 1046.5, durationMs: 60, delayMs: 0, gain: 0.28, waveform: "sine" },
+    { frequency: 1568, durationMs: 80, delayMs: 50, gain: 0.22, waveform: "sine" },
+    { frequency: 2093, durationMs: 50, delayMs: 100, gain: 0.15, waveform: "sine" },
   ],
   message: [
-    { frequency: 740, durationMs: 80, delayMs: 0, gain: 0.07, waveform: "triangle" },
-    { frequency: 987.77, durationMs: 120, delayMs: 88, gain: 0.08, waveform: "triangle" },
+    { frequency: 587.33, durationMs: 70, delayMs: 0, gain: 0.3, waveform: "sine" },
+    { frequency: 880, durationMs: 100, delayMs: 70, gain: 0.25, waveform: "sine" },
+    { frequency: 1174.66, durationMs: 130, delayMs: 140, gain: 0.18, waveform: "sine" },
   ],
 };
 
@@ -44,23 +47,28 @@ function getAudioContext(): AudioContext | null {
 
 function playTone(ctx: AudioContext, tone: Tone) {
   const now = ctx.currentTime + tone.delayMs / 1000;
-  const attack = 0.01;
-  const release = Math.max(0.04, tone.durationMs / 1000);
+  const attack = 0.008;
+  const decay = 0.04;
+  const sustain = tone.gain * 0.6;
+  const release = Math.max(0.06, tone.durationMs / 1000);
 
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
 
   oscillator.type = tone.waveform;
   oscillator.frequency.setValueAtTime(tone.frequency, now);
+  
+  // Sharp attack for a crisp pop
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, tone.gain), now + attack);
+  gain.gain.linearRampToValueAtTime(Math.max(0.0001, tone.gain), now + attack);
+  gain.gain.linearRampToValueAtTime(Math.max(0.0001, sustain), now + attack + decay);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + release);
 
   oscillator.connect(gain);
   gain.connect(ctx.destination);
 
   oscillator.start(now);
-  oscillator.stop(now + release + 0.01);
+  oscillator.stop(now + release + 0.02);
 }
 
 export function playUiSound(type: UiSoundType) {
