@@ -851,7 +851,10 @@ export default function Chat() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center">
-                  <p className={`text-[15px] truncate ${hasUnread ? "font-black text-gray-900 dark:text-foreground" : "font-semibold text-gray-700 dark:text-foreground/80"}`}>{other?.display_name || `User #${otherId}`}</p>
+                  <p className={`text-[15px] truncate inline-flex items-center gap-1 ${hasUnread ? "font-black text-gray-900 dark:text-foreground" : "font-semibold text-gray-700 dark:text-foreground/80"}`}>
+                    <span>{other?.display_name || `User #${otherId}`}</span>
+                    {other?.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+                  </p>
                   <span className={`text-[11px] whitespace-nowrap ml-2 ${hasUnread ? "text-blue-600 dark:text-primary font-bold" : "text-gray-400"}`}>
                     {timeAgo(convo.last_message_at)}
                   </span>
