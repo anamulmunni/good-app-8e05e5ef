@@ -1049,7 +1049,7 @@ export default function Feed() {
                       <span className="text-[11px] font-semibold text-gray-900 dark:text-foreground mt-1">Create story</span>
                     </div>
                   </button>
-                  <input ref={storyInputRef} type="file" accept="image/*" className="hidden" onChange={handleStorySelect} />
+                  <input ref={storyInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleStorySelect} />
 
                   {Object.entries(storyGroups).map(([uid, userStories]) => {
                     const storyUser = userStories[0].user;
