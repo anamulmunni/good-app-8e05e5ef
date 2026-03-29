@@ -651,14 +651,37 @@ export default function Reels() {
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="Search good-app"
-                className="w-full h-10 rounded-full px-4 pr-10 text-sm outline-none"
+                className="w-full h-10 rounded-full px-4 pr-20 text-sm outline-none"
                 style={{ background: "#222", color: "#fff", border: "1px solid #333" }}
               />
-              {searchInput && (
-                <button onClick={() => setSearchInput("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <X className="w-4 h-4" style={{ color: "#aaa" }} />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchInput && (
+                  <button onClick={() => setSearchInput("")}>
+                    <X className="w-4 h-4" style={{ color: "#aaa" }} />
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+                    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+                    const recognition = new SpeechRecognition();
+                    recognition.lang = 'bn-BD';
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+                    recognition.onresult = (event: any) => {
+                      const transcript = event.results[0][0].transcript;
+                      setSearchInput(transcript);
+                      setTimeout(() => handleSearch(), 300);
+                    };
+                    recognition.start();
+                  }}
+                  className="w-8 h-8 rounded-full grid place-items-center"
+                  style={{ background: "#333" }}
+                  title="Voice search"
+                >
+                  <Mic className="w-4 h-4" style={{ color: "#ff4444" }} />
                 </button>
-              )}
+              </div>
             </div>
             <button onClick={handleSearch} className="h-10 w-10 shrink-0 rounded-full grid place-items-center" style={{ background: "#222" }}>
               <Search className="w-5 h-5" style={{ color: "#fff" }} />
