@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,6 +11,7 @@ import {
   getChannelStats,
   getLocalVideoEngagement,
   getUploadedLongVideos,
+  getUploadedLongVideoByPostId,
   toggleChannelSubscription,
   trackVideoPreference,
   type ExternalReelVideo,
@@ -19,6 +20,7 @@ import {
   getPostComments,
   addComment,
   toggleReaction,
+  getUserReactions,
   type PostComment,
 } from "@/lib/feed-api";
 
@@ -87,6 +89,25 @@ function dedupeVideos(items: ExternalReelVideo[]): ExternalReelVideo[] {
   });
 }
 
+function mapExternalVideoToVideoItem(v: ExternalReelVideo): VideoItem {
+  return {
+    id: v.id,
+    title: v.title,
+    video_url: v.video_url,
+    thumbnail_url: v.thumbnail_url,
+    creator: v.creator || "",
+    duration: v.duration,
+    isExternal: v.source !== "good-app",
+    uploader_user_id: v.uploader_user_id,
+    uploader_guest_id: v.uploader_guest_id,
+    uploader_avatar_url: v.uploader_avatar_url,
+    uploader_is_verified_badge: v.uploader_is_verified_badge,
+    local_post_id: v.local_post_id,
+    likes_count: v.likes_count,
+    comments_count: v.comments_count,
+  };
+}
+
 function timeAgo(sec?: number) {
   if (!sec) return "";
   if (sec < 60) return `${sec}s ago`;
@@ -152,7 +173,10 @@ function viewCount() {
 
 export default function Reels() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isLoading } = useAuth();
+  const playParam = searchParams.get("play");
+  const uploadParam = searchParams.get("upload");
 
   const [searchMode, setSearchMode] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -184,6 +208,7 @@ export default function Reels() {
   const [commentSending, setCommentSending] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
+  const [externalReactions, setExternalReactions] = useState<Record<string, { reaction: "like" | "dislike" | null; likes: number }>>({});
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
