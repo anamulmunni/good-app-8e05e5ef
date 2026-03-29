@@ -2,6 +2,17 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User as AppUser } from "@/lib/api";
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 12000, message = "Request timeout") {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export function useAuth() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -9,11 +20,11 @@ export function useAuth() {
   const fetchedRef = useRef(false);
 
   const fetchOrCreateAppUser = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
-    const { data: existing } = await (supabase
+    const { data: existing } = await withTimeout((supabase
       .from("users")
       .select("*") as any)
       .eq("auth_id", authUser.id)
-      .single();
+      .single(), 12000, "User fetch timeout");
 
     if (existing) {
       setUser(existing);
@@ -24,7 +35,7 @@ export function useAuth() {
     const displayName = meta.display_name || "User";
     const phone = meta.phone || "";
 
-    const { data: newUser, error } = await (supabase
+    const { data: newUser, error } = await withTimeout((supabase
       .from("users")
       .insert({
         auth_id: authUser.id,
@@ -32,7 +43,7 @@ export function useAuth() {
         display_name: displayName,
       } as any)
       .select() as any)
-      .single();
+      .single(), 12000, "User create timeout");
 
     if (error) {
       console.error("Error creating user:", error);
@@ -44,31 +55,53 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Get session first, then listen for changes
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchOrCreateAppUser(session.user).finally(() => setIsLoading(false));
-        fetchedRef.current = true;
-      } else {
+    withTimeout(supabase.auth.getSession(), 12000, "Session timeout")
+      .then(({ data: { session } }) => {
+        if (!isMounted) return;
+        if (session?.user) {
+          fetchOrCreateAppUser(session.user).finally(() => {
+            if (isMounted) setIsLoading(false);
+          });
+          fetchedRef.current = true;
+        } else {
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Session init failed:", error);
+        if (!isMounted) return;
+        setUser(null);
         setIsLoading(false);
-      }
-    });
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
       if (session?.user) {
         // Skip if we already fetched on mount
         if (fetchedRef.current) {
           fetchedRef.current = false;
           return;
         }
-        fetchOrCreateAppUser(session.user).finally(() => setIsLoading(false));
+        fetchOrCreateAppUser(session.user)
+          .catch((error) => {
+            console.error("Auth state user fetch failed:", error);
+          })
+          .finally(() => {
+            if (isMounted) setIsLoading(false);
+          });
       } else {
         setUser(null);
         setIsLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchOrCreateAppUser]);
 
   const logout = useCallback(async () => {
@@ -78,7 +111,11 @@ export function useAuth() {
 
   const refreshUser = useCallback(async () => {
     if (user?.id) {
-      const { data } = await supabase.from("users").select("*").eq("id", user.id).single();
+      const { data } = await withTimeout(
+        supabase.from("users").select("*").eq("id", user.id).single(),
+        12000,
+        "User refresh timeout",
+      );
       if (data) setUser(data);
     }
   }, [user?.id]);
