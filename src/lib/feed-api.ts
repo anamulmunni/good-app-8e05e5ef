@@ -393,13 +393,16 @@ async function fetchYouTubeVideos(
   rows = 20,
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  // Public YouTube proxy instances are unstable and currently causing heavy loading.
-  // Keep feed fast by relying on local + Dailymotion for now.
-  void searchQuery;
-  void page;
-  void rows;
-  void freshnessToken;
-  return { videos: [], hasMore: false };
+  const query = (searchQuery || "").trim() || "bangla new song 2026";
+  try {
+    const raw = await fetchYouTubeViaEdge(query, page, freshnessToken);
+    const videos = raw
+      .map(youtubeResultToExternal)
+      .filter(Boolean) as ExternalReelVideo[];
+    return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
+  } catch {
+    return { videos: [], hasMore: false };
+  }
 }
 
 function buildSearchVariants(searchQuery?: string): string[] {
