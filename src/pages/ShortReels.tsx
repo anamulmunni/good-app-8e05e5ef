@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import {
 import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Music, Play, Pause } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { getShuffledSampleReels } from "@/lib/sample-reels";
 
 function ReelsCaption({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
