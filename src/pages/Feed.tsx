@@ -83,8 +83,8 @@ export default function Feed() {
   });
 
   // Paginated display
-  const posts = allPosts.filter(p => !hiddenPosts.has(p.id)).slice(0, page * POSTS_PER_PAGE);
-  const hasMore = posts.length < allPosts.filter(p => !hiddenPosts.has(p.id)).length;
+  const posts = allPosts.filter(p => !hiddenPosts.has(p.id) && !p.video_url).slice(0, page * POSTS_PER_PAGE);
+  const hasMore = posts.length < allPosts.filter(p => !hiddenPosts.has(p.id) && !p.video_url).length;
 
   // Infinite scroll observer
   useEffect(() => {
