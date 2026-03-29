@@ -44,6 +44,7 @@ type ChannelVideo = {
   post_id: string;
   title: string;
   video_url: string;
+  thumbnail_url?: string | null;
   duration?: number;
   likes_count: number;
   comments_count: number;
@@ -85,6 +86,7 @@ export default function ChannelPage() {
     queryKey: ["channel-videos", channelUserId],
     queryFn: async () => {
       const { data: posts } = await (supabase.from("posts").select("*") as any)
+        // selecting all fields including image_url for thumbnail
         .eq("user_id", channelUserId)
         .not("video_url", "is", null)
         .like("content", `${LONG_VIDEO_MARKER}%`)
@@ -99,6 +101,7 @@ export default function ChannelPage() {
           post_id: p.id,
           title: parsed?.title || "Video",
           video_url: p.video_url,
+          thumbnail_url: p.image_url || null,
           duration: parsed?.duration,
           likes_count: Number(p.likes_count || 0),
           comments_count: Number(p.comments_count || 0),
