@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import StoryEditor from "@/components/StoryEditor";
 import StoryViewer from "@/components/StoryViewer";
+import { playUiSound } from "@/lib/ui-sounds";
 
 export default function Feed() {
   const { user, isLoading } = useAuth();
@@ -180,6 +181,7 @@ export default function Feed() {
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
         queryClient.invalidateQueries({ queryKey: ["unread-count"] });
+        playUiSound("message");
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests" }, () => {
         queryClient.invalidateQueries({ queryKey: ["friend-request-count"] });
@@ -244,6 +246,9 @@ export default function Feed() {
     onMutate: async ({ postId, type }) => {
       const prev = userReactions[postId];
       const isSameReaction = prev === type;
+      if (!isSameReaction) {
+        playUiSound("like");
+      }
       setUserReactions(r => {
         const next = { ...r };
         if (isSameReaction) delete next[postId];
@@ -685,7 +690,10 @@ export default function Feed() {
           )}
 
           {/* Facebook-style Action buttons */}
-          <div className="px-1 py-1 border-t border-gray-200 dark:border-border/20 grid grid-cols-3 relative">
+          <div
+            className="px-1 py-1 border-t border-gray-200 dark:border-border/20 grid grid-cols-3 relative select-none"
+            style={{ WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+          >
             <div className="relative">
               <button
                 onClick={() => reactionMutation.mutate({ postId: post.id, type: myReaction || "like" })}
@@ -695,7 +703,7 @@ export default function Feed() {
                   const cleanup = () => { clearTimeout(timer); document.removeEventListener("touchend", cleanup); };
                   document.addEventListener("touchend", cleanup);
                 }}
-                className={`flex items-center justify-center gap-2 py-2.5 w-full rounded-lg transition-colors ${
+                className={`flex items-center justify-center gap-2 py-2.5 w-full rounded-lg transition-colors select-none ${
                   myReaction ? "text-blue-600 dark:text-primary" : "text-gray-600 dark:text-muted-foreground"
                 }`}>
                 {myReaction ? (
@@ -703,7 +711,7 @@ export default function Feed() {
                 ) : (
                   <ThumbsUp className="w-5 h-5" />
                 )}
-                <span className="text-[13px] font-semibold">{myReaction ? (myReaction === "like" ? "পছন্দ" : REACTION_EMOJIS[myReaction]) : "পছন্দ"}</span>
+                <span className="text-[13px] font-semibold select-none">{myReaction ? (myReaction === "like" ? "পছন্দ" : REACTION_EMOJIS[myReaction]) : "পছন্দ"}</span>
               </button>
 
               <AnimatePresence>
@@ -724,15 +732,17 @@ export default function Feed() {
             </div>
 
             <button onClick={() => openComments(post.id)}
-              className="flex items-center justify-center gap-2 py-2.5 text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary/50 rounded-lg transition-colors">
+              className="flex items-center justify-center gap-2 py-2.5 text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary/50 rounded-lg transition-colors select-none"
+              onContextMenu={(e) => e.preventDefault()}>
               <MessageCircle className="w-5 h-5" />
-              <span className="text-[13px] font-semibold">মন্তব্য</span>
+              <span className="text-[13px] font-semibold select-none">মন্তব্য</span>
             </button>
 
             <button onClick={() => sharePost(post)}
-              className="flex items-center justify-center gap-2 py-2.5 text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary/50 rounded-lg transition-colors">
+              className="flex items-center justify-center gap-2 py-2.5 text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary/50 rounded-lg transition-colors select-none"
+              onContextMenu={(e) => e.preventDefault()}>
               <Share2 className="w-5 h-5" />
-              <span className="text-[13px] font-semibold">শেয়ার</span>
+              <span className="text-[13px] font-semibold select-none">শেয়ার</span>
             </button>
           </div>
         </div>
