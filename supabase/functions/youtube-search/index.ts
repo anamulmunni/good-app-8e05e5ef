@@ -36,6 +36,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+function normalizePage(page: number, maxPage = 6): number {
+  const safe = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+  return ((safe - 1) % Math.max(1, maxPage)) + 1;
+}
+
 function normalizeVideo(item: any): any | null {
   const videoId = String(item?.videoId || "").trim();
   if (!videoId) return null;
@@ -56,7 +61,8 @@ function normalizeVideo(item: any): any | null {
 }
 
 async function tryInvidiousInstance(instance: string, query: string, page: number): Promise<any[]> {
-  const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${page}&type=video&sort_by=relevance&region=BD`;
+  const queryPage = normalizePage(page, 7);
+  const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&page=${queryPage}&type=video&sort_by=relevance&region=BD`;
   const res = await withTimeout(fetch(url), 3200);
   if (!res.ok) return [];
   const data = await res.json();
@@ -174,8 +180,9 @@ serve(async (req) => {
     const query = String(url.searchParams.get("q") || "bangla new song 2025").trim().slice(0, 140);
     const pageRaw = Number(url.searchParams.get("page") || "1");
     const seedRaw = Number(url.searchParams.get("seed") || "0");
-    const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(20, Math.floor(pageRaw))) : 1;
+    const page = Number.isFinite(pageRaw) ? Math.max(1, Math.min(120, Math.floor(pageRaw))) : 1;
     const seed = Number.isFinite(seedRaw) ? seedRaw : 0;
+    const normalizedPage = normalizePage(page, 7);
 
     if (!query) {
       return new Response(JSON.stringify({ results: [] }), {
@@ -184,13 +191,32 @@ serve(async (req) => {
     }
 
     const [invidiousResults, pipedResults, noKeyResults] = await Promise.all([
-      searchInvidious(query, page),
+      searchInvidious(query, normalizedPage),
       searchPiped(query),
       searchNoKeyApi(query),
     ]);
 
-    const merged = dedupeVideos([...invidiousResults, ...pipedResults, ...noKeyResults]);
-    const shuffled = seededShuffle(merged, seed + page * 29).slice(0, 120);
+    let merged = dedupeVideos([...invidiousResults, ...pipedResults, ...noKeyResults]);
+
+    if (merged.length === 0 && normalizedPage !== 1) {
+      const [retryInvidious, retryPiped, retryNoKey] = await Promise.all([
+        searchInvidious(query, 1),
+        searchPiped(query),
+        searchNoKeyApi(query),
+      ]);
+      merged = dedupeVideos([...retryInvidious, ...retryPiped, ...retryNoKey]);
+    }
+
+    if (merged.length === 0 && query !== "bangla new song 2025") {
+      const [fallbackInvidious, fallbackPiped, fallbackNoKey] = await Promise.all([
+        searchInvidious("bangla new song 2025", 1),
+        searchPiped("bangla new song 2025"),
+        searchNoKeyApi("bangla new song 2025"),
+      ]);
+      merged = dedupeVideos([...fallbackInvidious, ...fallbackPiped, ...fallbackNoKey]);
+    }
+
+    const shuffled = seededShuffle(merged, seed + normalizedPage * 29).slice(0, 120);
 
     return new Response(JSON.stringify({ results: shuffled }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

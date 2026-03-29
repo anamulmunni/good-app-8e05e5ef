@@ -299,7 +299,7 @@ function writeRecentVideoIds(newIds: string[]): void {
   if (typeof window === "undefined") return;
   try {
     const existing = Array.from(readRecentVideoIds());
-    const merged = Array.from(new Set([...newIds, ...existing])).slice(0, 500);
+    const merged = Array.from(new Set([...newIds, ...existing])).slice(0, 1000);
     window.localStorage.setItem(VIDEO_RECENT_KEY, JSON.stringify(merged));
   } catch {
     // no-op
@@ -406,9 +406,22 @@ async function fetchYouTubeVideos(
   const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
   const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
 
-  const fetchPromises = ordered.slice(0, 6).map((q, idx) => fetchYouTubeViaEdge(q, page + (idx % 2), freshnessToken + idx * 97));
+  const pageWindow = canonical ? 4 : 6;
+  const startPage = Math.abs((freshnessToken + page * 7) % pageWindow) + 1;
+  const fetchPromises = ordered.slice(0, 8).map((q, idx) => {
+    const queryPage = ((startPage + idx - 1) % pageWindow) + 1;
+    return fetchYouTubeViaEdge(q, queryPage, freshnessToken + idx * 97 + page * 13);
+  });
   const allResults = await Promise.all(fetchPromises);
-  const results = allResults.flat();
+  let results = allResults.flat();
+
+  if (results.length < rows) {
+    const fallbackCalls = ordered
+      .slice(0, 3)
+      .map((q, idx) => fetchYouTubeViaEdge(q, 1, freshnessToken + 500 + idx * 67));
+    const fallbackResults = await Promise.all(fallbackCalls);
+    results = [...results, ...fallbackResults.flat()];
+  }
 
   const queryWords = getQueryWords(canonical);
   const normalizedQuery = normalizeForMatch(canonical);
@@ -755,12 +768,22 @@ export async function getBangladeshExternalVideos(
   const dmHasMore = dmResult.status === "fulfilled" ? dmResult.value.hasMore : false;
 
   const recentIds = readRecentVideoIds();
+  const recentArray = Array.from(recentIds);
+  const hardBlock = new Set(recentArray.slice(0, 220));
+  const softBlock = new Set(recentArray.slice(220, 700));
   let merged = dedupeExternalVideos([...ytVideos, ...dmVideos]);
 
   // Avoid repeating recently shown videos in default suggestion mode
   if (!trimmedQuery) {
-    const unseen = merged.filter((video) => !recentIds.has(video.id));
-    merged = unseen.length >= rows ? unseen : [...unseen, ...merged.filter((video) => recentIds.has(video.id))];
+    const unseenHard = merged.filter((video) => !hardBlock.has(video.id));
+    const unseenSoft = unseenHard.filter((video) => !softBlock.has(video.id));
+    if (unseenSoft.length >= rows) {
+      merged = unseenSoft;
+    } else if (unseenHard.length >= rows) {
+      merged = unseenHard;
+    } else {
+      merged = unseenHard.length > 0 ? [...unseenHard, ...merged.filter((video) => !hardBlock.has(video.id) && softBlock.has(video.id))] : merged;
+    }
   }
 
   if (trimmedQuery) {
@@ -794,14 +817,16 @@ export async function getBangladeshExternalVideos(
           + (hasFreshMarker(video.title) ? 11 : 0)
           + (hasQualityMarker(video.title) ? 9 : 0)
           + (video.source === "youtube" ? 6 : 0)
-          + (recentIds.has(video.id) ? -20 : 0);
+          + (hardBlock.has(video.id) ? -220 : 0)
+          + (softBlock.has(video.id) ? -70 : 0);
 
         return { ...video, _score: score };
       })
       .sort((a: any, b: any) => b._score - a._score)
       .map(({ _score, ...rest }: any) => rest);
 
-    merged = diversifyByCreator(seededShuffle(merged, freshnessToken + page * 31), 2);
+    const mixedSources = seededShuffle(merged, freshnessToken + page * 31);
+    merged = diversifyByCreator(mixedSources, 1);
   }
 
   if (merged.length === 0) {
