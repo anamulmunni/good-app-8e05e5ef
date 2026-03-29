@@ -20,6 +20,7 @@ import {
   getPostComments,
   addComment,
   toggleReaction,
+  getUserReactions,
   type PostComment,
 } from "@/lib/feed-api";
 
