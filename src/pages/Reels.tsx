@@ -7,6 +7,7 @@ import {
   createLongVideoUpload,
   getBangladeshExternalVideos,
   getUploadedLongVideos,
+  trackVideoPreference,
   type ExternalReelVideo,
   markReelsSeen,
   uploadPostMedia,
