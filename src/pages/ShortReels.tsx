@@ -380,6 +380,7 @@ export default function ShortReels() {
                 <YouTubeReelPlayer
                   videoId={video.videoId!}
                   isActive={index === currentIndex}
+                  isNearby={Math.abs(index - currentIndex) <= 2}
                 />
               ) : (
                 <video
