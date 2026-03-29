@@ -549,7 +549,7 @@ export default function Feed() {
               {suggestedPeople.map((sp: any) => (
                 <div key={sp.id} className="min-w-[160px] max-w-[160px] rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card shrink-0 shadow-sm">
                   {/* Cover/avatar area */}
-                  <div className="h-[140px] relative bg-gray-100 dark:bg-secondary">
+                  <button onClick={() => navigate(`/user/${sp.id}`)} className="h-[140px] w-full relative bg-gray-100 dark:bg-secondary block">
                     {sp.cover_url ? (
                       <img src={sp.cover_url} className="w-full h-full object-cover" alt="" />
                     ) : sp.avatar_url ? (
@@ -559,10 +559,12 @@ export default function Feed() {
                         <User className="w-12 h-12 text-gray-400" />
                       </div>
                     )}
-                  </div>
+                  </button>
                   {/* Info */}
                   <div className="p-2.5">
-                    <p className="text-[13px] font-bold text-gray-900 dark:text-foreground truncate">{sp.display_name || sp.guest_id}</p>
+                    <button onClick={() => navigate(`/user/${sp.id}`)} className="w-full text-left">
+                      <p className="text-[13px] font-bold text-gray-900 dark:text-foreground truncate">{sp.display_name || sp.guest_id}</p>
+                    </button>
                     <button
                       onClick={() => friendRequestMutation.mutate(sp.id)}
                       disabled={friendRequestMutation.isPending}
