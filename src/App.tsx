@@ -51,6 +51,7 @@ function AppInner() {
         <Route path="/feed" element={<Feed />} />
         <Route path="/reels" element={<Reels />} />
         <Route path="/user/:userId" element={<UserProfile />} />
+        <Route path="/channel/:userId" element={<ChannelPage />} />
         <Route path="/call/:userId" element={<CallPage />} />
         <Route path="/install" element={<Install />} />
         <Route path="/~oauth" element={<Login />} />
