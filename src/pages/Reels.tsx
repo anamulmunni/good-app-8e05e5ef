@@ -177,7 +177,12 @@ export default function Reels() {
   const [channelLoading, setChannelLoading] = useState(false);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [engagementStats, setEngagementStats] = useState<{ likes_count: number; comments_count: number } | null>(null);
-
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commentSending, setCommentSending] = useState(false);
+  const [liked, setLiked] = useState(false);
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
