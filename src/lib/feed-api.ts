@@ -270,6 +270,42 @@ function seededShuffle<T>(items: T[], seed = 0): T[] {
   return arr;
 }
 
+function diversifyByCreator(videos: ExternalReelVideo[], maxPerCreator = 2): ExternalReelVideo[] {
+  const counter = new Map<string, number>();
+  return videos.filter((video) => {
+    const creator = normalizeForMatch(video.creator || "unknown");
+    const count = counter.get(creator) || 0;
+    if (count >= maxPerCreator) return false;
+    counter.set(creator, count + 1);
+    return true;
+  });
+}
+
+const VIDEO_RECENT_KEY = "goodapp-video-recent-v1";
+
+function readRecentVideoIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(VIDEO_RECENT_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeRecentVideoIds(newIds: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = Array.from(readRecentVideoIds());
+    const merged = Array.from(new Set([...newIds, ...existing])).slice(0, 500);
+    window.localStorage.setItem(VIDEO_RECENT_KEY, JSON.stringify(merged));
+  } catch {
+    // no-op
+  }
+}
+
 export function trackVideoPreference(input: { title?: string; category?: string | null }): void {
   if (typeof window === "undefined") return;
   try {
