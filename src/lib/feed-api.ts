@@ -344,9 +344,12 @@ async function fetchYouTubeVideos(
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
   const canonical = canonicalizeSearchQuery(searchQuery || "");
+  const preferredCats = topPreferredCategories(2);
+
   const queries = canonical
-    ? [canonical, `${canonical} song`, `${canonical} official video`]
+    ? [canonical, `${canonical} song`, `${canonical} official video`, `${canonical} lyrics`, `${canonical} full hd`]
     : [
+        ...preferredCats.map((cat) => `bangla ${cat} song new`),
         "bangla new song 2025",
         "bangla latest song official video",
         "bangla romantic song new",
@@ -354,54 +357,55 @@ async function fetchYouTubeVideos(
         "bangla hit song 2025",
       ];
 
-  const shift = canonical ? 0 : Math.abs(freshnessToken % queries.length);
-  const ordered = shift > 0 ? [...queries.slice(shift), ...queries.slice(0, shift)] : queries;
+  const uniqueQueries = queries.filter((q, idx, arr) => q && arr.indexOf(q) === idx);
+  const shift = Math.abs((freshnessToken + page) % Math.max(uniqueQueries.length, 1));
+  const ordered = shift > 0 ? [...uniqueQueries.slice(shift), ...uniqueQueries.slice(0, shift)] : uniqueQueries;
 
-  // Fetch in parallel for speed
-  const fetchPromises = ordered.slice(0, 3).map((q) => fetchYouTubeViaEdge(q, page));
+  const fetchPromises = ordered.slice(0, 4).map((q) => fetchYouTubeViaEdge(q, page));
   const allResults = await Promise.all(fetchPromises);
   const results = allResults.flat();
 
-  const seen = new Set<string>();
   const queryWords = getQueryWords(canonical);
   const normalizedQuery = normalizeForMatch(canonical);
 
-  let videos = results
-    .map(youtubeResultToExternal)
-    .filter((v): v is ExternalReelVideo => {
-      if (!v) return false;
-      if (seen.has(v.id)) return false;
-      seen.add(v.id);
-      return true;
-    });
+  let videos = dedupeExternalVideos(
+    results
+      .map(youtubeResultToExternal)
+      .filter((v): v is ExternalReelVideo => Boolean(v))
+  );
 
-  // For search queries, score and sort by relevance
-  if (canonical) {
-    videos = videos
-      .map((v) => {
-        const normalizedTitle = normalizeForMatch(v.title);
-        let score = 0;
-        if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 40;
-        for (const w of queryWords) {
-          if (normalizedTitle.includes(w)) score += 8;
-        }
-        if (queryWords.every((w) => normalizedTitle.includes(w))) score += 15;
-        return { ...v, _score: score };
-      })
-      .sort((a: any, b: any) => b._score - a._score)
-      .map(({ _score, ...rest }: any) => rest);
-  } else {
-    // Default feed: prefer Bangla songs
-    videos = videos.filter((v) => {
-      const lower = v.title.toLowerCase();
-      const hasNonMusic = /(natok|drama|movie|serial|episode|cartoon|mukbang|vlog|prank|gaming|challenge)/i.test(lower);
-      return !hasNonMusic;
-    });
+  if (videos.length === 0) {
+    return { videos: [], hasMore: false };
   }
 
+  videos = videos
+    .map((video) => {
+      const normalizedTitle = normalizeForMatch(video.title);
+      let score = scorePreferredCategory(video.title, video.category);
+
+      if (canonical) {
+        if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) score += 45;
+        for (const w of queryWords) {
+          if (normalizedTitle.includes(w)) score += 10;
+        }
+        if (queryWords.length > 0 && queryWords.every((w) => normalizedTitle.includes(w))) score += 20;
+        if (isMusicIntent(canonical) && /(song|music|audio|lyrics|গান|official)/i.test(video.title)) score += 14;
+      } else {
+        if (isBanglaDefaultSuggestion(video.title, video.country)) score += 18;
+        if (hasFreshMarker(video.title)) score += 12;
+        if (hasQualityMarker(video.title)) score += 10;
+      }
+
+      return { ...video, _score: score };
+    })
+    .sort((a: any, b: any) => b._score - a._score)
+    .map(({ _score, ...rest }: any) => rest);
+
+  const varied = canonical ? videos : seededShuffle(videos, freshnessToken + page * 17);
+
   return {
-    videos: videos.slice(0, rows),
-    hasMore: results.length > rows,
+    videos: varied.slice(0, rows),
+    hasMore: varied.length > rows,
   };
 }
 
