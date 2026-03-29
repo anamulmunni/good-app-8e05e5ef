@@ -733,7 +733,7 @@ export async function getBangladeshExternalVideos(
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
   const trimmedQuery = searchQuery?.trim();
-  const safeRows = Math.max(rows, 12);
+  const safeRows = Math.max(rows * 2, 24);
 
   const [ytResult, dmResult] = await Promise.allSettled([
     fetchYouTubeVideos(trimmedQuery, page, safeRows, freshnessToken + page),
@@ -745,7 +745,14 @@ export async function getBangladeshExternalVideos(
   const ytHasMore = ytResult.status === "fulfilled" ? ytResult.value.hasMore : false;
   const dmHasMore = dmResult.status === "fulfilled" ? dmResult.value.hasMore : false;
 
+  const recentIds = readRecentVideoIds();
   let merged = dedupeExternalVideos([...ytVideos, ...dmVideos]);
+
+  // Avoid repeating recently shown videos in default suggestion mode
+  if (!trimmedQuery) {
+    const unseen = merged.filter((video) => !recentIds.has(video.id));
+    merged = unseen.length >= rows ? unseen : [...unseen, ...merged.filter((video) => recentIds.has(video.id))];
+  }
 
   if (trimmedQuery) {
     const canonical = canonicalizeSearchQuery(trimmedQuery);
@@ -758,12 +765,12 @@ export async function getBangladeshExternalVideos(
 
         let score = scoreFallbackVideo(video.title, words, canonical)
           + scorePreferredCategory(video.title, video.category)
-          + (video.source === "youtube" ? 6 : 0)
+          + (video.source === "youtube" ? 8 : 0)
           + (video.duration && video.duration >= 120 ? 2 : 0);
 
-        if (normalizedTitle.includes(canonical)) score += 24;
+        if (normalizedTitle.includes(canonical)) score += 26;
         if (words.length > 0 && words.every((w) => normalizedTitle.includes(w) || normalizedCreator.includes(w))) {
-          score += 16;
+          score += 18;
         }
 
         return { ...video, _score: score };
@@ -777,22 +784,26 @@ export async function getBangladeshExternalVideos(
           + (isBanglaDefaultSuggestion(video.title, video.country) ? 16 : 0)
           + (hasFreshMarker(video.title) ? 11 : 0)
           + (hasQualityMarker(video.title) ? 9 : 0)
-          + (video.source === "youtube" ? 5 : 0);
+          + (video.source === "youtube" ? 6 : 0)
+          + (recentIds.has(video.id) ? -20 : 0);
 
         return { ...video, _score: score };
       })
       .sort((a: any, b: any) => b._score - a._score)
       .map(({ _score, ...rest }: any) => rest);
 
-    merged = seededShuffle(merged, freshnessToken + page * 31);
+    merged = diversifyByCreator(seededShuffle(merged, freshnessToken + page * 31), 2);
   }
 
   if (merged.length === 0) {
     return { videos: [], hasMore: false };
   }
 
+  const finalVideos = merged.slice(0, rows);
+  writeRecentVideoIds(finalVideos.map((video) => video.id));
+
   return {
-    videos: merged.slice(0, rows),
+    videos: finalVideos,
     hasMore: merged.length > rows || ytHasMore || dmHasMore,
   };
 }
