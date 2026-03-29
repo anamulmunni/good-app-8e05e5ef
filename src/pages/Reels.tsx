@@ -1493,6 +1493,7 @@ export default function Reels() {
         )}
       </AnimatePresence>
 
+      {selectedVideo && miniPlayer && (
         <div
           className="fixed bottom-20 right-3 w-[180px] rounded-lg overflow-hidden shadow-2xl cursor-pointer z-50"
           style={{ background: "#000" }}
