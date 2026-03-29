@@ -739,6 +739,41 @@ export async function getUploadedLongVideos(
   };
 }
 
+export async function getUploadedLongVideoByPostId(postId: string): Promise<ExternalReelVideo | null> {
+  const { data: post } = await (supabase.from("posts").select("id,user_id,video_url,content,created_at,likes_count,comments_count") as any)
+    .eq("id", postId)
+    .not("video_url", "is", null)
+    .like("content", `${LONG_VIDEO_MARKER}%`)
+    .single();
+
+  if (!post) return null;
+
+  const { data: owner } = await (supabase.from("users").select("id, display_name, guest_id, avatar_url, is_verified_badge") as any)
+    .eq("id", post.user_id)
+    .single();
+
+  const parsed = parseLongVideoMeta(post.content);
+
+  return {
+    id: `local-${post.id}`,
+    title: parsed?.title || "Long video",
+    source: "good-app",
+    video_url: post.video_url,
+    creator: owner?.display_name || owner?.guest_id || "Unknown",
+    duration: parsed?.duration,
+    created_at: post.created_at,
+    category: "music",
+    country: "BD",
+    local_post_id: post.id,
+    uploader_user_id: post.user_id,
+    uploader_guest_id: owner?.guest_id || null,
+    uploader_avatar_url: owner?.avatar_url || null,
+    uploader_is_verified_badge: Boolean(owner?.is_verified_badge),
+    likes_count: Number(post.likes_count || 0),
+    comments_count: Number(post.comments_count || 0),
+  };
+}
+
 export async function getBangladeshExternalVideos(
   page = 1,
   rows = 10,
