@@ -11,7 +11,7 @@ import {
 } from "@/lib/chat-api";
 import { getUser } from "@/lib/api";
 import { getOnlineUsers, isUserOnline } from "@/hooks/use-online";
-import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Smile, Palette } from "lucide-react";
+import { ArrowLeft, Send, Search, Image, Mic, MicOff, X, MessageCircle, Loader2, Phone, Edit3, Camera, Smile, Palette, Video, Trash2 } from "lucide-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
