@@ -319,17 +319,20 @@ function youtubeResultToExternal(item: any): ExternalReelVideo | null {
   const duration = Number(item?.lengthSeconds || 0);
   if (duration < 30) return null;
 
+  const title = String(item?.title || "YouTube Video");
+  const category = inferCategoryFromTitle(title);
+
   return {
     id: `yt-${videoId}`,
-    title: String(item?.title || "YouTube Video"),
-    source: "dailymotion" as const,
+    title,
+    source: "youtube",
     video_url: `https://www.youtube.com/embed/${videoId}`,
     watch_url: `https://www.youtube.com/watch?v=${videoId}`,
     creator: item?.author || null,
     thumbnail_url: item?.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     video_id: videoId,
     duration,
-    category: detectExternalCategory(String(item?.title || "")),
+    category,
     country: "BD",
   };
 }
