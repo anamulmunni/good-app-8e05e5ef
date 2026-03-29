@@ -386,17 +386,11 @@ export default function ChannelPage() {
                       </p>
                       <button
                         type="button"
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
+                          e.preventDefault();
                           const videoUrl = `${window.location.origin}/watch/${video.post_id}`;
-                          try {
-                            if (navigator.share) {
-                              await navigator.share({ title: video.title, url: videoUrl });
-                            } else {
-                              await navigator.clipboard.writeText(videoUrl);
-                              alert("Video link copied!");
-                            }
-                          } catch {}
+                          shareOrCopy(video.title, videoUrl);
                         }}
                         className="flex items-center gap-1 mt-1 text-[11px] font-medium"
                         style={{ color: "#3ea6ff" }}
