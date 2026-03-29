@@ -84,15 +84,36 @@ function isEmbed(url: string) {
   return url.includes("/embed/");
 }
 
+function isYouTubeEmbed(url: string) {
+  return url.includes("youtube.com/embed/");
+}
+
 function buildExternalPlayerUrl(url: string, autoplay = false) {
-  const separator = url.includes("?") ? "&" : "?";
+  const params = new URLSearchParams();
   // YouTube autoplay with sound is often force-muted by browser policy.
-  // Keep autoplay off for YouTube so first manual play starts with sound.
-  if (url.includes("youtube.com/embed/")) {
-    return `${url}${separator}autoplay=0&mute=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1`;
+  // We keep autoplay off and start playback through a user tap.
+  if (isYouTubeEmbed(url)) {
+    params.set("autoplay", "0");
+    params.set("mute", "0");
+    params.set("rel", "0");
+    params.set("modestbranding", "1");
+    params.set("playsinline", "1");
+    params.set("enablejsapi", "1");
+    if (typeof window !== "undefined") {
+      params.set("origin", window.location.origin);
+    }
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}${params.toString()}`;
   }
   // Dailymotion embeds
-  return `${url}${separator}autoplay=${autoplay ? 1 : 0}&quality=1080&mute=0&sharing-enable=false&ui-start-screen-info=false&start=0`;
+  params.set("autoplay", autoplay ? "1" : "0");
+  params.set("quality", "1080");
+  params.set("mute", "0");
+  params.set("sharing-enable", "false");
+  params.set("ui-start-screen-info", "false");
+  params.set("start", "0");
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}${params.toString()}`;
 }
 
 function viewCount() {
@@ -117,6 +138,7 @@ export default function Reels() {
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [viewCounts] = useState<Record<string, string>>({});
   const [miniPlayer, setMiniPlayer] = useState(false);
+  const [showYoutubeTapToPlay, setShowYoutubeTapToPlay] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -129,13 +151,60 @@ export default function Reels() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const playerShellRef = useRef<HTMLDivElement>(null);
+  const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const youtubeCommandIntervalRef = useRef<number | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
+  const stopYoutubeCommandLoop = useCallback(() => {
+    if (youtubeCommandIntervalRef.current !== null) {
+      window.clearInterval(youtubeCommandIntervalRef.current);
+      youtubeCommandIntervalRef.current = null;
+    }
+  }, []);
+
+  const postYoutubeCommand = useCallback((func: string, args: unknown[] = []) => {
+    const frameWindow = youtubeIframeRef.current?.contentWindow;
+    if (!frameWindow) return;
+    frameWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*");
+  }, []);
+
+  const playYoutubeWithSound = useCallback(() => {
+    setShowYoutubeTapToPlay(false);
+
+    postYoutubeCommand("unMute");
+    postYoutubeCommand("setVolume", [100]);
+    postYoutubeCommand("playVideo");
+
+    stopYoutubeCommandLoop();
+    let tries = 0;
+    youtubeCommandIntervalRef.current = window.setInterval(() => {
+      postYoutubeCommand("unMute");
+      postYoutubeCommand("setVolume", [100]);
+      if (tries < 2) postYoutubeCommand("playVideo");
+      tries += 1;
+      if (tries >= 10) {
+        stopYoutubeCommandLoop();
+      }
+    }, 220);
+  }, [postYoutubeCommand, stopYoutubeCommandLoop]);
+
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
+
+  useEffect(() => {
+    const isYoutubeSelected = Boolean(selectedVideo?.isExternal && isYouTubeEmbed(selectedVideo.video_url));
+    setShowYoutubeTapToPlay(isYoutubeSelected);
+    stopYoutubeCommandLoop();
+  }, [selectedVideo, stopYoutubeCommandLoop]);
+
+  useEffect(() => {
+    return () => {
+      stopYoutubeCommandLoop();
+    };
+  }, [stopYoutubeCommandLoop]);
 
   useEffect(() => {
     if (user) markReelsSeen(user.id);
@@ -456,6 +525,9 @@ export default function Reels() {
                 className="w-full h-full"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
                 allowFullScreen
+                ref={(node) => {
+                  youtubeIframeRef.current = node;
+                }}
               />
             ) : (
               <video
@@ -466,6 +538,21 @@ export default function Reels() {
                 playsInline
                 className="w-full h-full object-contain"
               />
+            )}
+            {selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && showYoutubeTapToPlay && (
+              <button
+                type="button"
+                onClick={playYoutubeWithSound}
+                className="absolute inset-0 z-20 grid place-items-center"
+                style={{ background: "rgba(0,0,0,0.55)" }}
+              >
+                <span
+                  className="px-5 py-2.5 rounded-full text-sm font-semibold"
+                  style={{ background: "rgba(0,0,0,0.78)", color: "#fff", border: "1px solid rgba(255,255,255,0.35)" }}
+                >
+                  Tap to play with sound
+                </span>
+              </button>
             )}
             <button
               onClick={requestFullscreen}
