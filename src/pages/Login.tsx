@@ -245,20 +245,27 @@ export default function Login() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex rounded-2xl bg-secondary/50 p-1.5 mb-5 backdrop-blur-sm border border-border/50"
+          className="flex rounded-2xl bg-secondary/50 p-1.5 mb-5 backdrop-blur-sm border border-border/50 shadow-lg shadow-primary/10"
         >
           {(["login", "register"] as const).map((t) => (
-            <button
+            <motion.button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+              whileTap={{ scale: 0.95 }}
+              className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                 tab === t
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                  ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/30"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "login" ? "লগইন" : "রেজিস্ট্রেশন"}
-            </button>
+              <motion.span
+                initial={false}
+                animate={tab === t ? { scale: [1, 1.05, 1] } : {}}
+                transition={{ duration: 0.3 }}
+              >
+                {t === "login" ? "🔑 লগইন" : "✨ রেজিস্ট্রেশন"}
+              </motion.span>
+            </motion.button>
           ))}
         </motion.div>
 
