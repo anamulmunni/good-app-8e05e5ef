@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const cache = new Map<string, { data: any; ts: number }>();
-const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000; // 5 min cache for more variety
 
 function getCached(key: string) {
   const entry = cache.get(key);
