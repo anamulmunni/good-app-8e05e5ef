@@ -222,6 +222,7 @@ function scoreFallbackVideo(title: string, queryWords: string[], searchQuery?: s
 }
 
 function toDailymotionEmbed(videoId?: string, fallbackUrl?: string): string {
+  // Kept for backward compatibility with existing local data
   if (videoId) return `https://www.dailymotion.com/embed/video/${videoId}`;
   return fallbackUrl || "";
 }
