@@ -474,6 +474,8 @@ export default function Reels() {
 
   useEffect(() => {
     if (user) markReelsSeen(user.id);
+    setWatchHistory(readWatchHistory());
+    setSearchHistory(readSearchHistory());
   }, [user]);
 
   const activeQuery = useMemo(() => {
