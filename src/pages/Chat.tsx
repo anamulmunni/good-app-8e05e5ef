@@ -489,7 +489,10 @@ export default function Chat() {
             {otherOnline && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-card" />}
           </button>
           <button onClick={() => navigate(`/user/${otherUser.id}`)} className="flex-1 text-left min-w-0">
-            <p className="font-bold text-[15px] text-gray-900 dark:text-foreground truncate">{otherUser.display_name || "User"}</p>
+            <p className="font-bold text-[15px] text-gray-900 dark:text-foreground truncate inline-flex items-center gap-1">
+              <span>{otherUser.display_name || "User"}</span>
+              {otherUser.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+            </p>
             <p className="text-[11px] text-gray-500 dark:text-muted-foreground">{otherOnline ? "Active now" : `Last seen ${lastSeenAgo(otherUser.online_at)}`}</p>
           </button>
           <button onClick={() => navigate(`/call/${otherUser.id}`)}
