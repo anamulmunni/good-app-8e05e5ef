@@ -40,6 +40,7 @@ export default function ShortReels() {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const lastTapRef = useRef(0);
+  const doubleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
