@@ -448,57 +448,8 @@ async function fetchYouTubeVideos(
   }
 }
 
-function buildSearchVariants(searchQuery?: string): string[] {
-  const raw = (searchQuery || "").trim();
-  const canonical = canonicalizeSearchQuery(raw);
+// Dailymotion functions removed - YouTube only
 
-  if (!canonical) {
-    // Fresh HD Bangla songs first, then variety
-    const allDefaults = [
-      "bangla new song 2026 full hd",
-      "bangla new release song 2026 1080p",
-      "বাংলা নতুন গান ২০২৬ hd official",
-      "bangla latest song official video",
-      "bangla latest music video 1080p",
-      "bangla romantic song full hd",
-      "বাংলা নতুন গান hd 2026",
-      "bangla trending song 2026",
-      "bangla hit song new release",
-      "bangla lofi song",
-      "bangla sad song new",
-      "bangla pop song trending",
-      "bangla rap song new 2026",
-      "bangla band song latest",
-      "bangla folk song modern remix",
-      "bangla unplugged song hd",
-      "new bengali movie song 2026",
-      "bangla indie music video",
-      "bangla dj remix song 2026",
-    ];
-    // Pick a rotating subset based on time to ensure variety
-    const offset = Math.floor(Date.now() / 60000) % allDefaults.length;
-    const picked: string[] = [];
-    for (let i = 0; i < 5; i++) {
-      picked.push(allDefaults[(offset + i * 3) % allDefaults.length]);
-    }
-    return picked;
-  }
-
-  const words = getQueryWords(canonical);
-  const compact = words.slice(0, 4).join(" ");
-  return [
-    canonical,
-    `${canonical} song`,
-    `${canonical} official song`,
-    `${canonical} music video`,
-    `${canonical} lyrics`,
-    compact && compact !== canonical ? compact : "",
-  ]
-    .filter(Boolean)
-    .filter((q, idx, arr) => arr.indexOf(q) === idx);
-}
-
-async function fetchDailymotionByQuery(
   query: string,
   page: number,
   limit: number,
