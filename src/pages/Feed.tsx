@@ -83,8 +83,8 @@ export default function Feed() {
   });
 
   // Paginated display
-  const posts = allPosts.filter(p => !hiddenPosts.has(p.id)).slice(0, page * POSTS_PER_PAGE);
-  const hasMore = posts.length < allPosts.filter(p => !hiddenPosts.has(p.id)).length;
+  const posts = allPosts.filter(p => !hiddenPosts.has(p.id) && !p.video_url).slice(0, page * POSTS_PER_PAGE);
+  const hasMore = posts.length < allPosts.filter(p => !hiddenPosts.has(p.id) && !p.video_url).length;
 
   // Infinite scroll observer
   useEffect(() => {
@@ -549,7 +549,7 @@ export default function Feed() {
               {suggestedPeople.map((sp: any) => (
                 <div key={sp.id} className="min-w-[160px] max-w-[160px] rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card shrink-0 shadow-sm">
                   {/* Cover/avatar area */}
-                  <div className="h-[140px] relative bg-gray-100 dark:bg-secondary">
+                  <button onClick={() => navigate(`/user/${sp.id}`)} className="h-[140px] w-full relative bg-gray-100 dark:bg-secondary block">
                     {sp.cover_url ? (
                       <img src={sp.cover_url} className="w-full h-full object-cover" alt="" />
                     ) : sp.avatar_url ? (
@@ -559,10 +559,12 @@ export default function Feed() {
                         <User className="w-12 h-12 text-gray-400" />
                       </div>
                     )}
-                  </div>
+                  </button>
                   {/* Info */}
                   <div className="p-2.5">
-                    <p className="text-[13px] font-bold text-gray-900 dark:text-foreground truncate">{sp.display_name || sp.guest_id}</p>
+                    <button onClick={() => navigate(`/user/${sp.id}`)} className="w-full text-left">
+                      <p className="text-[13px] font-bold text-gray-900 dark:text-foreground truncate">{sp.display_name || sp.guest_id}</p>
+                    </button>
                     <button
                       onClick={() => friendRequestMutation.mutate(sp.id)}
                       disabled={friendRequestMutation.isPending}
@@ -820,6 +822,13 @@ export default function Feed() {
           </button>
 
           <button
+            onClick={() => navigate("/short-reels")}
+            className="relative flex-1 h-full flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground"
+          >
+            <Video className="w-6 h-6" />
+          </button>
+
+          <button
             onClick={() => { if (user) { markReelsSeen(user.id).then(() => queryClient.invalidateQueries({ queryKey: ["new-reels-count"] })); } navigate("/reels"); }}
             className="relative flex-1 h-full flex items-center justify-center border-b-[3px] border-transparent text-gray-500 dark:text-muted-foreground"
           >
@@ -1041,7 +1050,7 @@ export default function Feed() {
                         <img src={userStories[0].image_url} className="w-full h-full object-cover" alt="" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
                         {userStories.length > 1 && (
-                          <span className="absolute top-2 left-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
+                          <span className="absolute top-2 right-2 min-w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-md flex items-center justify-center px-1">
                             {userStories.length}
                           </span>
                         )}
@@ -1284,6 +1293,7 @@ export default function Feed() {
         {viewingStory && (
           <StoryViewer
             story={viewingStory}
+            allStories={storyGroups[viewingStory.user_id] || [viewingStory]}
             userId={user.id}
             onClose={() => setViewingStory(null)}
             onDelete={(id) => deleteStoryMutation.mutate(id)}

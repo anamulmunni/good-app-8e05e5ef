@@ -13,6 +13,7 @@ import AddKeys from "./pages/AddKeys";
 import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
 import Reels from "./pages/Reels";
+import ShortReels from "./pages/ShortReels";
 import UserProfile from "./pages/UserProfile";
 import ChannelPage from "./pages/ChannelPage";
 import CallPage from "./pages/CallPage";
@@ -50,6 +51,7 @@ function AppInner() {
         <Route path="/chat" element={<Chat />} />
         <Route path="/feed" element={<Feed />} />
         <Route path="/reels" element={<Reels />} />
+        <Route path="/short-reels" element={<ShortReels />} />
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/channel/:userId" element={<ChannelPage />} />
         <Route path="/call/:userId" element={<CallPage />} />

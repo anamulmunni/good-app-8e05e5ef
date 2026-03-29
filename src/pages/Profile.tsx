@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { TransactionList } from "@/components/TransactionList";
 import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones, ChevronDown, ChevronUp, History } from "lucide-react";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -197,7 +198,7 @@ export default function Profile() {
                 </motion.div>
               ) : (
                 <motion.div key="display" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center justify-center gap-2 mb-2">
-                  <h2 className="text-xl font-bold">{user.display_name || "Unknown"}</h2>
+                  <h2 className="text-xl font-bold inline-flex items-center gap-1.5">{user.display_name || "Unknown"}{user.is_verified_badge && <VerifiedBadge className="h-5 w-5" />}</h2>
                   <button onClick={() => { setNewName(user.display_name || ""); setIsEditingName(true); }}
                     className="p-1.5 hover:bg-primary/20 rounded-full text-muted-foreground hover:text-primary transition-all">
                     <Pencil className="w-4 h-4" />
