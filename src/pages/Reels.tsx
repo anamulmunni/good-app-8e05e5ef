@@ -660,7 +660,7 @@ export default function Reels() {
             <div className="mt-2 flex items-center justify-between gap-2">
               <button
                 type="button"
-                onClick={() => selectedVideo.uploader_user_id && navigate(`/user/${selectedVideo.uploader_user_id}`)}
+                onClick={() => selectedVideo.uploader_user_id && navigate(`/channel/${selectedVideo.uploader_user_id}`)}
                 className="flex items-center gap-2 min-w-0"
                 disabled={!selectedVideo.uploader_user_id}
               >

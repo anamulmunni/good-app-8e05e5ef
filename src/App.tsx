@@ -14,6 +14,7 @@ import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
 import Reels from "./pages/Reels";
 import UserProfile from "./pages/UserProfile";
+import ChannelPage from "./pages/ChannelPage";
 import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
 import Install from "./pages/Install";
@@ -50,6 +51,7 @@ function AppInner() {
         <Route path="/feed" element={<Feed />} />
         <Route path="/reels" element={<Reels />} />
         <Route path="/user/:userId" element={<UserProfile />} />
+        <Route path="/channel/:userId" element={<ChannelPage />} />
         <Route path="/call/:userId" element={<CallPage />} />
         <Route path="/install" element={<Install />} />
         <Route path="/~oauth" element={<Login />} />
