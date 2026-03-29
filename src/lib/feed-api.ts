@@ -457,13 +457,32 @@ function buildSearchVariants(searchQuery?: string): string[] {
   const canonical = canonicalizeSearchQuery(raw);
 
   if (!canonical) {
-    return [
-      "bangla new song full hd 2026",
+    // Much more variety - rotate through different Bengali music styles
+    const allDefaults = [
+      "bangla new song 2026 full hd",
       "bangla latest song official video",
-      "bangla new music video hd",
       "bangla romantic song full hd",
-      "বাংলা নতুন গান hd",
+      "বাংলা নতুন গান hd 2026",
+      "bangla trending song 2026",
+      "bangla hit song new release",
+      "bangla lofi song",
+      "bangla sad song new",
+      "bangla pop song trending",
+      "bangla rap song new 2026",
+      "bangla band song latest",
+      "bangla folk song modern remix",
+      "bangla unplugged song hd",
+      "new bengali movie song 2026",
+      "bangla indie music video",
+      "bangla dj remix song 2026",
     ];
+    // Pick a rotating subset based on time to ensure variety
+    const offset = Math.floor(Date.now() / 60000) % allDefaults.length;
+    const picked: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      picked.push(allDefaults[(offset + i * 3) % allDefaults.length]);
+    }
+    return picked;
   }
 
   const words = getQueryWords(canonical);
