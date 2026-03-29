@@ -956,6 +956,23 @@ export default function Reels() {
 
       <main ref={mainRef} className="flex-1 overflow-y-auto">
         <div className="pb-20">
+          {allVideos.length === 0 && loading && (
+            <div className="space-y-4 px-3 py-3">
+              {[1,2,3].map(i => (
+                <div key={i} className="animate-pulse">
+                  <div className="w-full aspect-video rounded-xl" style={{ background: "#272727" }} />
+                  <div className="flex gap-3 mt-3">
+                    <div className="w-9 h-9 rounded-full shrink-0" style={{ background: "#272727" }} />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 rounded" style={{ background: "#272727", width: "80%" }} />
+                      <div className="h-3 rounded" style={{ background: "#272727", width: "50%" }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {allVideos.length === 0 && !loading && (
             <div className="py-20 text-center text-sm" style={{ color: "#aaa" }}>
               {activeQuery ? `No results for "${activeQuery}"` : "Loading videos..."}
