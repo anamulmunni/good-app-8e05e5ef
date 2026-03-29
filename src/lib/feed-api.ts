@@ -433,7 +433,8 @@ async function fetchYouTubeVideos(
   rows = 20,
   freshnessToken = 0,
 ): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
-  const query = (searchQuery || "").trim() || "bangla new song 2026";
+  const defaultQueries = ["bangla new song 2026", "bangla hit song latest", "bangla trending song", "new bengali song hd", "bangla pop song 2026"];
+  const query = (searchQuery || "").trim() || defaultQueries[Math.floor(Date.now() / 120000) % defaultQueries.length];
   try {
     const raw = await fetchYouTubeViaEdge(query, page, freshnessToken);
     const videos = raw
