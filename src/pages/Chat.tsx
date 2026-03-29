@@ -26,14 +26,20 @@ type PendingMedia = {
   status: "uploading" | "sending" | "failed";
 };
 
-// Chat themes
+// Chat themes - Messenger-style beautiful themes
 const CHAT_THEMES = [
-  { name: "Messenger", gradient: "linear-gradient(to right, #0084ff, #0099ff)", bg: "#e8e8e8", bubbleFrom: "#0084ff", bubbleTo: "#0099ff", accent: "#0084ff" },
-  { name: "Love", gradient: "linear-gradient(to right, #ff6b6b, #ee5a24)", bg: "#fce4ec", bubbleFrom: "#ff6b6b", bubbleTo: "#ee5a24", accent: "#ff6b6b" },
-  { name: "Ocean", gradient: "linear-gradient(to right, #00b894, #00cec9)", bg: "#e0f7fa", bubbleFrom: "#00b894", bubbleTo: "#00cec9", accent: "#00b894" },
-  { name: "Purple", gradient: "linear-gradient(to right, #a855f7, #6366f1)", bg: "#f3e8ff", bubbleFrom: "#a855f7", bubbleTo: "#6366f1", accent: "#a855f7" },
-  { name: "Sunset", gradient: "linear-gradient(to right, #f97316, #ef4444)", bg: "#fff7ed", bubbleFrom: "#f97316", bubbleTo: "#ef4444", accent: "#f97316" },
-  { name: "Dark", gradient: "linear-gradient(to right, #374151, #1f2937)", bg: "#111827", bubbleFrom: "#374151", bubbleTo: "#1f2937", accent: "#6b7280" },
+  { name: "Messenger", gradient: "linear-gradient(135deg, #0084ff, #00c6ff)", bg: "#f0f2f5", bubbleFrom: "#0084ff", bubbleTo: "#00c6ff", accent: "#0084ff" },
+  { name: "Love", gradient: "linear-gradient(135deg, #ff4b6e, #ff2d55)", bg: "#fff0f3", bubbleFrom: "#ff4b6e", bubbleTo: "#ff2d55", accent: "#ff2d55" },
+  { name: "Ocean", gradient: "linear-gradient(135deg, #00d2ff, #3a7bd5)", bg: "#e8f4f8", bubbleFrom: "#00d2ff", bubbleTo: "#3a7bd5", accent: "#00d2ff" },
+  { name: "Purple", gradient: "linear-gradient(135deg, #8b5cf6, #6366f1)", bg: "#f0e6ff", bubbleFrom: "#8b5cf6", bubbleTo: "#6366f1", accent: "#8b5cf6" },
+  { name: "Sunset", gradient: "linear-gradient(135deg, #ff6b35, #f72585)", bg: "#fff5f0", bubbleFrom: "#ff6b35", bubbleTo: "#f72585", accent: "#ff6b35" },
+  { name: "Dark", gradient: "linear-gradient(135deg, #4a5568, #2d3748)", bg: "#0f172a", bubbleFrom: "#4a5568", bubbleTo: "#2d3748", accent: "#64748b" },
+  { name: "Forest", gradient: "linear-gradient(135deg, #22c55e, #16a34a)", bg: "#f0fdf4", bubbleFrom: "#22c55e", bubbleTo: "#16a34a", accent: "#22c55e" },
+  { name: "Rose Gold", gradient: "linear-gradient(135deg, #f43f5e, #e11d48)", bg: "#fff1f2", bubbleFrom: "#f43f5e", bubbleTo: "#e11d48", accent: "#f43f5e" },
+  { name: "Aurora", gradient: "linear-gradient(135deg, #06b6d4, #8b5cf6)", bg: "#ecfeff", bubbleFrom: "#06b6d4", bubbleTo: "#8b5cf6", accent: "#06b6d4" },
+  { name: "Gold", gradient: "linear-gradient(135deg, #f59e0b, #d97706)", bg: "#fffbeb", bubbleFrom: "#f59e0b", bubbleTo: "#d97706", accent: "#f59e0b" },
+  { name: "Galaxy", gradient: "linear-gradient(135deg, #6366f1, #ec4899)", bg: "#fdf2f8", bubbleFrom: "#6366f1", bubbleTo: "#ec4899", accent: "#6366f1" },
+  { name: "Neon", gradient: "linear-gradient(135deg, #00ff87, #60efff)", bg: "#f0fdf4", bubbleFrom: "#00ff87", bubbleTo: "#60efff", accent: "#00ff87" },
 ];
 
 const QUICK_EMOJIS = ["❤️", "😍", "🔥", "😂", "👍", "😘", "🥰", "💕"];
