@@ -2,20 +2,37 @@ import { useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
-// Updates the user's online_at timestamp every 30 seconds
+// Updates the user's online_at timestamp every 2 minutes (lighter backend load)
 export function useOnlineHeartbeat() {
   const { user } = useAuth();
 
   const sendHeartbeat = useCallback(async () => {
-    if (!user) return;
-    await (supabase.from("users").update({ online_at: new Date().toISOString() } as any).eq("id", user.id) as any);
+    if (!user || document.hidden || !navigator.onLine) return;
+    try {
+      await (supabase.from("users").update({ online_at: new Date().toISOString() } as any).eq("id", user.id) as any);
+    } catch {
+      // best-effort heartbeat
+    }
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
+
     sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 30000);
-    return () => clearInterval(interval);
+
+    const interval = setInterval(sendHeartbeat, 120000);
+    const onVisible = () => {
+      if (!document.hidden) sendHeartbeat();
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [user, sendHeartbeat]);
 }
 
