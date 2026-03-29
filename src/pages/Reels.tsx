@@ -685,6 +685,7 @@ export default function Reels() {
   }, []);
 
   const openSearch = useCallback(() => {
+    setSearchHistory(readSearchHistory());
     setSearchMode(true);
     setTimeout(() => searchRef.current?.focus(), 100);
   }, []);
