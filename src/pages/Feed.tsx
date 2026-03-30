@@ -1212,7 +1212,7 @@ export default function Feed() {
                           <div className="bg-gray-100 dark:bg-secondary rounded-2xl px-3 py-2.5">
                             <button onClick={() => navigate(`/user/${c.user_id}`)}
                               className="text-[14px] font-bold text-gray-900 dark:text-foreground hover:underline block">
-                              {c.user?.display_name || "User"}
+                              <NameWithBadge name={c.user?.display_name || "User"} isVerified={c.user?.is_verified_badge} />
                             </button>
                             <p className="text-[15px] leading-relaxed text-gray-900 dark:text-foreground mt-0.5 break-words whitespace-pre-wrap">
                               {renderMentionText(c.content)}
