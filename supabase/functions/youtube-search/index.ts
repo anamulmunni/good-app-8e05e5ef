@@ -180,6 +180,7 @@ async function searchViaPiped(query: string, maxResults = 25): Promise<{ results
             channelId: item.uploaderUrl?.replace("/channel/", "") || "",
             thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
             publishedAt: item.uploadedDate || "",
+            lengthSeconds: item.duration || 0,
           };
         })
         .filter((r: any) => r.videoId);
