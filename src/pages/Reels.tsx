@@ -583,18 +583,28 @@ export default function Reels() {
     run();
   }, [user, activeQuery, refreshTick]);
 
+  // Infinite scroll observer
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingRef.current) loadMore();
+        if (entries[0].isIntersecting && !loadingRef.current) loadMore();
       },
       { threshold: 0, rootMargin: "800px 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, loadMore]);
+  }, [loadMore]);
+
+  // Auto-refresh: prepend fresh videos every 90 seconds
+  useEffect(() => {
+    if (!user) return;
+    const interval = window.setInterval(() => {
+      setRefreshTick((t) => t + 1);
+    }, 90_000);
+    return () => window.clearInterval(interval);
+  }, [user]);
 
   const allVideos = useMemo<VideoItem[]>(() => {
     return extVideos.map((v) => ({
