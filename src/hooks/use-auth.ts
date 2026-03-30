@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User as AppUser } from "@/lib/api";
 
-function withTimeout(promise: any, timeoutMs = 12000, message = "Request timeout") {
+function withTimeout(promise: any, timeoutMs = 8000, message = "Request timeout") {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
