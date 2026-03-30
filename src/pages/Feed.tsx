@@ -1243,7 +1243,9 @@ export default function Feed() {
                                   <div className="flex-1 min-w-0">
                                     <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-2">
                                       <button onClick={() => navigate(`/user/${r.user_id}`)}
-                                        className="text-[13px] font-bold text-gray-900 dark:text-foreground">{r.user?.display_name || "User"}</button>
+                                        className="text-[13px] font-bold text-gray-900 dark:text-foreground">
+                                        <NameWithBadge name={r.user?.display_name || "User"} isVerified={r.user?.is_verified_badge} />
+                                      </button>
                                       <p className="text-[14px] leading-relaxed text-gray-900 dark:text-foreground break-words">
                                         {renderMentionText(r.content)}
                                       </p>
