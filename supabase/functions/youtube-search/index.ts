@@ -10,6 +10,7 @@ const corsHeaders = {
 const cache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL_TRENDING = 60 * 60 * 1000; // 1 hour for trending
 const CACHE_TTL_SEARCH = 30 * 60 * 1000;   // 30 min for search
+const YT_KEY_REGEX = /^AIza[0-9A-Za-z_-]{20,}$/;
 
 function getCached(key: string, ttl: number) {
   const entry = cache.get(key);
@@ -35,6 +36,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 // ── Multi API Key Management ────────────────────────────────────────────
 const exhaustedKeys = new Map<string, number>(); // key -> timestamp when exhausted
+const invalidKeys = new Map<string, string>(); // key -> reason
 const KEY_COOLDOWN = 60 * 60 * 1000; // 1 hour cooldown per key
 
 let cachedApiKeys: string[] = [];
@@ -51,7 +53,7 @@ async function getAllApiKeys(): Promise<string[]> {
   }
 
   const keys: string[] = [];
-  if (envKey) keys.push(envKey.trim());
+  if (envKey && YT_KEY_REGEX.test(envKey.trim())) keys.push(envKey.trim());
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -60,7 +62,10 @@ async function getAllApiKeys(): Promise<string[]> {
       const sb = createClient(supabaseUrl, serviceKey);
       const { data, error } = await sb.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle();
       if (data?.value) {
-        const dbKeys = data.value.split("\n").map((k: string) => k.trim()).filter((k: string) => k.length > 10);
+        const dbKeys = data.value
+          .split(/[\s,]+/)
+          .map((k: string) => k.trim())
+          .filter((k: string) => YT_KEY_REGEX.test(k));
         console.log(`Loaded ${dbKeys.length} API keys from DB`);
         for (const k of dbKeys) {
           if (!keys.includes(k)) keys.push(k);
@@ -81,6 +86,7 @@ async function getAllApiKeys(): Promise<string[]> {
 function getAvailableKey(keys: string[]): string | null {
   const now = Date.now();
   for (const key of keys) {
+    if (invalidKeys.has(key)) continue;
     const exhaustedAt = exhaustedKeys.get(key);
     if (!exhaustedAt || now - exhaustedAt > KEY_COOLDOWN) {
       exhaustedKeys.delete(key);
@@ -92,6 +98,10 @@ function getAvailableKey(keys: string[]): string | null {
 
 function markKeyExhausted(key: string) {
   exhaustedKeys.set(key, Date.now());
+}
+
+function markKeyInvalid(key: string, reason: string) {
+  invalidKeys.set(key, reason);
 }
 
 // ── Fallback Videos ─────────────────────────────────────────────────────
@@ -157,12 +167,18 @@ async function searchYouTubeWithRotation(
       const res = await youtubeApiFetch(baseUrl, apiKey);
       if (!res.ok) {
         const errBody = await res.text();
+        const errLower = errBody.toLowerCase();
         if (res.status === 403 && errBody.includes("quotaExceeded")) {
           console.log(`Key exhausted: ${apiKey.slice(0, 8)}...`);
           markKeyExhausted(apiKey);
           continue; // Try next key
         }
-        throw new Error(`youtube_api_${res.status}`);
+        if (res.status === 400 || (res.status === 403 && (errLower.includes("apikey") || errLower.includes("accessnotconfigured") || errLower.includes("forbidden")))) {
+          console.log(`Key invalid/restricted: ${apiKey.slice(0, 8)}...`);
+          markKeyInvalid(apiKey, `http_${res.status}`);
+          continue;
+        }
+        continue;
       }
       const data = await res.json();
       const items = Array.isArray(data?.items) ? data.items : [];
@@ -204,12 +220,15 @@ async function getTrendingWithRotation(
       try {
         const res = await youtubeApiFetch(baseUrl, apiKey);
         if (!res.ok) {
-          if (res.status === 403) {
-            const errBody = await res.text();
-            if (errBody.includes("quotaExceeded")) {
-              markKeyExhausted(apiKey);
-              continue;
-            }
+          const errBody = await res.text();
+          const errLower = errBody.toLowerCase();
+          if (res.status === 403 && errBody.includes("quotaExceeded")) {
+            markKeyExhausted(apiKey);
+            continue;
+          }
+          if (res.status === 400 || (res.status === 403 && (errLower.includes("apikey") || errLower.includes("accessnotconfigured") || errLower.includes("forbidden")))) {
+            markKeyInvalid(apiKey, `http_${res.status}`);
+            continue;
           }
           break;
         }
@@ -291,8 +310,23 @@ serve(async (req) => {
       const now = Date.now();
       const statuses = keys.map((k, i) => {
         const exhaustedAt = exhaustedKeys.get(k);
-        const available = !exhaustedAt || now - exhaustedAt > KEY_COOLDOWN;
-        return { index: i, prefix: k.slice(0, 8) + "...", available, exhaustedMinAgo: exhaustedAt ? Math.round((now - exhaustedAt) / 60000) : null };
+        const invalidReason = invalidKeys.get(k);
+        const exhausted = !!exhaustedAt && now - exhaustedAt <= KEY_COOLDOWN;
+        const available = !invalidReason && !exhausted;
+        const cooldownMinutes = exhaustedAt ? Math.max(0, Math.ceil((KEY_COOLDOWN - (now - exhaustedAt)) / 60000)) : 0;
+        return {
+          index: i,
+          prefix: k.slice(0, 8) + "...",
+          available,
+          status: invalidReason ? "invalid/restricted" : exhausted ? "cooldown" : "active",
+          exhaustedMinAgo: exhaustedAt ? Math.round((now - exhaustedAt) / 60000) : null,
+          cooldownMinutes,
+          message: invalidReason
+            ? "Key invalid বা API restriction আছে (YouTube Data API v3 enable/restrict check করুন)"
+            : exhausted
+            ? `Quota শেষ, ${cooldownMinutes} মিনিট পরে retry হবে`
+            : "Ready",
+        };
       });
       return new Response(JSON.stringify({ totalKeys: keys.length, available: statuses.filter(s => s.available).length, keys: statuses }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
