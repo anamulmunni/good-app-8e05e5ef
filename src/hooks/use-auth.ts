@@ -108,6 +108,7 @@ export function useAuth() {
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, [fetchOrCreateAppUser]);
