@@ -541,14 +541,14 @@ export default function Reels() {
     setPage(1);
     setHasMore(true);
     setExtVideos([]);
+    setNextPageToken(undefined);
     loadingRef.current = false;
     const run = async () => {
       loadingRef.current = true;
       setLoading(true);
       try {
-        let externalStartPage = activeQuery ? 1 : randomExternalStartPage(refreshTick);
         let [externalResult, localResult] = await Promise.all([
-          getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
+          getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
         // Interleave local videos randomly
@@ -558,8 +558,7 @@ export default function Reels() {
           merged.splice(pos, 0, lv);
         }
 
-        if (!activeQuery && merged.length === 0 && externalStartPage !== 1) {
-          externalStartPage = 1;
+        if (!activeQuery && merged.length === 0) {
           [externalResult, localResult] = await Promise.all([
             getBangladeshExternalVideos(1, 20, undefined, undefined, "long", refreshTick),
             getUploadedLongVideos(1, 10),
@@ -573,6 +572,7 @@ export default function Reels() {
 
         setExtVideos(merged);
         setHasMore(localResult.hasMore || externalResult.hasMore);
+        setNextPageToken(externalResult.nextPageToken);
         setPage(2);
       } finally {
         loadingRef.current = false;
