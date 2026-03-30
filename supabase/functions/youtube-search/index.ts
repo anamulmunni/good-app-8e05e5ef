@@ -440,7 +440,7 @@ serve(async (req) => {
         });
       }
       const invidious = await searchYouTubeViaInvidious("bangla trending song 2026", maxResults);
-      return new Response(JSON.stringify(getFallbackVideos(maxResults)), {
+      return new Response(JSON.stringify(invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults)), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
