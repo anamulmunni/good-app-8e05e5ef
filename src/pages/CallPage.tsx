@@ -253,6 +253,8 @@ export default function CallPage() {
 
       noAnswerTimerRef.current = window.setTimeout(() => {
         if (["calling", "ringing"].includes(callStateRef.current)) {
+          // Send missed call message
+          if (user) sendCallMessage(user.id, targetUserId, "missed", undefined, isVideoCall);
           endCall(true);
           toast({ title: "কোনো উত্তর নেই" });
         }
