@@ -11,6 +11,14 @@ const cache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL_TRENDING = 60 * 60 * 1000; // 1 hour for trending
 const CACHE_TTL_SEARCH = 30 * 60 * 1000;   // 30 min for search
 const YT_KEY_REGEX = /^AIza[0-9A-Za-z_-]{20,}$/;
+const CACHE_VERSION = "v2";
+
+const INVIDIOUS_INSTANCES = [
+  "https://inv.nadeko.net",
+  "https://invidious.nerdvpn.de",
+  "https://yewtu.be",
+  "https://iv.nboeck.de",
+];
 
 function getCached(key: string, ttl: number) {
   const entry = cache.get(key);
@@ -143,6 +151,44 @@ function getFallbackVideos(maxResults = 25): { results: any[]; source: "fallback
   };
 }
 
+async function searchYouTubeViaInvidious(query: string, maxResults = 25): Promise<{ results: any[]; source: "invidious" | "fallback" }> {
+  const trimmed = query.trim();
+  if (!trimmed) return getFallbackVideos(maxResults);
+
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const params = new URLSearchParams({
+        q: trimmed,
+        type: "video",
+        sort_by: "relevance",
+        region: "BD",
+      });
+      const res = await withTimeout(fetch(`${instance}/api/v1/search?${params}`), 7000);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!Array.isArray(data)) continue;
+
+      const results = data
+        .filter((item: any) => item?.videoId)
+        .slice(0, maxResults)
+        .map((item: any) => ({
+          videoId: item.videoId,
+          title: item.title || "",
+          author: item.author || "",
+          channelId: item.authorId || "",
+          thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
+          publishedAt: item.publishedText || "",
+        }));
+
+      if (results.length > 0) return { results, source: "invidious" };
+    } catch {
+      continue;
+    }
+  }
+
+  return getFallbackVideos(maxResults);
+}
+
 // ── YouTube API calls with key rotation ─────────────────────────────────
 
 async function youtubeApiFetch(url: string, apiKey: string): Promise<Response> {
@@ -152,7 +198,7 @@ async function youtubeApiFetch(url: string, apiKey: string): Promise<Response> {
 
 async function searchYouTubeWithRotation(
   keys: string[], query: string, pageToken?: string, maxResults = 25, order = "relevance"
-): Promise<{ results: any[]; nextPageToken?: string; source?: "youtube" | "fallback" }> {
+): Promise<{ results: any[]; nextPageToken?: string; source?: "youtube" | "invidious" | "fallback" }> {
   const params = new URLSearchParams({
     part: "snippet", q: query, type: "video", maxResults: String(maxResults),
     order, regionCode: "BD", relevanceLanguage: "bn", videoDuration: "medium",
@@ -197,12 +243,13 @@ async function searchYouTubeWithRotation(
       throw e;
     }
   }
-  return getFallbackVideos(maxResults);
+  const invidious = await searchYouTubeViaInvidious(query, maxResults);
+  return invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults);
 }
 
 async function getTrendingWithRotation(
   keys: string[], maxResults = 25, categoryId?: string
-): Promise<{ results: any[]; source?: "youtube" | "fallback" }> {
+): Promise<{ results: any[]; source?: "youtube" | "invidious" | "fallback" }> {
   const categories = categoryId ? [categoryId] : ["10", "24", "1", "22"];
   const perCategory = categoryId ? maxResults : Math.ceil(maxResults / categories.length) + 5;
   const allResults: any[] = [];
@@ -258,7 +305,9 @@ async function getTrendingWithRotation(
   const seen = new Set<string>();
   const deduped = allResults.filter(r => { if (seen.has(r.videoId)) return false; seen.add(r.videoId); return true; });
   const result = { results: deduped.slice(0, maxResults), source: "youtube" as const };
-  return result.results.length > 0 ? result : getFallbackVideos(maxResults);
+  if (result.results.length > 0) return result;
+  const invidious = await searchYouTubeViaInvidious("bangla trending song 2026", maxResults);
+  return invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults);
 }
 
 async function probeYouTubeKey(key: string): Promise<{ state: "ok" | "quota" | "invalid" | "error"; message: string }> {
@@ -331,7 +380,7 @@ serve(async (req) => {
 
     // Suggestions (free)
     if (action === "suggest") {
-      const cacheKey = `suggest:${query}`;
+      const cacheKey = `${CACHE_VERSION}:suggest:${query}`;
       const cached = getCached(cacheKey, 60 * 60 * 1000);
       if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const suggestions = await getYouTubeSuggestions(query);
@@ -384,6 +433,13 @@ serve(async (req) => {
 
     const keys = await getAllApiKeys();
     if (keys.length === 0) {
+      if (query) {
+        const invidious = await searchYouTubeViaInvidious(query, maxResults);
+        return new Response(JSON.stringify(invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults)), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const invidious = await searchYouTubeViaInvidious("bangla trending song 2026", maxResults);
       return new Response(JSON.stringify(getFallbackVideos(maxResults)), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -392,7 +448,7 @@ serve(async (req) => {
     // Trending
     if (action === "trending") {
       const categoryId = url.searchParams.get("categoryId") || undefined;
-      const cacheKey = `trending:${categoryId || "all"}:${maxResults}`;
+      const cacheKey = `${CACHE_VERSION}:trending:${categoryId || "all"}:${maxResults}`;
       const cached = getCached(cacheKey, CACHE_TTL_TRENDING);
       if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const response = await getTrendingWithRotation(keys, maxResults, categoryId);
@@ -402,7 +458,7 @@ serve(async (req) => {
 
     // No query → trending
     if (!query) {
-      const cacheKey = `trending:default:${maxResults}`;
+      const cacheKey = `${CACHE_VERSION}:trending:default:${maxResults}`;
       const cached = getCached(cacheKey, CACHE_TTL_TRENDING);
       if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const response = await getTrendingWithRotation(keys, maxResults);
@@ -411,7 +467,7 @@ serve(async (req) => {
     }
 
     // Search
-    const cacheKey = `search:${query}:${order}:${maxResults}:${pageToken || ""}`;
+    const cacheKey = `${CACHE_VERSION}:search:${query}:${order}:${maxResults}:${pageToken || ""}`;
     const cached = getCached(cacheKey, CACHE_TTL_SEARCH);
     if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const response = await searchYouTubeWithRotation(keys, query, pageToken, maxResults, order);
