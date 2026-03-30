@@ -93,19 +93,48 @@ export default function AdminPanel() {
   const [withdrawLockUntilSetting, setWithdrawLockUntilSetting] = useState("");
   const [requestLockUntilSetting, setRequestLockUntilSetting] = useState("");
   const [resetHistorySearch, setResetHistorySearch] = useState("");
-  const [youtubeApiKeys, setYoutubeApiKeys] = useState("");
+  const [youtubeApiKeyInput, setYoutubeApiKeyInput] = useState("");
+  const [savedYoutubeKeys, setSavedYoutubeKeys] = useState<string[]>([]);
   const [youtubeKeysLoading, setYoutubeKeysLoading] = useState(false);
   const [youtubeKeyStatus, setYoutubeKeyStatus] = useState<any>(null);
   const [youtubeKeysLoaded, setYoutubeKeysLoaded] = useState(false);
+  const [showFullYoutubeKeys, setShowFullYoutubeKeys] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const parseYoutubeKeys = (value: string) => {
+    const keys = value
+      .split(/[\s,]+/)
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .filter((k) => /^AIza[0-9A-Za-z_-]{20,}$/.test(k));
+    return Array.from(new Set(keys));
+  };
+
+  const maskYoutubeKey = (key: string) => `${key.slice(0, 8)}...${key.slice(-4)}`;
+
+  const persistYoutubeKeys = async (keys: string[]) => {
+    const payload = keys.join("\n");
+    const { data: existing } = await supabase.from("settings").select("id").eq("key", "youtube_api_keys").maybeSingle();
+    if (existing) {
+      const { error } = await supabase.from("settings").update({ value: payload }).eq("key", "youtube_api_keys");
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("settings").insert({ key: "youtube_api_keys", value: payload });
+      if (error) throw error;
+    }
+  };
 
   // Auto-load YouTube API keys
   useEffect(() => {
     if (isLoggedIn && !youtubeKeysLoaded) {
       setYoutubeKeysLoaded(true);
       supabase.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle()
-        .then(({ data }) => { if (data?.value) setYoutubeApiKeys(data.value); });
+        .then(({ data }) => {
+          const keys = parseYoutubeKeys(data?.value || "");
+          setSavedYoutubeKeys(keys);
+          setYoutubeApiKeyInput("");
+        });
     }
   }, [isLoggedIn, youtubeKeysLoaded]);
 
@@ -963,23 +992,40 @@ export default function AdminPanel() {
 
         {/* ═══════════════════════════════════════ */}
         {/* 🎬 YouTube API Keys */}
-        <Section icon={Youtube} title={`YouTube API Keys${youtubeApiKeys ? ` (${youtubeApiKeys.split("\n").filter(k => k.trim().length > 10).length})` : ""}`} color="destructive">
+        <Section icon={Youtube} title={`YouTube API Keys${savedYoutubeKeys.length ? ` (${savedYoutubeKeys.length})` : ""}`} color="destructive">
           <div className="space-y-4 pt-3">
             <p className="text-xs text-muted-foreground">প্রতিটি API key আলাদা লাইনে দিন। একাধিক key দিলে কোটা শেষ হলে অটো পরের key ব্যবহার হবে।</p>
             
             {/* Show saved keys (masked) */}
-            {youtubeApiKeys && (
+            {savedYoutubeKeys.length > 0 && (
               <div className="bg-secondary/30 rounded-xl p-3 space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground mb-1">সেভ করা কীগুলো:</p>
-                {youtubeApiKeys.split("\n").filter(k => k.trim().length > 10).map((k, i) => (
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] font-bold text-muted-foreground">সেভ করা কীগুলো:</p>
+                  <button
+                    onClick={() => setShowFullYoutubeKeys((p) => !p)}
+                    className="text-[10px] font-bold text-primary hover:opacity-80"
+                  >
+                    {showFullYoutubeKeys ? "Hide" : "Show"}
+                  </button>
+                </div>
+                {savedYoutubeKeys.map((k, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs font-mono">
                     <span className="text-muted-foreground">{i + 1}.</span>
-                    <span>{k.trim().slice(0, 12)}...{k.trim().slice(-4)}</span>
-                    <button onClick={() => {
-                      const keys = youtubeApiKeys.split("\n").filter(line => line.trim().length > 10);
-                      keys.splice(i, 1);
-                      setYoutubeApiKeys(keys.join("\n"));
-                    }} className="text-destructive hover:text-destructive/80 ml-auto">
+                    <span>{showFullYoutubeKeys ? k : maskYoutubeKey(k)}</span>
+                    <button onClick={async () => {
+                      setYoutubeKeysLoading(true);
+                      try {
+                        const next = savedYoutubeKeys.filter((_, idx) => idx !== i);
+                        await persistYoutubeKeys(next);
+                        setSavedYoutubeKeys(next);
+                        setYoutubeKeyStatus(null);
+                        toast({ title: "API key ডিলিট হয়েছে" });
+                      } catch {
+                        toast({ title: "ডিলিট ব্যর্থ", variant: "destructive" });
+                      } finally {
+                        setYoutubeKeysLoading(false);
+                      }
+                    }} className="text-destructive hover:text-destructive/80 ml-auto" disabled={youtubeKeysLoading}>
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -988,8 +1034,8 @@ export default function AdminPanel() {
             )}
 
             <textarea
-              value={youtubeApiKeys}
-              onChange={(e) => setYoutubeApiKeys(e.target.value)}
+              value={youtubeApiKeyInput}
+              onChange={(e) => setYoutubeApiKeyInput(e.target.value)}
               placeholder={"AIzaSy...\nAIzaSy...\nAIzaSy..."}
               className="input-field min-h-[100px] font-mono text-xs"
               rows={4}
@@ -1001,8 +1047,10 @@ export default function AdminPanel() {
                   setYoutubeKeysLoading(true);
                   try {
                     const { data } = await supabase.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle();
-                    setYoutubeApiKeys(data?.value || "");
-                    toast({ title: data?.value ? "লোড হয়েছে" : "কোনো key সেভ নেই" });
+                    const keys = parseYoutubeKeys(data?.value || "");
+                    setSavedYoutubeKeys(keys);
+                    setYoutubeApiKeyInput("");
+                    toast({ title: keys.length > 0 ? "লোড হয়েছে" : "কোনো key সেভ নেই" });
                   } catch { toast({ title: "লোড ব্যর্থ", variant: "destructive" }); }
                   finally { setYoutubeKeysLoading(false); }
                 }}
@@ -1015,14 +1063,17 @@ export default function AdminPanel() {
                 onClick={async () => {
                   setYoutubeKeysLoading(true);
                   try {
-                    const trimmedKeys = youtubeApiKeys.split("\n").map(k => k.trim()).filter(k => k.length > 10).join("\n");
-                    const { data: existing } = await supabase.from("settings").select("id").eq("key", "youtube_api_keys").maybeSingle();
-                    if (existing) {
-                      await supabase.from("settings").update({ value: trimmedKeys }).eq("key", "youtube_api_keys");
-                    } else {
-                      await supabase.from("settings").insert({ key: "youtube_api_keys", value: trimmedKeys });
+                    const newKeys = parseYoutubeKeys(youtubeApiKeyInput);
+                    if (newKeys.length === 0) {
+                      toast({ title: "valid YouTube API key দিন", variant: "destructive" });
+                      return;
                     }
-                    toast({ title: `${trimmedKeys.split("\n").filter(k => k).length} টি API key সেভ হয়েছে ✓` });
+                    const merged = Array.from(new Set([...savedYoutubeKeys, ...newKeys]));
+                    await persistYoutubeKeys(merged);
+                    setSavedYoutubeKeys(merged);
+                    setYoutubeApiKeyInput("");
+                    setYoutubeKeyStatus(null);
+                    toast({ title: `${newKeys.length} টি নতুন key সেভ হয়েছে ✓` });
                   } catch (e: any) { toast({ title: "সেভ ব্যর্থ", description: e.message, variant: "destructive" }); }
                   finally { setYoutubeKeysLoading(false); }
                 }}
@@ -1050,7 +1101,7 @@ export default function AdminPanel() {
               🔍 Key স্ট্যাটাস চেক করুন (লাইভ)
             </button>
             {youtubeKeyStatus && (
-              <div className="bg-secondary/50 rounded-xl p-3 text-xs space-y-2">
+                <div className="bg-secondary/50 rounded-xl p-3 text-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="font-bold">মোট: {youtubeKeyStatus.totalKeys} টি key</p>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${youtubeKeyStatus.available > 0 ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
@@ -1063,10 +1114,15 @@ export default function AdminPanel() {
                     <span className="font-mono text-[11px]">{k.prefix}</span>
                     <span className="ml-auto text-[10px]">
                       {k.available 
-                        ? <span className="text-green-400">✓ সক্রিয়</span> 
-                        : <span className="text-red-400">✗ কোটা শেষ ({k.exhaustedMinAgo} মিনিট আগে, ~{Math.max(0, 60 - (k.exhaustedMinAgo || 0))} মিনিট বাকি)</span>
+                        ? <span className="text-green-400">✓ সক্রিয়</span>
+                        : <span className="text-red-400">✗ {k.status || "inactive"}{k.cooldownMinutes ? ` (~${k.cooldownMinutes}m)` : ""}</span>
                       }
                     </span>
+                  </div>
+                ))}
+                {youtubeKeyStatus.keys?.map((k: any, i: number) => (
+                  <div key={`msg-${i}`} className="text-[10px] text-muted-foreground leading-relaxed">
+                    {k.prefix}: {k.message || (k.available ? "ready" : "unavailable")}
                   </div>
                 ))}
                 {youtubeKeyStatus.available === 0 && (
