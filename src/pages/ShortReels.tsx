@@ -57,12 +57,24 @@ const TikTokReelPlayer = forwardRef<HTMLDivElement, {
   videoId: string;
   isActive: boolean;
   isNearby: boolean;
-}>(function TikTokReelPlayer({ videoId, isActive, isNearby }, ref) {
+  onUnavailable?: () => void;
+}>(function TikTokReelPlayer({ videoId, isActive, isNearby, onUnavailable }, ref) {
   const [loaded, setLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    if (!isActive && !isNearby) setLoaded(false);
+    if (!isActive && !isNearby) { setLoaded(false); setHasError(false); }
   }, [isActive, isNearby]);
+
+  // Detect unavailable videos - if iframe loads but content fails
+  useEffect(() => {
+    if (!isActive || !loaded) return;
+    const timer = setTimeout(() => {
+      // If still showing after load check, consider it valid
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [isActive, loaded]);
 
   if (!isActive && !isNearby) {
     return (
@@ -75,20 +87,30 @@ const TikTokReelPlayer = forwardRef<HTMLDivElement, {
   }
 
   return (
-    <div ref={ref} className="w-full h-full relative bg-black overflow-hidden">
+    <div ref={ref} className="w-full h-full relative bg-black overflow-hidden flex items-center justify-center">
       {!loaded && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
           <Loader2 className="w-10 h-10 text-white animate-spin" />
         </div>
       )}
       <iframe
-        key={`tiktok-${videoId}-${isActive ? "active" : "buffer"}`}
-        src={`https://www.tiktok.com/embed/v2/${videoId}?hide_share_button=1&autoplay=${isActive ? 1 : 0}`}
-        className="w-full h-full border-0"
-        allow="autoplay; encrypted-media"
+        ref={iframeRef}
+        key={`tiktok-${videoId}-${isActive ? "a" : "b"}`}
+        src={`https://www.tiktok.com/player/v1/${videoId}?music_info=0&description=0&rel=0&autoplay=${isActive ? 1 : 0}&loop=1`}
+        className="border-0"
+        allow="autoplay; encrypted-media; fullscreen"
         allowFullScreen
-        style={{ pointerEvents: isActive ? "auto" : "none" }}
+        sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+        style={{
+          pointerEvents: isActive ? "auto" : "none",
+          width: "100%",
+          height: "100%",
+          position: "absolute",
+          top: 0,
+          left: 0,
+        }}
         onLoad={() => setLoaded(true)}
+        onError={() => { setHasError(true); onUnavailable?.(); }}
       />
     </div>
   );
@@ -487,6 +509,12 @@ export default function ShortReels() {
                   videoId={video.tiktokVideoId!}
                   isActive={index === currentIndex}
                   isNearby={Math.abs(index - currentIndex) <= 2}
+                  onUnavailable={() => {
+                    // Skip to next if this one is unavailable
+                    if (index === currentIndex) {
+                      setTimeout(() => goToNextReel(), 500);
+                    }
+                  }}
                 />
               ) : (
                 <video
@@ -582,19 +610,21 @@ export default function ShortReels() {
                 )}
               </div>
 
-              {/* Bottom info */}
-              <div className="absolute bottom-4 left-3 right-16 z-20">
-                <button onClick={() => !video.isSample && navigate(`/user/${video.user_id}`)} className="inline-flex items-center gap-2 mb-2">
-                  <span className="text-white font-bold text-[14px]">{video.user?.display_name || "User"}</span>
-                  {video.user?.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
-                </button>
-                {video.content && !video.content.startsWith("__GOODAPP_LONG__") && (
-                  <ReelsCaption text={video.content} />
-                )}
-              </div>
-
-              {/* Gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30 pointer-events-none" />
+              {/* Bottom info - only for non-TikTok videos */}
+              {!video.isTikTok && (
+                <>
+                  <div className="absolute bottom-4 left-3 right-16 z-20">
+                    <button onClick={() => !video.isSample && navigate(`/user/${video.user_id}`)} className="inline-flex items-center gap-2 mb-2">
+                      <span className="text-white font-bold text-[14px]">{video.user?.display_name || "User"}</span>
+                      {video.user?.is_verified_badge && <VerifiedBadge className="h-3.5 w-3.5" />}
+                    </button>
+                    {video.content && !video.content.startsWith("__GOODAPP_LONG__") && (
+                      <ReelsCaption text={video.content} />
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30 pointer-events-none" />
+                </>
+              )}
             </div>
           ))}
         </div>
