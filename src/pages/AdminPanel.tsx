@@ -364,7 +364,7 @@ export default function AdminPanel() {
             />
             <div className="relative z-10">
               <ShieldCheck className="w-6 h-6 text-[hsl(var(--amber))] mx-auto mb-1" />
-              <p className="text-3xl font-black text-[hsl(var(--amber))]">{users?.filter(u => u.key_count >= 5).length || 0}</p>
+              <p className="text-3xl font-black text-[hsl(var(--amber))]">{users?.filter(u => u.key_count >= 5).reduce((sum, u) => sum + (u.key_count || 0), 0) || 0}</p>
               <p className="text-[10px] text-muted-foreground font-semibold">৫+ ভেরিফাইড</p>
             </div>
           </motion.div>
