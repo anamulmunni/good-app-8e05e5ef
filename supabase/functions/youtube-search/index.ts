@@ -11,6 +11,14 @@ const cache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL_TRENDING = 60 * 60 * 1000; // 1 hour for trending
 const CACHE_TTL_SEARCH = 30 * 60 * 1000;   // 30 min for search
 const YT_KEY_REGEX = /^AIza[0-9A-Za-z_-]{20,}$/;
+const CACHE_VERSION = "v2";
+
+const INVIDIOUS_INSTANCES = [
+  "https://inv.nadeko.net",
+  "https://invidious.nerdvpn.de",
+  "https://yewtu.be",
+  "https://iv.nboeck.de",
+];
 
 function getCached(key: string, ttl: number) {
   const entry = cache.get(key);
@@ -128,18 +136,57 @@ const FALLBACK_VIDEOS = [
   { videoId: "PT2_F-1esPk", title: "The Nights - Avicii", author: "Avicii" },
 ];
 
-function getFallbackVideos(maxResults = 25): { results: any[] } {
+function getFallbackVideos(maxResults = 25): { results: any[]; source: "fallback" } {
   const shuffled = [...FALLBACK_VIDEOS];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return {
+    source: "fallback",
     results: shuffled.slice(0, maxResults).map(v => ({
       videoId: v.videoId, title: v.title, author: v.author, channelId: "",
       thumbnail: `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`, publishedAt: "",
     })),
   };
+}
+
+async function searchYouTubeViaInvidious(query: string, maxResults = 25): Promise<{ results: any[]; source: "invidious" | "fallback" }> {
+  const trimmed = query.trim();
+  if (!trimmed) return getFallbackVideos(maxResults);
+
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const params = new URLSearchParams({
+        q: trimmed,
+        type: "video",
+        sort_by: "relevance",
+        region: "BD",
+      });
+      const res = await withTimeout(fetch(`${instance}/api/v1/search?${params}`), 7000);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!Array.isArray(data)) continue;
+
+      const results = data
+        .filter((item: any) => item?.videoId)
+        .slice(0, maxResults)
+        .map((item: any) => ({
+          videoId: item.videoId,
+          title: item.title || "",
+          author: item.author || "",
+          channelId: item.authorId || "",
+          thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
+          publishedAt: item.publishedText || "",
+        }));
+
+      if (results.length > 0) return { results, source: "invidious" };
+    } catch {
+      continue;
+    }
+  }
+
+  return getFallbackVideos(maxResults);
 }
 
 // ── YouTube API calls with key rotation ─────────────────────────────────
@@ -151,7 +198,7 @@ async function youtubeApiFetch(url: string, apiKey: string): Promise<Response> {
 
 async function searchYouTubeWithRotation(
   keys: string[], query: string, pageToken?: string, maxResults = 25, order = "relevance"
-): Promise<{ results: any[]; nextPageToken?: string }> {
+): Promise<{ results: any[]; nextPageToken?: string; source?: "youtube" | "invidious" | "fallback" }> {
   const params = new URLSearchParams({
     part: "snippet", q: query, type: "video", maxResults: String(maxResults),
     order, regionCode: "BD", relevanceLanguage: "bn", videoDuration: "medium",
@@ -190,18 +237,19 @@ async function searchYouTubeWithRotation(
         thumbnail: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
         publishedAt: item.snippet?.publishedAt || "",
       }));
-      return { results, nextPageToken: data?.nextPageToken };
+      return { results, nextPageToken: data?.nextPageToken, source: "youtube" };
     } catch (e) {
       if (String(e).includes("timeout")) continue;
       throw e;
     }
   }
-  return getFallbackVideos(maxResults);
+  const invidious = await searchYouTubeViaInvidious(query, maxResults);
+  return invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults);
 }
 
 async function getTrendingWithRotation(
   keys: string[], maxResults = 25, categoryId?: string
-): Promise<{ results: any[] }> {
+): Promise<{ results: any[]; source?: "youtube" | "invidious" | "fallback" }> {
   const categories = categoryId ? [categoryId] : ["10", "24", "1", "22"];
   const perCategory = categoryId ? maxResults : Math.ceil(maxResults / categories.length) + 5;
   const allResults: any[] = [];
@@ -256,8 +304,45 @@ async function getTrendingWithRotation(
   }
   const seen = new Set<string>();
   const deduped = allResults.filter(r => { if (seen.has(r.videoId)) return false; seen.add(r.videoId); return true; });
-  const result = { results: deduped.slice(0, maxResults) };
-  return result.results.length > 0 ? result : getFallbackVideos(maxResults);
+  const result = { results: deduped.slice(0, maxResults), source: "youtube" as const };
+  if (result.results.length > 0) return result;
+  const invidious = await searchYouTubeViaInvidious("bangla trending song 2026", maxResults);
+  return invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults);
+}
+
+async function probeYouTubeKey(key: string): Promise<{ state: "ok" | "quota" | "invalid" | "error"; message: string }> {
+  try {
+    const params = new URLSearchParams({
+      part: "id",
+      id: "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+      key,
+    });
+    const res = await withTimeout(fetch(`https://www.googleapis.com/youtube/v3/channels?${params}`), 5000);
+    if (res.ok) return { state: "ok", message: "Ready" };
+
+    const errBody = await res.text();
+    const errLower = errBody.toLowerCase();
+
+    if (res.status === 403 && errLower.includes("quotaexceeded")) {
+      return { state: "quota", message: "Quota exceeded" };
+    }
+
+    if (
+      res.status === 400 ||
+      (res.status === 403 && (
+        errLower.includes("apikey") ||
+        errLower.includes("accessnotconfigured") ||
+        errLower.includes("forbidden") ||
+        errLower.includes("iprefererblocked")
+      ))
+    ) {
+      return { state: "invalid", message: "Invalid/restricted key" };
+    }
+
+    return { state: "error", message: `HTTP ${res.status}` };
+  } catch {
+    return { state: "error", message: "Probe timeout/network error" };
+  }
 }
 
 // ── YouTube Suggest API (free, no quota) ────────────────────────────────
@@ -295,7 +380,7 @@ serve(async (req) => {
 
     // Suggestions (free)
     if (action === "suggest") {
-      const cacheKey = `suggest:${query}`;
+      const cacheKey = `${CACHE_VERSION}:suggest:${query}`;
       const cached = getCached(cacheKey, 60 * 60 * 1000);
       if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const suggestions = await getYouTubeSuggestions(query);
@@ -307,8 +392,21 @@ serve(async (req) => {
     // API key status check
     if (action === "key-status") {
       const keys = await getAllApiKeys();
+      const shouldProbe = url.searchParams.get("probe") === "1";
+      const probeMap = new Map<string, { state: "ok" | "quota" | "invalid" | "error"; message: string }>();
+
+      if (shouldProbe) {
+        const probeResults = await Promise.all(keys.map(async (k) => ({ key: k, result: await probeYouTubeKey(k) })));
+        for (const entry of probeResults) {
+          probeMap.set(entry.key, entry.result);
+          if (entry.result.state === "quota") markKeyExhausted(entry.key);
+          if (entry.result.state === "invalid") markKeyInvalid(entry.key, "probe_invalid_or_restricted");
+        }
+      }
+
       const now = Date.now();
       const statuses = keys.map((k, i) => {
+        const probe = probeMap.get(k);
         const exhaustedAt = exhaustedKeys.get(k);
         const invalidReason = invalidKeys.get(k);
         const exhausted = !!exhaustedAt && now - exhaustedAt <= KEY_COOLDOWN;
@@ -321,11 +419,11 @@ serve(async (req) => {
           status: invalidReason ? "invalid/restricted" : exhausted ? "cooldown" : "active",
           exhaustedMinAgo: exhaustedAt ? Math.round((now - exhaustedAt) / 60000) : null,
           cooldownMinutes,
-          message: invalidReason
+          message: probe?.message || (invalidReason
             ? "Key invalid বা API restriction আছে (YouTube Data API v3 enable/restrict check করুন)"
             : exhausted
             ? `Quota শেষ, ${cooldownMinutes} মিনিট পরে retry হবে`
-            : "Ready",
+            : "Ready"),
         };
       });
       return new Response(JSON.stringify({ totalKeys: keys.length, available: statuses.filter(s => s.available).length, keys: statuses }), {
@@ -335,7 +433,14 @@ serve(async (req) => {
 
     const keys = await getAllApiKeys();
     if (keys.length === 0) {
-      return new Response(JSON.stringify(getFallbackVideos(maxResults)), {
+      if (query) {
+        const invidious = await searchYouTubeViaInvidious(query, maxResults);
+        return new Response(JSON.stringify(invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults)), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const invidious = await searchYouTubeViaInvidious("bangla trending song 2026", maxResults);
+      return new Response(JSON.stringify(invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults)), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -343,30 +448,30 @@ serve(async (req) => {
     // Trending
     if (action === "trending") {
       const categoryId = url.searchParams.get("categoryId") || undefined;
-      const cacheKey = `trending:${categoryId || "all"}:${maxResults}`;
+      const cacheKey = `${CACHE_VERSION}:trending:${categoryId || "all"}:${maxResults}`;
       const cached = getCached(cacheKey, CACHE_TTL_TRENDING);
       if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const response = await getTrendingWithRotation(keys, maxResults, categoryId);
-      if (response.results.length > 0) setCache(cacheKey, response);
+      if (response.results.length > 0 && response.source !== "fallback") setCache(cacheKey, response);
       return new Response(JSON.stringify(response), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // No query → trending
     if (!query) {
-      const cacheKey = `trending:default:${maxResults}`;
+      const cacheKey = `${CACHE_VERSION}:trending:default:${maxResults}`;
       const cached = getCached(cacheKey, CACHE_TTL_TRENDING);
       if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const response = await getTrendingWithRotation(keys, maxResults);
-      if (response.results.length > 0) setCache(cacheKey, response);
+      if (response.results.length > 0 && response.source !== "fallback") setCache(cacheKey, response);
       return new Response(JSON.stringify(response), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Search
-    const cacheKey = `search:${query}:${order}:${maxResults}:${pageToken || ""}`;
+    const cacheKey = `${CACHE_VERSION}:search:${query}:${order}:${maxResults}:${pageToken || ""}`;
     const cached = getCached(cacheKey, CACHE_TTL_SEARCH);
     if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const response = await searchYouTubeWithRotation(keys, query, pageToken, maxResults, order);
-    if (response.results.length > 0) setCache(cacheKey, response);
+    if (response.results.length > 0 && response.source !== "fallback") setCache(cacheKey, response);
     return new Response(JSON.stringify(response), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e) {

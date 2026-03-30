@@ -1089,7 +1089,7 @@ export default function AdminPanel() {
                 try {
                   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
                   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-                  const res = await fetch(`${supabaseUrl}/functions/v1/youtube-search?action=key-status`, {
+                  const res = await fetch(`${supabaseUrl}/functions/v1/youtube-search?action=key-status&probe=1`, {
                     headers: { "Authorization": `Bearer ${supabaseKey}` },
                   });
                   const data = await res.json();

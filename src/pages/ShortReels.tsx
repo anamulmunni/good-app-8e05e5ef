@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,11 +11,11 @@ import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play } from "l
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
-function ReelsCaption({ text }: { text: string }) {
+const ReelsCaption = forwardRef<HTMLDivElement, { text: string }>(function ReelsCaption({ text }, ref) {
   const [expanded, setExpanded] = useState(false);
   const isLong = text.length > 80;
   return (
-    <div onClick={(e) => { e.stopPropagation(); if (isLong) setExpanded(!expanded); }}>
+    <div ref={ref} onClick={(e) => { e.stopPropagation(); if (isLong) setExpanded(!expanded); }}>
       <p className={`text-white text-[14px] leading-[20px] drop-shadow-lg ${expanded ? "" : "line-clamp-2"}`}>
         {text}
       </p>
@@ -24,7 +24,7 @@ function ReelsCaption({ text }: { text: string }) {
       )}
     </div>
   );
-}
+});
 
 type ShortVideo = {
   id: string;
@@ -41,15 +41,15 @@ type ShortVideo = {
 };
 
 // YouTube Reel Player - pre-buffers nearby reels, only active one has autoplay+sound
-function YouTubeReelPlayer({
+const YouTubeReelPlayer = forwardRef<HTMLDivElement, {
+  videoId: string;
+  isActive: boolean;
+  isNearby: boolean;
+}>(function YouTubeReelPlayer({
   videoId,
   isActive,
   isNearby,
-}: {
-  videoId: string;
-  isActive: boolean;
-  isNearby: boolean; // within ±2 of current - pre-buffer iframe
-}) {
+}, ref) {
   const [loaded, setLoaded] = useState(false);
 
   // Reset loaded state when going far away
@@ -60,7 +60,7 @@ function YouTubeReelPlayer({
   // Far away - just show thumbnail
   if (!isActive && !isNearby) {
     return (
-      <div className="w-full h-full relative bg-black">
+      <div ref={ref} className="w-full h-full relative bg-black">
         <img
           src={`https://i.ytimg.com/vi/${videoId}/hq720.jpg`}
           className="w-full h-full object-cover"
@@ -78,7 +78,7 @@ function YouTubeReelPlayer({
 
   // Active = autoplay + sound, nearby = muted pre-buffer (hidden)
   return (
-    <div className="w-full h-full relative bg-black">
+    <div ref={ref} className="w-full h-full relative bg-black">
       {!loaded && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
           <img
@@ -100,7 +100,7 @@ function YouTubeReelPlayer({
       />
     </div>
   );
-}
+});
 
 // Category tabs
 const CATEGORIES = [
