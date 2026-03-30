@@ -545,12 +545,13 @@ export default function Reels() {
     setExtVideos([]);
     setNextPageToken(undefined);
     loadingRef.current = false;
+    const freshSeed = Date.now();
     const run = async () => {
       loadingRef.current = true;
       setLoading(true);
       try {
         let [externalResult, localResult] = await Promise.all([
-          getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long", refreshTick),
+          getBangladeshExternalVideos(randomExternalStartPage(freshSeed), 20, undefined, activeQuery || undefined, "long", freshSeed),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
         // Interleave local videos randomly
@@ -562,7 +563,7 @@ export default function Reels() {
 
         if (!activeQuery && merged.length === 0) {
           [externalResult, localResult] = await Promise.all([
-            getBangladeshExternalVideos(1, 20, undefined, undefined, "long", refreshTick),
+            getBangladeshExternalVideos(1, 20, undefined, undefined, "long", freshSeed),
             getUploadedLongVideos(1, 10),
           ]);
           merged = dedupeVideos([...externalResult.videos]);
