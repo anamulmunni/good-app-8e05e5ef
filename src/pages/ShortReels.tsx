@@ -368,7 +368,7 @@ export default function ShortReels() {
             <p className="text-white/60 text-sm">ভিডিও খোঁজা হচ্ছে...</p>
           </div>
         </div>
-      ) : videos.length === 0 ? (
+      ) : shuffledVideos.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-white">
           <Play className="w-16 h-16 mb-4 opacity-40" />
           <p className="text-lg font-bold">কোনো Reels নেই</p>
@@ -381,7 +381,7 @@ export default function ShortReels() {
           className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
           style={{ scrollSnapType: "y mandatory" }}
         >
-          {videos.map((video, index) => (
+          {shuffledVideos.map((video, index) => (
             <div
               key={video.id}
               className="h-full w-full relative snap-start snap-always"
