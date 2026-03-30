@@ -768,6 +768,15 @@ export default function Reels() {
       if (shell.requestFullscreen) {
         await shell.requestFullscreen();
         try { await (screen.orientation as any).lock?.("landscape"); } catch {}
+        
+        // Listen for fullscreen exit to unlock orientation
+        const onFullscreenChange = () => {
+          if (!document.fullscreenElement) {
+            try { (screen.orientation as any).unlock?.(); } catch {}
+            document.removeEventListener("fullscreenchange", onFullscreenChange);
+          }
+        };
+        document.addEventListener("fullscreenchange", onFullscreenChange);
         return;
       }
 
