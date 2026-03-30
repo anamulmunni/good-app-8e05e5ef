@@ -1028,7 +1028,7 @@ export default function Reels() {
           <div ref={playerShellRef} className="w-full aspect-video relative overflow-hidden" style={{ background: "#000" }}>
             {/* Hide YouTube logo with good-app branding */}
             {selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && (
-              <div className="absolute bottom-[26px] right-0 w-[200px] h-[36px] z-[6] pointer-events-none flex items-center justify-end pr-[6px] overflow-hidden" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.9) 10%)" }}>
+              <div className="absolute bottom-[26px] right-[2px] w-[160px] h-[34px] z-[6] pointer-events-none flex items-center justify-center overflow-hidden" style={{ background: "rgba(0,0,0,0.55)", borderRadius: "4px" }}>
                 <span className="text-[20px] font-black tracking-wider" style={{
                   background: "linear-gradient(135deg, #22c55e 0%, #4ade80 30%, #86efac 50%, #4ade80 70%, #22c55e 100%)",
                   backgroundSize: "200% 200%",
