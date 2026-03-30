@@ -21,12 +21,12 @@ const CATEGORIES = [
 ] as const;
 
 const CATEGORY_QUERY: Record<string, string> = {
-  mixed: "bangla short video 2025",
-  gajal: "bangla gojol short 2025",
-  funny: "bangla funny video short",
-  dance: "bangla dance tiktok short",
-  nature: "nature short video aesthetic",
-  music: "bangla song short video",
+  mixed: "bangla tiktok viral video 2025",
+  gajal: "bangla gojol tiktok 2025",
+  funny: "bangla funny tiktok 2025",
+  dance: "bangla dance tiktok viral 2025",
+  nature: "nature aesthetic tiktok short",
+  music: "bangla song tiktok viral 2025",
 };
 
 const SEEN_REELS_KEY = "goodapp-short-reels-seen-v2";
