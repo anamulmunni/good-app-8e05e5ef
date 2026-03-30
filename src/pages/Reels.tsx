@@ -276,6 +276,7 @@ export default function Reels() {
 
   const [searchMode, setSearchMode] = useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const [voiceListening, setVoiceListening] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [ytSuggestions, setYtSuggestions] = useState<string[]>([]);
