@@ -797,6 +797,28 @@ export async function toggleReaction(postId: string, userId: number, reactionTyp
     // no-op
   }
 
+  if (reacted) {
+    try {
+      const [{ data: postOwner }, { data: senderData }] = await Promise.all([
+        (supabase.from("posts").select("user_id").eq("id", postId).single() as any),
+        (supabase.from("users").select("display_name").eq("id", userId).single() as any),
+      ]);
+
+      if (postOwner?.user_id && postOwner.user_id !== userId) {
+        const senderName = senderData?.display_name || "কেউ";
+        await (supabase.from("notifications").insert({
+          user_id: postOwner.user_id,
+          from_user_id: userId,
+          type: "like",
+          reference_id: postId,
+          content: `${senderName} আপনার পোস্টে ${reactionType} রিঅ্যাকশন দিয়েছে`,
+        } as any) as any);
+      }
+    } catch {
+      // no-op
+    }
+  }
+
   return { reacted, type: reactionType };
 }
 
@@ -888,6 +910,7 @@ export async function addComment(postId: string, userId: number, content: string
   // Get sender name for notifications
   const { data: senderData } = await (supabase.from("users").select("display_name").eq("id", userId).single() as any);
   const senderName = senderData?.display_name || "কেউ";
+  const notifiedUserIds = new Set<number>();
 
   // If this is a reply, notify the parent comment author
   if (parentCommentId) {
@@ -901,9 +924,25 @@ export async function addComment(postId: string, userId: number, content: string
           reference_id: postId,
           content: `${senderName} আপনার মন্তব্যে রিপ্লাই করেছে: "${content.slice(0, 80)}"`,
         } as any) as any);
+        notifiedUserIds.add(parentComment.user_id);
       }
     } catch {}
   }
+
+  // Notify post owner for new comments/replies
+  try {
+    const { data: postOwner } = await (supabase.from("posts").select("user_id").eq("id", postId).single() as any);
+    if (postOwner?.user_id && postOwner.user_id !== userId && !notifiedUserIds.has(postOwner.user_id)) {
+      await (supabase.from("notifications").insert({
+        user_id: postOwner.user_id,
+        from_user_id: userId,
+        type: "comment",
+        reference_id: postId,
+        content: `${senderName} আপনার পোস্টে মন্তব্য করেছে: "${content.slice(0, 80)}"`,
+      } as any) as any);
+      notifiedUserIds.add(postOwner.user_id);
+    }
+  } catch {}
 
   // Parse @mentions and create notifications
   const mentions = content.match(/@([\w\s]+?)(?=\s@|\s*$|[.,!?])/g);
@@ -913,7 +952,7 @@ export async function addComment(postId: string, userId: number, content: string
       if (!name) continue;
       const { data: mentionedUsers } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
       const mentioned = mentionedUsers && mentionedUsers.length > 0 ? mentionedUsers[0] : null;
-      if (mentioned && mentioned.id !== userId) {
+      if (mentioned && mentioned.id !== userId && !notifiedUserIds.has(mentioned.id)) {
         await (supabase.from("notifications").insert({
           user_id: mentioned.id,
           from_user_id: userId,
@@ -921,6 +960,7 @@ export async function addComment(postId: string, userId: number, content: string
           reference_id: postId,
           content: `${senderName} আপনাকে একটি মন্তব্যে মেন্টশন করেছে: "${content.slice(0, 80)}"`,
         } as any) as any);
+        notifiedUserIds.add(mentioned.id);
       }
     }
   }
