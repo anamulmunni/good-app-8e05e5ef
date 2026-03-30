@@ -401,15 +401,16 @@ export default function Dashboard() {
 
       {/* Feed & Chat buttons - top bar */}
       <div className="max-w-md mx-auto px-4 pt-4 relative z-10">
-        <div className="flex gap-3">
+        <div className="flex gap-2">
+          {/* Feed */}
           <motion.button
-            initial={{ x: -40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", damping: 12, delay: 0.1 }}
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => navigate("/feed")}
-            className="flex-1 relative py-3.5 rounded-2xl font-bold text-sm overflow-hidden"
+            className="flex-1 relative py-3 rounded-2xl font-bold text-xs overflow-hidden"
           >
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--amber))] via-[hsl(var(--orange))] to-[hsl(var(--amber))]"
@@ -422,22 +423,52 @@ export default function Dashboard() {
               animate={{ x: ["-100%", "200%"] }}
               transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.5 }}
             />
-            <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+            <span className="relative z-10 flex items-center justify-center gap-1.5 text-primary-foreground">
               <motion.span animate={{ rotate: [0, -10, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
-                <Newspaper className="w-5 h-5" />
+                <Newspaper className="w-4 h-4" />
               </motion.span>
-              নিউজ ফিড
+              ফিড
             </span>
           </motion.button>
 
+          {/* Video */}
           <motion.button
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: "spring", damping: 12, delay: 0.15 }}
+            whileHover={{ scale: 1.04, y: -2 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => navigate("/reels")}
+            className="flex-1 relative py-3 rounded-2xl font-bold text-xs overflow-hidden"
+          >
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-[#ff0000] via-[#cc0000] to-[#ff0000]"
+              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              style={{ backgroundSize: "200% 100%" }}
+            />
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.8 }}
+            />
+            <span className="relative z-10 flex items-center justify-center gap-1.5 text-white font-black">
+              <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                <Play className="w-4 h-4 fill-white" />
+              </motion.span>
+              Video
+            </span>
+          </motion.button>
+
+          {/* Chat */}
+          <motion.button
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", damping: 12, delay: 0.2 }}
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => navigate("/chat")}
-            className="flex-1 relative py-3.5 rounded-2xl font-bold text-sm overflow-hidden"
+            className="flex-1 relative py-3 rounded-2xl font-bold text-xs overflow-hidden"
           >
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--blue))] to-[hsl(var(--cyan))]"
@@ -450,9 +481,9 @@ export default function Dashboard() {
               animate={{ x: ["-100%", "200%"] }}
               transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2 }}
             />
-            <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+            <span className="relative z-10 flex items-center justify-center gap-1.5 text-primary-foreground">
               <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                <MessageCircle className="w-5 h-5" />
+                <MessageCircle className="w-4 h-4" />
               </motion.span>
               মেসেজ
             </span>
