@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User, Image as ImageIcon, Copy, ExternalLink, Mic, Clock, History } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User, Image as ImageIcon, Copy, ExternalLink, Mic, Clock, History, Home } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
@@ -276,6 +276,7 @@ export default function Reels() {
 
   const [searchMode, setSearchMode] = useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const [voiceListening, setVoiceListening] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [ytSuggestions, setYtSuggestions] = useState<string[]>([]);
@@ -845,33 +846,32 @@ export default function Reels() {
                       alert("আপনার ব্রাউজার ভয়েস সার্চ সাপোর্ট করে না");
                       return;
                     }
+                    setVoiceListening(true);
                     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
                     const recognition = new SpeechRecognition();
                     recognition.lang = 'bn-BD';
                     recognition.continuous = false;
                     recognition.interimResults = false;
-                    setSearchInput("🎤 শুনছি... বলুন");
                     recognition.onresult = (event: any) => {
                       const transcript = event.results[0][0].transcript;
                       setSearchInput(transcript);
+                      setVoiceListening(false);
                       setTimeout(() => handleSearch(), 300);
                     };
                     recognition.onerror = () => {
+                      setVoiceListening(false);
                       setSearchInput("");
                     };
                     recognition.onend = () => {
-                      setSearchInput((prev) => prev === "🎤 শুনছি... বলুন" ? "" : prev);
+                      setVoiceListening(false);
                     };
                     recognition.start();
                   }}
-                  className="w-8 h-8 rounded-full grid place-items-center relative group"
+                  className="w-8 h-8 rounded-full grid place-items-center"
                   style={{ background: "#333" }}
                   title="🎤 ক্লিক করে বাংলায় বলুন"
                 >
                   <Mic className="w-4 h-4" style={{ color: "#ff4444" }} />
-                  <span className="absolute -bottom-7 right-0 text-[10px] px-2 py-0.5 rounded whitespace-nowrap pointer-events-none" style={{ background: "#333", color: "#fff" }}>
-                    🎤 বলুন
-                  </span>
                 </button>
               </div>
             </div>
@@ -944,8 +944,8 @@ export default function Reels() {
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => navigate("/feed")} className="h-10 w-10 shrink-0 grid place-items-center" title="হোমে ফিরে যান">
-                <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
+              <button onClick={() => navigate("/dashboard")} className="h-10 w-10 shrink-0 grid place-items-center" title="হোমে ফিরে যান">
+                <Home className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
               {selectedVideo && (
                 <button onClick={() => { setSelectedVideo(null); setMiniPlayer(false); }} className="h-8 w-8 shrink-0 grid place-items-center rounded-full ml-[-4px]" style={{ background: "#272727" }} title="ভিডিও বন্ধ করুন">
@@ -1838,6 +1838,39 @@ export default function Reels() {
           </div>
         </div>
       )}
+
+      {/* Full-screen voice listening overlay */}
+      <AnimatePresence>
+        {voiceListening && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.92)" }}
+            onClick={() => setVoiceListening(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.5 }}
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              className="w-28 h-28 rounded-full flex items-center justify-center mb-6"
+              style={{ background: "linear-gradient(135deg, #ff4444, #ff6b6b)", boxShadow: "0 0 60px rgba(255,68,68,0.5)" }}
+            >
+              <Mic className="w-14 h-14 text-white" />
+            </motion.div>
+            <p className="text-white text-xl font-bold mb-2">🎤 শুনছি...</p>
+            <p className="text-white/60 text-sm">বাংলায় বলুন কী সার্চ করতে চান</p>
+            <button
+              onClick={() => setVoiceListening(false)}
+              className="mt-8 px-6 py-2 rounded-full text-sm font-medium"
+              style={{ background: "#333", color: "#fff" }}
+            >
+              বাতিল করুন
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
