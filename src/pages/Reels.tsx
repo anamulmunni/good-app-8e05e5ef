@@ -1155,12 +1155,12 @@ export default function Reels() {
           >
             <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
           </button>
-          <div className="px-3 py-3" style={{ background: "#0f0f0f" }}>
-            <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
+          <div className="px-3 py-2" style={{ background: "#0f0f0f" }}>
+            <h2 className="font-medium text-[14px] leading-[18px] line-clamp-2" style={{ color: "#f1f1f1" }}>
               {selectedVideo.title}
             </h2>
-            <p className="text-[12px] mt-1" style={{ color: "#aaa" }}>
-              {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
+            <p className="text-[11px] mt-0.5" style={{ color: "#aaa" }}>
+              {getViewCount(selectedVideo.id)}{selectedVideo.duration ? ` • ${fmt(selectedVideo.duration)}` : ""}
             </p>
           </div>
 

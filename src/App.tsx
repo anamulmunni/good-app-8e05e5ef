@@ -50,6 +50,7 @@ function AppInner() {
   return (
     <>
       <IncomingCallHandler />
+      <FloatingDashboardButton />
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/index" element={<Login />} />
