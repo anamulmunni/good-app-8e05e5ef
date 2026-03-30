@@ -78,7 +78,7 @@ export default function Feed() {
   // Capped fetch to reduce backend pressure and keep feed stable
   const { data: allPosts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["feed-posts", searchQuery],
-    queryFn: () => getFeedPosts(300, searchQuery),
+    queryFn: () => getFeedPosts(1000, searchQuery),
     enabled: !!user,
     staleTime: 20000,
   });
@@ -1177,7 +1177,7 @@ export default function Feed() {
             className="fixed inset-0 z-[150] bg-black/50" onClick={() => { setCommentingPostId(null); setReplyingTo(null); }}>
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              transition={{ type: "spring", damping: 30, stiffness: 400 }}
               onClick={(e) => e.stopPropagation()}
               className="absolute bottom-0 left-0 right-0 bg-white dark:bg-card rounded-t-2xl max-h-[85vh] flex flex-col">
               {/* Header */}
@@ -1212,7 +1212,7 @@ export default function Feed() {
                           <div className="bg-gray-100 dark:bg-secondary rounded-2xl px-3 py-2.5">
                             <button onClick={() => navigate(`/user/${c.user_id}`)}
                               className="text-[14px] font-bold text-gray-900 dark:text-foreground hover:underline block">
-                              {c.user?.display_name || "User"}
+                              <NameWithBadge name={c.user?.display_name || "User"} isVerified={c.user?.is_verified_badge} />
                             </button>
                             <p className="text-[15px] leading-relaxed text-gray-900 dark:text-foreground mt-0.5 break-words whitespace-pre-wrap">
                               {renderMentionText(c.content)}
@@ -1243,7 +1243,9 @@ export default function Feed() {
                                   <div className="flex-1 min-w-0">
                                     <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-2">
                                       <button onClick={() => navigate(`/user/${r.user_id}`)}
-                                        className="text-[13px] font-bold text-gray-900 dark:text-foreground">{r.user?.display_name || "User"}</button>
+                                        className="text-[13px] font-bold text-gray-900 dark:text-foreground">
+                                        <NameWithBadge name={r.user?.display_name || "User"} isVerified={r.user?.is_verified_badge} />
+                                      </button>
                                       <p className="text-[14px] leading-relaxed text-gray-900 dark:text-foreground break-words">
                                         {renderMentionText(r.content)}
                                       </p>
