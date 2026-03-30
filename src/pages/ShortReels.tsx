@@ -135,36 +135,62 @@ export default function ShortReels() {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
 
-  // Fetch TikTok videos from database
+  // Fetch TikTok videos from edge function (which reads from DB + auto-refreshes)
   const { data: tiktokVideos = [], isLoading: tiktokLoading } = useQuery({
     queryKey: ["tiktok-videos", selectedCategory],
     queryFn: async () => {
-      let query = supabase
-        .from("tiktok_videos" as any)
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
+      try {
+        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+        // First try to refresh from TikTok (background, don't block)
+        fetch(
+          `https://${projectId}.supabase.co/functions/v1/tiktok-feed?action=refresh&category=${selectedCategory}`,
+          { headers: { "Content-Type": "application/json" } }
+        ).catch(() => {});
 
-      if (selectedCategory !== "mixed") {
-        query = query.eq("category", selectedCategory);
+        // Fetch existing from DB via edge function
+        const res = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/tiktok-feed?action=fetch&category=${selectedCategory}`,
+          { headers: { "Content-Type": "application/json" } }
+        );
+        if (!res.ok) throw new Error("fetch failed");
+        const data = await res.json();
+        
+        return ((data?.results || []) as any[]).map((item: any) => ({
+          id: `tt-${item.video_id}`,
+          user_id: 0,
+          video_url: item.video_url,
+          content: item.caption || "TikTok Video",
+          likes_count: Math.floor(Math.random() * 5000) + 200,
+          comments_count: Math.floor(Math.random() * 200),
+          created_at: item.created_at,
+          user: { display_name: item.added_by || "TikTok", avatar_url: null, guest_id: "tiktok", is_verified_badge: true },
+          isSample: true,
+          isTikTok: true,
+          tiktokVideoId: item.video_id,
+        })) as ShortVideo[];
+      } catch {
+        // Fallback: direct DB query
+        let query = supabase
+          .from("tiktok_videos" as any)
+          .select("*")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false });
+        if (selectedCategory !== "mixed") query = query.eq("category", selectedCategory);
+        const { data } = await query;
+        return ((data || []) as any[]).map((item: any) => ({
+          id: `tt-${item.video_id}`,
+          user_id: 0,
+          video_url: item.video_url,
+          content: item.caption || "TikTok Video",
+          likes_count: Math.floor(Math.random() * 5000) + 200,
+          comments_count: Math.floor(Math.random() * 200),
+          created_at: item.created_at,
+          user: { display_name: item.added_by || "TikTok", avatar_url: null, guest_id: "tiktok", is_verified_badge: true },
+          isSample: true,
+          isTikTok: true,
+          tiktokVideoId: item.video_id,
+        })) as ShortVideo[];
       }
-
-      const { data, error } = await query;
-      if (error || !data) return [];
-
-      return (data as any[]).map((item: any) => ({
-        id: `tt-${item.video_id}`,
-        user_id: 0,
-        video_url: item.video_url,
-        content: item.caption || "TikTok Video",
-        likes_count: Math.floor(Math.random() * 5000) + 200,
-        comments_count: Math.floor(Math.random() * 200),
-        created_at: item.created_at,
-        user: { display_name: item.added_by || "TikTok", avatar_url: null, guest_id: "tiktok", is_verified_badge: true },
-        isSample: true,
-        isTikTok: true,
-        tiktokVideoId: item.video_id,
-      })) as ShortVideo[];
     },
     enabled: !!user,
     staleTime: 2 * 60 * 1000,
