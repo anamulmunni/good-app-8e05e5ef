@@ -216,15 +216,26 @@ export default function ShortReels() {
 
   const videosLoading = userLoading || ytLoading;
 
+  // Shuffle videos on each mount so re-entry shows different order
+  const shuffledVideos = useMemo(() => {
+    if (videos.length === 0) return [];
+    const arr = [...videos];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [videos]);
+
   // Load reactions
   useEffect(() => {
-    if (user && videos.length > 0) {
-      const nonSampleIds = videos.filter(v => !v.isSample).map(v => v.id);
+    if (user && shuffledVideos.length > 0) {
+      const nonSampleIds = shuffledVideos.filter(v => !v.isSample).map(v => v.id);
       if (nonSampleIds.length > 0) {
         getUserReactions(user.id, nonSampleIds).then(setUserReactions);
       }
     }
-  }, [user, videos]);
+  }, [user, shuffledVideos]);
 
   const currentVideo = shuffledVideos[currentIndex];
 
@@ -317,17 +328,6 @@ export default function ShortReels() {
     setCurrentIndex(0);
     if (containerRef.current) containerRef.current.scrollTop = 0;
   }, [selectedCategory]);
-
-  // Shuffle videos on each mount so re-entry shows different order
-  const shuffledVideos = useMemo(() => {
-    if (videos.length === 0) return [];
-    const arr = [...videos];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }, [videos]);
 
   if (isLoading || !user) return null;
 
