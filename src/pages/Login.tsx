@@ -203,7 +203,7 @@ export default function Login() {
         <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
       </div>
 
-      {/* Floating particles */}
+      {/* Floating particles - faster */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         {[...Array(6)].map((_, i) => (
           <motion.div
@@ -213,14 +213,14 @@ export default function Login() {
               x: [0, (i % 2 === 0 ? 15 : -15), 0],
               opacity: [0.3, 0.7, 0.3],
             }}
-            transition={{ duration: 4 + i * 1.2, repeat: Infinity, delay: i * 0.8 }}
+            transition={{ duration: 2.5 + i * 0.6, repeat: Infinity, delay: i * 0.3 }}
             className="absolute w-2 h-2 rounded-full bg-primary/40"
             style={{ top: `${15 + i * 14}%`, left: `${10 + i * 15}%` }}
           />
         ))}
         <motion.div
           animate={{ y: [0, -20, 0], opacity: [0.03, 0.08, 0.03] }}
-          transition={{ duration: 8, repeat: Infinity }}
+          transition={{ duration: 5, repeat: Infinity }}
           className="absolute inset-0 flex items-center justify-center"
         >
           <span className="text-[120px] md:text-[200px] font-black text-foreground/[0.03] select-none tracking-tighter leading-none">
@@ -229,77 +229,66 @@ export default function Login() {
         </motion.div>
       </div>
 
-      <div className="relative z-10 max-w-md mx-auto px-4 py-6 min-h-screen flex flex-col">
-        {/* Logo & Header */}
+      <div className="relative z-10 max-w-md mx-auto px-4 py-4 min-h-screen flex flex-col">
+        {/* Logo & Header - compact */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center pt-4 pb-6"
+          transition={{ duration: 0.3 }}
+          className="text-center pt-2 pb-3"
         >
           <motion.img
             src="/logo.png"
             alt="Good App"
-            className="w-20 h-20 mx-auto mb-3 drop-shadow-2xl rounded-2xl"
+            className="w-16 h-16 mx-auto mb-2 drop-shadow-2xl rounded-2xl"
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300 }}
           />
-          <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary/80 to-accent">
+          <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary/80 to-accent">
             Good App
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">আপনার বিশ্বস্ত সোশ্যাল ও আর্নিং প্ল্যাটফর্ম</p>
+          <p className="text-muted-foreground text-xs mt-0.5">আপনার বিশ্বস্ত সোশ্যাল ও আর্নিং প্ল্যাটফর্ম</p>
         </motion.div>
 
-        {/* Tab Switcher */}
+        {/* Tab Switcher - unique pill style */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex rounded-2xl p-1.5 mb-5 backdrop-blur-xl border border-border/50 shadow-2xl relative overflow-hidden"
+          transition={{ delay: 0.1, duration: 0.25 }}
+          className="flex rounded-2xl p-1.5 mb-4 backdrop-blur-xl border border-border/50 shadow-2xl relative overflow-hidden"
           style={{ background: "linear-gradient(135deg, hsl(222 47% 10% / 0.9), hsl(222 47% 12% / 0.9))" }}
         >
-          {/* Animated border glow */}
-          <motion.div
-            className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{ 
-              background: tab === "login" 
-                ? "linear-gradient(135deg, hsl(152 56% 38% / 0.15), transparent, hsl(152 56% 38% / 0.1))"
-                : "linear-gradient(135deg, hsl(38 92% 50% / 0.15), transparent, hsl(38 92% 50% / 0.1))"
-            }}
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          />
           {(["login", "register"] as const).map((t) => (
             <motion.button
               key={t}
               onClick={() => setTab(t)}
-              whileTap={{ scale: 0.9 }}
-              className={`flex-1 py-4 rounded-xl text-sm font-black tracking-wide transition-all duration-300 relative overflow-hidden z-10 ${
+              whileTap={{ scale: 0.92 }}
+              className={`flex-1 py-3.5 rounded-xl text-sm font-black tracking-wide transition-all duration-200 relative overflow-hidden z-10 ${
                 tab === t
-                  ? "text-primary-foreground shadow-xl"
+                  ? "text-white shadow-xl"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               style={tab === t ? {
                 background: t === "login" 
-                  ? "linear-gradient(135deg, hsl(152 56% 32%), hsl(152 68% 42%), hsl(160 60% 45%))"
-                  : "linear-gradient(135deg, hsl(38 92% 45%), hsl(30 95% 55%), hsl(45 90% 55%))",
+                  ? "linear-gradient(135deg, hsl(210 100% 45%), hsl(220 95% 55%), hsl(230 85% 60%))"
+                  : "linear-gradient(135deg, hsl(340 80% 50%), hsl(350 85% 58%), hsl(0 80% 60%))",
                 boxShadow: t === "login"
-                  ? "0 4px 20px -4px hsl(152 56% 38% / 0.5), 0 0 30px -8px hsl(152 56% 38% / 0.3)"
-                  : "0 4px 20px -4px hsl(38 92% 50% / 0.5), 0 0 30px -8px hsl(38 92% 50% / 0.3)",
+                  ? "0 4px 20px -4px hsl(220 95% 55% / 0.6), 0 0 30px -8px hsl(220 95% 55% / 0.3)"
+                  : "0 4px 20px -4px hsl(340 80% 50% / 0.6), 0 0 30px -8px hsl(340 80% 50% / 0.3)",
               } : {}}
             >
               {tab === t && (
                 <motion.div
                   layoutId="tab-active-bg"
                   className="absolute inset-0 rounded-xl"
-                  style={{ background: "linear-gradient(90deg, transparent, hsla(0,0%,100%,0.12), transparent)" }}
-                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                  style={{ background: "linear-gradient(90deg, transparent, hsla(0,0%,100%,0.15), transparent)" }}
+                  transition={{ type: "spring", bounce: 0.15, duration: 0.3 }}
                 />
               )}
               <motion.span
                 initial={false}
-                animate={tab === t ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-                transition={{ duration: 0.35 }}
+                animate={tab === t ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                transition={{ duration: 0.2 }}
                 className="relative z-10 text-[15px]"
               >
                 {t === "login" ? "🔑 লগইন" : "✨ রেজিস্ট্রেশন"}
@@ -310,21 +299,21 @@ export default function Login() {
 
         {/* Form Card */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="glass-card rounded-3xl p-6 border border-border/30 backdrop-blur-md"
+          transition={{ delay: 0.15, duration: 0.3 }}
+          className="glass-card rounded-3xl p-5 border border-border/30 backdrop-blur-md"
         >
           <AnimatePresence mode="wait">
             {tab === "login" ? (
               <motion.form
                 key="login"
-                initial={{ opacity: 0, x: -30 }}
+                initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 30 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.15 }}
                 onSubmit={handleLogin}
-                className="space-y-4"
+                className="space-y-3.5"
               >
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1.5 ml-1 flex items-center gap-1.5">
@@ -354,32 +343,31 @@ export default function Login() {
                 <motion.button
                   type="submit"
                   disabled={isSubmitting || !phone || !password}
-                  className="btn-primary btn-neon-pulse py-4 text-lg w-full rounded-2xl"
-                  whileTap={{ scale: 0.93 }}
-                  whileHover={{ scale: 1.04, y: -3 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                  className="login-btn-royal py-4 text-lg w-full rounded-2xl"
+                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
                 >
                   {isSubmitting ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.6, repeat: Infinity, ease: "linear" }}>
                       <Loader2 className="w-6 h-6" />
                     </motion.div>
                   ) : (
-                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10"
-                      initial={false} animate={{ x: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}>
+                    <span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10">
                       🚀 লগইন করুন <ArrowRight className="w-5 h-5" />
-                    </motion.span>
+                    </span>
                   )}
                 </motion.button>
               </motion.form>
             ) : (
               <motion.form
                 key="register"
-                initial={{ opacity: 0, x: 30 }}
+                initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -30 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.15 }}
                 onSubmit={handleRegister}
-                className="space-y-3.5"
+                className="space-y-3"
               >
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1.5 ml-1 flex items-center gap-1.5">
@@ -447,22 +435,19 @@ export default function Login() {
                 <motion.button
                   type="submit"
                   disabled={isSubmitting || !displayName.trim() || !regPhone || regPassword.length < 6 || !agreedTerms}
-                  className="btn-accent py-4 text-lg w-full rounded-2xl"
-                  whileTap={{ scale: 0.93 }}
-                  whileHover={{ scale: 1.04, y: -3 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                  className="register-btn-rose py-4 text-lg w-full rounded-2xl"
+                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
                 >
                   {isSubmitting ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.6, repeat: Infinity, ease: "linear" }}>
                       <Loader2 className="w-6 h-6" />
                     </motion.div>
                   ) : (
-                    <motion.span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10"
-                      initial={false}
-                      animate={{ scale: [1, 1.05, 1], x: [0, 4, 0] }}
-                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut" }}>
+                    <span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10">
                       ✨ রেজিস্টার করুন <ArrowRight className="w-5 h-5" />
-                    </motion.span>
+                    </span>
                   )}
                 </motion.button>
               </motion.form>
@@ -474,8 +459,8 @@ export default function Login() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="flex flex-col gap-2.5 mt-5"
+          transition={{ delay: 0.25 }}
+          className="flex flex-col gap-2.5 mt-4"
         >
           {videoUrl && (
             <a
@@ -512,12 +497,12 @@ export default function Login() {
           </a>
         </motion.div>
 
-        {/* Features Section */}
+        {/* Features Section - faster stagger */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="mt-6"
+          transition={{ delay: 0.3 }}
+          className="mt-5"
         >
           <h2 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" /> আমাদের ফিচারসমূহ
@@ -526,9 +511,9 @@ export default function Login() {
             {FEATURES.map((f, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 + i * 0.08 }}
+                transition={{ delay: 0.35 + i * 0.04 }}
                 className="p-3 rounded-2xl bg-secondary/40 border border-border/30 backdrop-blur-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center mb-2">
@@ -545,15 +530,15 @@ export default function Login() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.9 }}
-          className="mt-5"
+          transition={{ delay: 0.4 }}
+          className="mt-4"
         >
           <button
             onClick={() => setShowAbout(!showAbout)}
             className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-secondary/40 border border-border/30"
           >
             <span className="text-sm font-bold text-foreground">📖 আমাদের সম্পর্কে</span>
-            <motion.div animate={{ rotate: showAbout ? 180 : 0 }}>
+            <motion.div animate={{ rotate: showAbout ? 180 : 0 }} transition={{ duration: 0.15 }}>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </motion.div>
           </button>
@@ -563,7 +548,7 @@ export default function Login() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.15 }}
                 className="overflow-hidden"
               >
                 <div className="px-4 py-3 text-xs text-muted-foreground leading-relaxed space-y-2">
@@ -585,7 +570,7 @@ export default function Login() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
+          transition={{ delay: 0.45 }}
           className="mt-3 mb-8"
         >
           <button
