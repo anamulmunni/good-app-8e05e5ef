@@ -21,6 +21,7 @@ import CallPage from "./pages/CallPage";
 import IncomingCallHandler from "./components/IncomingCallHandler";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
+import FloatingDashboardButton from "./components/FloatingDashboardButton";
 import { useOnlineHeartbeat } from "@/hooks/use-online";
 
 const queryClient = new QueryClient({
@@ -49,6 +50,7 @@ function AppInner() {
   return (
     <>
       <IncomingCallHandler />
+      <FloatingDashboardButton />
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/index" element={<Login />} />

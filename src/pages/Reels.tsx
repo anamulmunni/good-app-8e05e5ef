@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User, Image as ImageIcon, Copy, ExternalLink, Mic, Clock, History, Home } from "lucide-react";
+import { ArrowLeft, Cast, Loader2, Bell, Search, X, Plus, Play, Upload, Video, RefreshCcw, Maximize, ThumbsUp, ThumbsDown, Share2, MessageSquare, Send, User, Image as ImageIcon, Copy, ExternalLink, Mic, Clock, History } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import goodAppLogo from "@/assets/good-app-logo.jpg";
@@ -370,6 +370,25 @@ export default function Reels() {
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
+
+  // Browser back button: close video player or go back
+  useEffect(() => {
+    const handlePopState = () => {
+      if (selectedVideo) {
+        // Push state again so we stay on the page
+        window.history.pushState(null, "", window.location.href);
+        setSelectedVideo(null);
+        setMiniPlayer(false);
+      }
+    };
+
+    if (selectedVideo) {
+      window.history.pushState(null, "", window.location.href);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [selectedVideo]);
 
   // Handle ?play=postId to auto-play a specific video
   useEffect(() => {
@@ -944,9 +963,6 @@ export default function Reels() {
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => navigate("/dashboard")} className="h-10 w-10 shrink-0 grid place-items-center" title="হোমে ফিরে যান">
-                <Home className="w-5 h-5" style={{ color: "#fff" }} />
-              </button>
               {selectedVideo && (
                 <button onClick={() => { setSelectedVideo(null); setMiniPlayer(false); }} className="h-8 w-8 shrink-0 grid place-items-center rounded-full ml-[-4px]" style={{ background: "#272727" }} title="ভিডিও বন্ধ করুন">
                   <X className="w-4 h-4" style={{ color: "#fff" }} />
@@ -1016,11 +1032,6 @@ export default function Reels() {
           ))}
         </div>
 
-        <div className="px-3 pb-2 text-[12px] text-muted-foreground">
-          {searchQuery.trim()
-            ? `Showing search results for "${searchQuery.trim()}"`
-            : "Showing suggested new Bangla HD songs"}
-        </div>
       </header>
 
       {selectedVideo && !miniPlayer && (
@@ -1163,12 +1174,12 @@ export default function Reels() {
           >
             <div className="w-10 h-1 rounded-full" style={{ background: "#555" }} />
           </button>
-          <div className="px-3 py-3" style={{ background: "#0f0f0f" }}>
-            <h2 className="font-medium text-[15px] leading-5 line-clamp-2" style={{ color: "#f1f1f1" }}>
+          <div className="px-3 py-2" style={{ background: "#0f0f0f" }}>
+            <h2 className="font-medium text-[14px] leading-[18px] line-clamp-2" style={{ color: "#f1f1f1" }}>
               {selectedVideo.title}
             </h2>
-            <p className="text-[12px] mt-1" style={{ color: "#aaa" }}>
-              {getViewCount(selectedVideo.id)} • {selectedVideo.duration ? fmt(selectedVideo.duration) : ""}
+            <p className="text-[11px] mt-0.5" style={{ color: "#aaa" }}>
+              {getViewCount(selectedVideo.id)}{selectedVideo.duration ? ` • ${fmt(selectedVideo.duration)}` : ""}
             </p>
           </div>
 
@@ -1332,12 +1343,6 @@ export default function Reels() {
             )}
           </div>
 
-          <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
-            <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
-            <span className="text-[12px]" style={{ color: "#aaa" }}>
-              • {searchQuery.trim() ? `search results for "${searchQuery.trim()}"` : "suggested new Bangla HD songs"}
-            </span>
-          </div>
         </div>
       )}
 
