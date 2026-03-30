@@ -45,9 +45,10 @@ export default function ShortReels() {
   const [selectedCategory, setSelectedCategory] = useState("mixed");
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
-  const isScrolling = useRef(false);
+  const touchStartX = useRef(0);
+  const canSwipe = useRef(true);
+  const seenVideoIds = useRef(new Set<string>());
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -79,51 +80,76 @@ export default function ShortReels() {
     },
   });
 
-  // Build queue from candidates
+  // Build initial queue from candidates - avoid duplicates
   useEffect(() => {
     if (candidates.length === 0) return;
-    const next = shuffle(candidates).slice(0, 50);
-    setReelQueue(next);
+    seenVideoIds.current.clear();
+    const unique = shuffle(candidates).filter((c) => {
+      if (seenVideoIds.current.has(c.videoId)) return false;
+      seenVideoIds.current.add(c.videoId);
+      return true;
+    });
+    setReelQueue(unique);
     setCurrentIndex(0);
   }, [candidates]);
 
-  // Append more when near end
+  // Append more unique reels when near the end
   const appendMore = useCallback(() => {
     if (candidates.length === 0) return;
-    setReelQueue((prev) => [...prev, ...shuffle(candidates).slice(0, 30)]);
+    // If all candidates are seen, allow repeats but re-shuffle
+    const unseen = candidates.filter((c) => !seenVideoIds.current.has(c.videoId));
+    const pool = unseen.length > 3 ? unseen : candidates;
+    const next = shuffle(pool).slice(0, 20);
+    next.forEach((c) => seenVideoIds.current.add(c.videoId));
+    setReelQueue((prev) => [...prev, ...next]);
   }, [candidates]);
 
   useEffect(() => {
-    if (currentIndex >= reelQueue.length - 5 && reelQueue.length > 0) {
+    if (currentIndex >= reelQueue.length - 4 && reelQueue.length > 0) {
       appendMore();
     }
   }, [currentIndex, reelQueue.length, appendMore]);
 
-  // Scroll by one reel at a time - touch handling
+  // Touch swipe handling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
-    isScrolling.current = false;
+    touchStartX.current = e.touches[0].clientX;
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (isScrolling.current) return;
+    if (!canSwipe.current) return;
     const deltaY = touchStartY.current - e.changedTouches[0].clientY;
-    const threshold = 50;
+    const deltaX = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
 
-    if (Math.abs(deltaY) > threshold) {
-      isScrolling.current = true;
-      if (deltaY > 0) {
-        // Swipe up - next
-        setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
-      } else {
-        // Swipe down - previous
-        setCurrentIndex((prev) => Math.max(prev - 1, 0));
-      }
-      setTimeout(() => { isScrolling.current = false; }, 400);
+    // Ignore horizontal swipes
+    if (deltaX > Math.abs(deltaY)) return;
+
+    const threshold = 40;
+    if (Math.abs(deltaY) < threshold) return;
+
+    canSwipe.current = false;
+    if (deltaY > 0) {
+      setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
+    } else {
+      setCurrentIndex((prev) => Math.max(prev - 1, 0));
     }
+    setTimeout(() => { canSwipe.current = true; }, 350);
   }, [reelQueue.length]);
 
-  // Build YouTube embed URL with autoplay + sound
+  // Mouse wheel for desktop
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!canSwipe.current) return;
+    if (Math.abs(e.deltaY) < 30) return;
+    canSwipe.current = false;
+    if (e.deltaY > 0) {
+      setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
+    } else {
+      setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    }
+    setTimeout(() => { canSwipe.current = true; }, 400);
+  }, [reelQueue.length]);
+
+  // Build YouTube embed URL
   const buildEmbedUrl = useCallback((videoId: string, autoplay: boolean) => {
     const params = new URLSearchParams({
       autoplay: autoplay ? "1" : "0",
@@ -148,11 +174,9 @@ export default function ShortReels() {
 
   if (isLoading || !user) return null;
 
-  const currentReel = reelQueue[currentIndex];
-
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
-      {/* Header */}
+      {/* Header - above touch overlay */}
       <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 to-transparent">
         <div className="flex items-center justify-between px-3 py-2">
           <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center text-white">
@@ -191,21 +215,20 @@ export default function ShortReels() {
         </div>
       ) : (
         <div
-          ref={containerRef}
           className="h-full w-full relative overflow-hidden"
+          onWheel={handleWheel}
         >
-          {/* Touch overlay to capture swipes above iframe */}
+          {/* Touch overlay - starts below header (top ~90px) */}
           <div
-            className="absolute inset-0 z-10"
+            className="absolute left-0 right-0 bottom-0 z-10"
+            style={{ top: "90px", touchAction: "none" }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            style={{ touchAction: "none" }}
           />
 
-          {/* Render current, previous and next for smooth transitions */}
+          {/* Render current ± 1 for smooth transitions */}
           {reelQueue.map((item, index) => {
             const offset = index - currentIndex;
-            // Only render current ± 1
             if (Math.abs(offset) > 1) return null;
 
             const isActive = index === currentIndex;
@@ -214,11 +237,8 @@ export default function ShortReels() {
               <div
                 key={`${item.videoId}-${index}`}
                 className="absolute inset-0 w-full h-full transition-transform duration-300 ease-out"
-                style={{
-                  transform: `translateY(${offset * 100}%)`,
-                }}
+                style={{ transform: `translateY(${offset * 100}%)` }}
               >
-                {/* YouTube Embed - fullscreen, no controls */}
                 <iframe
                   src={buildEmbedUrl(item.videoId, isActive)}
                   className="w-full h-full border-0"
@@ -228,7 +248,7 @@ export default function ShortReels() {
                   style={{ pointerEvents: "none" }}
                 />
 
-                {/* Minimal info overlay at bottom */}
+                {/* Info overlay at bottom */}
                 <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent px-4 pb-5 pt-10 pointer-events-none">
                   <p className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
                     {item.title}
