@@ -335,9 +335,19 @@ serve(async (req) => {
         }
       }
 
-      // If YouTube API returned nothing, try Piped then Invidious
+      // If YouTube API returned nothing, try HTML scraping first
       if (results.length === 0) {
-        console.log("YouTube API returned 0 shorts, trying Piped...");
+        console.log("YouTube API returned 0 shorts, trying HTML scraping...");
+        for (const q of queries.slice(0, 2)) {
+          const htmlResults = await searchShortsViaHTML(q, 20);
+          results.push(...htmlResults);
+          if (results.length >= 20) break;
+        }
+      }
+
+      // Then try Piped
+      if (results.length === 0) {
+        console.log("HTML scraping returned 0, trying Piped...");
         for (const q of queries.slice(0, 2)) {
           const pipedResults = await searchShortsViaPiped(q, 20);
           results.push(...pipedResults);
