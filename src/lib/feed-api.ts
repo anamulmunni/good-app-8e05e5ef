@@ -719,7 +719,7 @@ export async function hasUserPosted(userId: number): Promise<boolean> {
 }
 
 // Get feed posts with user info
-export async function getFeedPosts(limit = 30, searchQuery?: string): Promise<Post[]> {
+export async function getFeedPosts(limit = 1000, searchQuery?: string): Promise<Post[]> {
   let query = (supabase.from("posts").select("*") as any)
     .order("created_at", { ascending: false })
     .limit(limit);

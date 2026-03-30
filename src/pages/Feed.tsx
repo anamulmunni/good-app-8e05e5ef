@@ -78,7 +78,7 @@ export default function Feed() {
   // Capped fetch to reduce backend pressure and keep feed stable
   const { data: allPosts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["feed-posts", searchQuery],
-    queryFn: () => getFeedPosts(300, searchQuery),
+    queryFn: () => getFeedPosts(1000, searchQuery),
     enabled: !!user,
     staleTime: 20000,
   });
