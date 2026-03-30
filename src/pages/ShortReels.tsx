@@ -7,7 +7,7 @@ import {
   toggleReaction, getUserReactions, getPostComments, addComment,
   type PostComment,
 } from "@/lib/feed-api";
-import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
@@ -26,6 +26,18 @@ const ReelsCaption = forwardRef<HTMLDivElement, { text: string }>(function Reels
   );
 });
 
+// Extract TikTok video ID from various URL formats
+function extractTikTokVideoId(url: string): string | null {
+  // https://www.tiktok.com/@user/video/1234567890
+  const match1 = url.match(/\/video\/(\d+)/);
+  if (match1) return match1[1];
+  // https://vm.tiktok.com/XXXXXXXX/
+  // Short URLs need the original URL stored, we'll use full URL
+  const match2 = url.match(/tiktok\.com.*?(\d{15,})/);
+  if (match2) return match2[1];
+  return null;
+}
+
 type ShortVideo = {
   id: string;
   user_id: number;
@@ -36,64 +48,44 @@ type ShortVideo = {
   created_at: string | null;
   user?: { display_name: string | null; avatar_url: string | null; guest_id: string; is_verified_badge?: boolean };
   isSample?: boolean;
-  isYouTube?: boolean;
-  videoId?: string;
+  isTikTok?: boolean;
+  tiktokVideoId?: string;
 };
 
-// YouTube Reel Player - pre-buffers nearby reels, only active one has autoplay+sound
-const YouTubeReelPlayer = forwardRef<HTMLDivElement, {
+// TikTok Reel Player using embed iframe
+const TikTokReelPlayer = forwardRef<HTMLDivElement, {
   videoId: string;
   isActive: boolean;
   isNearby: boolean;
-}>(function YouTubeReelPlayer({
-  videoId,
-  isActive,
-  isNearby,
-}, ref) {
+}>(function TikTokReelPlayer({ videoId, isActive, isNearby }, ref) {
   const [loaded, setLoaded] = useState(false);
 
-  // Reset loaded state when going far away
   useEffect(() => {
     if (!isActive && !isNearby) setLoaded(false);
   }, [isActive, isNearby]);
 
-  // Far away - just show thumbnail
   if (!isActive && !isNearby) {
     return (
-      <div ref={ref} className="w-full h-full relative bg-black">
-        <img
-          src={`https://i.ytimg.com/vi/${videoId}/hq720.jpg`}
-          className="w-full h-full object-cover"
-          alt=""
-          loading="lazy"
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-black/50 grid place-items-center">
-            <Play className="w-8 h-8 text-white ml-1" />
-          </div>
+      <div ref={ref} className="w-full h-full relative bg-black flex items-center justify-center">
+        <div className="w-16 h-16 rounded-full bg-white/10 grid place-items-center">
+          <Play className="w-8 h-8 text-white ml-1" />
         </div>
       </div>
     );
   }
 
-  // Active = autoplay + sound, nearby = muted pre-buffer (hidden)
   return (
-    <div ref={ref} className="w-full h-full relative bg-black">
+    <div ref={ref} className="w-full h-full relative bg-black overflow-hidden">
       {!loaded && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
-          <img
-            src={`https://i.ytimg.com/vi/${videoId}/hq720.jpg`}
-            className="absolute inset-0 w-full h-full object-cover opacity-40"
-            alt=""
-          />
-          <Loader2 className="w-10 h-10 text-white animate-spin relative z-10" />
+          <Loader2 className="w-10 h-10 text-white animate-spin" />
         </div>
       )}
       <iframe
-        key={`${videoId}-${isActive ? "active" : "buffer"}`}
-        src={`https://www.youtube.com/embed/${videoId}?autoplay=${isActive ? 1 : 0}&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=${isActive ? 0 : 1}&enablejsapi=0`}
+        key={`tiktok-${videoId}-${isActive ? "active" : "buffer"}`}
+        src={`https://www.tiktok.com/embed/v2/${videoId}?hide_share_button=1&autoplay=${isActive ? 1 : 0}`}
         className="w-full h-full border-0"
-        allow="autoplay; encrypted-media; picture-in-picture"
+        allow="autoplay; encrypted-media"
         allowFullScreen
         style={{ pointerEvents: isActive ? "auto" : "none" }}
         onLoad={() => setLoaded(true)}
@@ -106,10 +98,10 @@ const YouTubeReelPlayer = forwardRef<HTMLDivElement, {
 const CATEGORIES = [
   { id: "mixed", label: "🔥 সব" },
   { id: "gajal", label: "🕌 গজল" },
-  { id: "slowed_reverb", label: "🎧 Slowed" },
   { id: "funny", label: "😂 ফানি" },
   { id: "dance", label: "💃 ড্যান্স" },
   { id: "nature", label: "🌿 প্রকৃতি" },
+  { id: "music", label: "🎵 মিউজিক" },
 ];
 
 export default function ShortReels() {
@@ -130,6 +122,10 @@ export default function ShortReels() {
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState("mixed");
   const [reelQueue, setReelQueue] = useState<ShortVideo[]>([]);
+  const [showAddTikTok, setShowAddTikTok] = useState(false);
+  const [newTikTokUrl, setNewTikTokUrl] = useState("");
+  const [newTikTokCaption, setNewTikTokCaption] = useState("");
+  const [addingTikTok, setAddingTikTok] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const lastTapRef = useRef(0);
@@ -139,38 +135,39 @@ export default function ShortReels() {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
 
-  // Fetch YouTube Shorts from our edge function
-  const { data: youtubeShorts = [], isLoading: ytLoading } = useQuery({
-    queryKey: ["youtube-shorts", selectedCategory],
+  // Fetch TikTok videos from database
+  const { data: tiktokVideos = [], isLoading: tiktokLoading } = useQuery({
+    queryKey: ["tiktok-videos", selectedCategory],
     queryFn: async () => {
-      try {
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=search&category=${selectedCategory}&t=${Date.now()}`,
-          { headers: { "Content-Type": "application/json" } }
-        );
-        if (!res.ok) return [];
-        const data = await res.json();
-        return (data?.results || []).map((item: any) => ({
-          id: `yt-${item.videoId}`,
-          user_id: 0,
-          video_url: "",
-          content: item.title,
-          likes_count: Math.floor(Math.random() * 2000) + 100,
-          comments_count: Math.floor(Math.random() * 100),
-          created_at: new Date().toISOString(),
-          user: { display_name: item.author, avatar_url: null, guest_id: "youtube", is_verified_badge: true },
-          isSample: true,
-          isYouTube: true,
-          videoId: item.videoId,
-          thumbnail: item.thumbnail,
-        }));
-      } catch {
-        return [];
+      let query = supabase
+        .from("tiktok_videos" as any)
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+
+      if (selectedCategory !== "mixed") {
+        query = query.eq("category", selectedCategory);
       }
+
+      const { data, error } = await query;
+      if (error || !data) return [];
+
+      return (data as any[]).map((item: any) => ({
+        id: `tt-${item.video_id}`,
+        user_id: 0,
+        video_url: item.video_url,
+        content: item.caption || "TikTok Video",
+        likes_count: Math.floor(Math.random() * 5000) + 200,
+        comments_count: Math.floor(Math.random() * 200),
+        created_at: item.created_at,
+        user: { display_name: item.added_by || "TikTok", avatar_url: null, guest_id: "tiktok", is_verified_badge: true },
+        isSample: true,
+        isTikTok: true,
+        tiktokVideoId: item.video_id,
+      })) as ShortVideo[];
     },
     enabled: !!user,
-    staleTime: 2 * 60 * 1000, // 2 min cache (short so re-entry shows fresh)
+    staleTime: 2 * 60 * 1000,
     refetchOnMount: "always",
   });
 
@@ -196,23 +193,21 @@ export default function ShortReels() {
         ...p,
         user: userMap[p.user_id] || null,
         isSample: false,
-        isYouTube: false,
+        isTikTok: false,
       })) as ShortVideo[];
     },
     enabled: !!user,
   });
 
-  // TikTok-style: only show 2-3 uploaded videos per day, scattered among YouTube shorts
+  // Combine TikTok + user videos
   const videos = useMemo(() => {
-    if (youtubeShorts.length === 0) return userVideos.slice(0, 3);
-    if (userVideos.length === 0) return youtubeShorts;
-    
-    // Pick only 2-3 random uploaded videos to sprinkle in
+    if (tiktokVideos.length === 0) return userVideos.slice(0, 5);
+    if (userVideos.length === 0) return tiktokVideos;
+
     const shuffledUploads = [...userVideos].sort(() => Math.random() - 0.5);
     const dailyUploads = shuffledUploads.slice(0, Math.min(3, shuffledUploads.length));
-    
-    const result: ShortVideo[] = [...youtubeShorts];
-    // Space them out: place every ~15-25 items apart
+
+    const result: ShortVideo[] = [...tiktokVideos];
     for (let i = 0; i < dailyUploads.length; i++) {
       const minPos = Math.min(8 + i * 20, result.length);
       const maxPos = Math.min(minPos + 15, result.length);
@@ -220,11 +215,10 @@ export default function ShortReels() {
       result.splice(Math.min(pos, result.length), 0, dailyUploads[i]);
     }
     return result;
-  }, [userVideos, youtubeShorts]);
+  }, [userVideos, tiktokVideos]);
 
-  const videosLoading = userLoading || ytLoading;
+  const videosLoading = userLoading || tiktokLoading;
 
-  // Shuffle videos on each mount so re-entry shows different order
   const shuffledVideos = useMemo(() => {
     if (videos.length === 0) return [];
     const arr = [...videos];
@@ -264,12 +258,8 @@ export default function ShortReels() {
   const goToNextReel = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-
     const nextIndex = currentIndex + 1;
-    if (nextIndex >= reelQueue.length - 2) {
-      appendMoreReels();
-    }
-
+    if (nextIndex >= reelQueue.length - 2) appendMoreReels();
     const h = container.clientHeight || window.innerHeight;
     container.scrollTo({ top: nextIndex * h, behavior: "smooth" });
     setCurrentIndex(nextIndex);
@@ -284,7 +274,7 @@ export default function ShortReels() {
 
   const currentVideo = reelQueue[currentIndex];
 
-  // Auto-play current video, pause others
+  // Auto-play current video, pause others (for user-uploaded videos)
   useEffect(() => {
     Object.entries(videoRefs.current).forEach(([idx, el]) => {
       if (!el) return;
@@ -357,6 +347,28 @@ export default function ShortReels() {
     setCommentSending(false);
   };
 
+  const handleAddTikTok = async () => {
+    if (!newTikTokUrl.trim()) return;
+    const videoId = extractTikTokVideoId(newTikTokUrl.trim());
+    if (!videoId) {
+      alert("সঠিক TikTok লিংক দিন! উদাহরণ: https://www.tiktok.com/@user/video/1234567890");
+      return;
+    }
+    setAddingTikTok(true);
+    await supabase.from("tiktok_videos" as any).insert({
+      video_url: newTikTokUrl.trim(),
+      video_id: videoId,
+      caption: newTikTokCaption.trim() || null,
+      added_by: user?.display_name || "admin",
+      category: selectedCategory === "mixed" ? "mixed" : selectedCategory,
+    } as any);
+    setNewTikTokUrl("");
+    setNewTikTokCaption("");
+    setShowAddTikTok(false);
+    setAddingTikTok(false);
+    queryClient.invalidateQueries({ queryKey: ["tiktok-videos"] });
+  };
+
   const timeAgo = (dateStr: string | null) => {
     if (!dateStr) return "";
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -368,13 +380,14 @@ export default function ShortReels() {
     return `${Math.floor(hrs / 24)}d`;
   };
 
+  // Auto-advance for TikTok embeds (30s timeout since TikTok videos are usually longer)
   useEffect(() => {
-    if (!currentVideo || !currentVideo.isYouTube || showComments) return;
+    if (!currentVideo || !currentVideo.isTikTok || showComments) return;
     const timer = window.setTimeout(() => {
       goToNextReel();
-    }, 22000);
+    }, 30000);
     return () => window.clearTimeout(timer);
-  }, [currentVideo?.id, currentVideo?.isYouTube, goToNextReel, showComments]);
+  }, [currentVideo?.id, currentVideo?.isTikTok, goToNextReel, showComments]);
 
   if (isLoading || !user) return null;
 
@@ -386,8 +399,10 @@ export default function ShortReels() {
           <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center">
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
-          <h1 className="font-black text-lg" style={{ background: "linear-gradient(90deg, #fff, #ffd600)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Reels</h1>
-          <div className="w-10" />
+          <h1 className="font-black text-lg" style={{ background: "linear-gradient(90deg, #fff, #ff0050)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Reels</h1>
+          <button onClick={() => setShowAddTikTok(true)} className="w-10 h-10 grid place-items-center">
+            <Plus className="w-6 h-6 text-white" />
+          </button>
         </div>
 
         {/* Category tabs */}
@@ -419,7 +434,13 @@ export default function ShortReels() {
         <div className="h-full flex flex-col items-center justify-center text-white">
           <Play className="w-16 h-16 mb-4 opacity-40" />
           <p className="text-lg font-bold">কোনো Reels নেই</p>
-          <p className="text-sm text-white/60 mt-1">অন্য ক্যাটাগরি দেখুন</p>
+          <p className="text-sm text-white/60 mt-1">TikTok ভিডিও যোগ করুন</p>
+          <button
+            onClick={() => setShowAddTikTok(true)}
+            className="mt-4 px-6 py-2.5 bg-[#ff0050] rounded-full text-white font-bold text-sm"
+          >
+            + TikTok লিংক যোগ করুন
+          </button>
         </div>
       ) : (
         <div
@@ -434,10 +455,10 @@ export default function ShortReels() {
               className="h-full w-full relative snap-start snap-always"
               style={{ scrollSnapAlign: "start" }}
             >
-              {/* Video - only active index gets iframe to prevent multiple audio */}
-              {video.isYouTube ? (
-                <YouTubeReelPlayer
-                  videoId={video.videoId!}
+              {/* Video */}
+              {video.isTikTok ? (
+                <TikTokReelPlayer
+                  videoId={video.tiktokVideoId!}
                   isActive={index === currentIndex}
                   isNearby={Math.abs(index - currentIndex) <= 2}
                 />
@@ -454,13 +475,13 @@ export default function ShortReels() {
                 />
               )}
 
-              {/* Tap overlay - only for non-YouTube videos */}
-              {!video.isYouTube && (
+              {/* Tap overlay - only for non-TikTok videos */}
+              {!video.isTikTok && (
                 <div className="absolute inset-0 z-10" onClick={handleVideoTap} />
               )}
 
-              {/* Pause indicator - only for non-YouTube */}
-              {!video.isYouTube && paused && index === currentIndex && (
+              {/* Pause indicator */}
+              {!video.isTikTok && paused && index === currentIndex && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-15">
                   <div className="w-16 h-16 rounded-full bg-black/40 grid place-items-center">
                     <Play className="w-8 h-8 text-white ml-1" />
@@ -552,6 +573,53 @@ export default function ShortReels() {
           ))}
         </div>
       )}
+
+      {/* Add TikTok Modal */}
+      <AnimatePresence>
+        {showAddTikTok && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 flex items-end"
+            onClick={() => setShowAddTikTok(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="w-full bg-white dark:bg-card rounded-t-2xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold text-gray-900 dark:text-foreground mb-4">TikTok ভিডিও যোগ করুন</h3>
+              <input
+                value={newTikTokUrl}
+                onChange={(e) => setNewTikTokUrl(e.target.value)}
+                placeholder="TikTok ভিডিও লিংক পেস্ট করুন..."
+                className="w-full bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-xl px-4 py-3 text-[14px] border-none outline-none mb-3"
+              />
+              <input
+                value={newTikTokCaption}
+                onChange={(e) => setNewTikTokCaption(e.target.value)}
+                placeholder="ক্যাপশন (ঐচ্ছিক)..."
+                className="w-full bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-xl px-4 py-3 text-[14px] border-none outline-none mb-4"
+              />
+              <button
+                onClick={handleAddTikTok}
+                disabled={!newTikTokUrl.trim() || addingTikTok}
+                className="w-full py-3 bg-[#ff0050] text-white font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {addingTikTok ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                যোগ করুন
+              </button>
+              <p className="text-[12px] text-gray-400 mt-3 text-center">
+                উদাহরণ: https://www.tiktok.com/@user/video/1234567890
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Comment Bottom Sheet */}
       <AnimatePresence>

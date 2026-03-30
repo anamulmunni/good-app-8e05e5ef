@@ -642,6 +642,39 @@ export type Database = {
         }
         Relationships: []
       }
+      tiktok_videos: {
+        Row: {
+          added_by: string
+          caption: string | null
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          video_id: string
+          video_url: string
+        }
+        Insert: {
+          added_by?: string
+          caption?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          video_id: string
+          video_url: string
+        }
+        Update: {
+          added_by?: string
+          caption?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          video_id?: string
+          video_url?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
