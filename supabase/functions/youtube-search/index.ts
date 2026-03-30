@@ -431,6 +431,7 @@ async function getTrendingWithRotation(
           channelId: item.snippet?.channelId || "",
           thumbnail: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
           publishedAt: item.snippet?.publishedAt || "",
+          lengthSeconds: parseISO8601Duration(item.contentDetails?.duration || ""),
         })));
         break;
       } catch {
