@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Pause, Play } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 type ReelItem = {
   videoId: string;
@@ -62,9 +63,7 @@ function saveSeenReel(videoId: string) {
     const existing = readSeenReels();
     const next = [videoId, ...existing.filter((item) => item !== videoId)].slice(0, MAX_SEEN_REELS);
     window.localStorage.setItem(SEEN_REELS_KEY, JSON.stringify(next));
-  } catch {
-    // ignore storage errors
-  }
+  } catch {}
 }
 
 export default function ShortReels() {
@@ -76,9 +75,16 @@ export default function ShortReels() {
   const [fetchBatch, setFetchBatch] = useState(0);
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [showPauseIcon, setShowPauseIcon] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState<Set<string>>(new Set());
+
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
+  const touchStartTime = useRef(0);
   const swipeLocked = useRef(false);
+  const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
+  const pauseIconTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -122,25 +128,19 @@ export default function ShortReels() {
     setFetchBatch(0);
     setReelQueue([]);
     setCurrentIndex(0);
+    setPaused(false);
+    setIframeLoaded(new Set());
     swipeLocked.current = false;
   }, []);
 
   useEffect(() => {
     if (candidates.length === 0) return;
-
     const recentlySeen = new Set(readSeenReels());
     setReelQueue((prev) => {
       const existingIds = new Set(prev.map((item) => item.videoId));
       const freshItems = candidates.filter((item) => !existingIds.has(item.videoId) && !recentlySeen.has(item.videoId));
-
-      if (freshItems.length > 0) {
-        return [...prev, ...freshItems];
-      }
-
-      if (prev.length === 0) {
-        return candidates.filter((item) => !existingIds.has(item.videoId));
-      }
-
+      if (freshItems.length > 0) return [...prev, ...freshItems];
+      if (prev.length === 0) return candidates.filter((item) => !existingIds.has(item.videoId));
       return prev;
     });
   }, [candidates]);
@@ -150,6 +150,7 @@ export default function ShortReels() {
   useEffect(() => {
     if (!currentReel?.videoId) return;
     saveSeenReel(currentReel.videoId);
+    setPaused(false);
   }, [currentReel?.videoId]);
 
   useEffect(() => {
@@ -157,6 +158,28 @@ export default function ShortReels() {
     if (currentIndex < reelQueue.length - 3) return;
     setFetchBatch((prev) => prev + 1);
   }, [currentIndex, isFetching, reelQueue.length, user]);
+
+  // Send play/pause command to YouTube iframe via postMessage
+  const sendYtCommand = useCallback((videoId: string, command: "playVideo" | "pauseVideo") => {
+    const iframe = iframeRefs.current[videoId];
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage(
+      JSON.stringify({ event: "command", func: command, args: "" }),
+      "*"
+    );
+  }, []);
+
+  const togglePause = useCallback(() => {
+    if (!currentReel) return;
+    const next = !paused;
+    setPaused(next);
+    sendYtCommand(currentReel.videoId, next ? "pauseVideo" : "playVideo");
+
+    // Show pause/play icon briefly
+    setShowPauseIcon(true);
+    clearTimeout(pauseIconTimer.current);
+    pauseIconTimer.current = setTimeout(() => setShowPauseIcon(false), 800);
+  }, [paused, currentReel, sendYtCommand]);
 
   const moveToNext = useCallback(() => {
     setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
@@ -169,6 +192,7 @@ export default function ShortReels() {
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     touchStartX.current = e.touches[0].clientX;
+    touchStartTime.current = Date.now();
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
@@ -176,6 +200,13 @@ export default function ShortReels() {
 
     const deltaY = touchStartY.current - e.changedTouches[0].clientY;
     const deltaX = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
+    const elapsed = Date.now() - touchStartTime.current;
+
+    // Tap detection: short duration, small movement → pause/resume
+    if (Math.abs(deltaY) < 20 && deltaX < 20 && elapsed < 300) {
+      togglePause();
+      return;
+    }
 
     if (deltaX > Math.abs(deltaY)) return;
     if (Math.abs(deltaY) < 45) return;
@@ -187,7 +218,7 @@ export default function ShortReels() {
     window.setTimeout(() => {
       swipeLocked.current = false;
     }, 320);
-  }, [moveToNext, moveToPrev]);
+  }, [moveToNext, moveToPrev, togglePause]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (swipeLocked.current) return;
@@ -224,10 +255,19 @@ export default function ShortReels() {
     return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
   }, []);
 
+  const handleIframeLoad = useCallback((videoId: string) => {
+    setIframeLoaded((prev) => {
+      const next = new Set(prev);
+      next.add(videoId);
+      return next;
+    });
+  }, []);
+
   if (isLoading || !user) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
+      {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 to-transparent">
         <div className="flex items-center justify-between px-3 py-2">
           <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center text-white">
@@ -264,6 +304,7 @@ export default function ShortReels() {
         </div>
       ) : (
         <div className="h-full w-full relative overflow-hidden" onWheel={handleWheel}>
+          {/* Touch overlay for swipe + tap */}
           <div
             className="absolute left-0 right-0 bottom-0 z-10"
             style={{ top: "92px", touchAction: "none" }}
@@ -271,11 +312,32 @@ export default function ShortReels() {
             onTouchEnd={handleTouchEnd}
           />
 
+          {/* Pause/Play icon overlay */}
+          <AnimatePresence>
+            {showPauseIcon && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+              >
+                <div className="w-20 h-20 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                  {paused ? (
+                    <Play className="w-10 h-10 text-white ml-1" fill="white" />
+                  ) : (
+                    <Pause className="w-10 h-10 text-white" fill="white" />
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {reelQueue.map((item, index) => {
             const offset = index - currentIndex;
             if (Math.abs(offset) > 1) return null;
 
             const isActive = index === currentIndex;
+            const loaded = iframeLoaded.has(item.videoId);
 
             return (
               <div
@@ -283,15 +345,35 @@ export default function ShortReels() {
                 className="absolute inset-0 w-full h-full transition-transform duration-300 ease-out"
                 style={{ transform: `translateY(${offset * 100}%)` }}
               >
+                {/* Thumbnail shown while iframe loads */}
+                {!loaded && (
+                  <div className="absolute inset-0 z-[1] flex items-center justify-center bg-black">
+                    <img
+                      src={`https://i.ytimg.com/vi/${item.videoId}/hq720.jpg`}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="w-10 h-10 animate-spin text-white/80" />
+                    </div>
+                  </div>
+                )}
+
                 <iframe
-                  src={buildEmbedUrl(item.videoId, isActive)}
+                  ref={(el) => { iframeRefs.current[item.videoId] = el; }}
+                  src={buildEmbedUrl(item.videoId, isActive && !paused)}
                   className="w-full h-full border-0"
                   allow="autoplay; encrypted-media; accelerometer; gyroscope"
                   allowFullScreen={false}
-                  loading={isActive ? "eager" : "lazy"}
+                  loading={Math.abs(offset) <= 1 ? "eager" : "lazy"}
                   style={{ pointerEvents: "none" }}
+                  onLoad={() => handleIframeLoad(item.videoId)}
                 />
 
+                {/* Bottom info gradient */}
                 <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent px-4 pb-5 pt-10 pointer-events-none">
                   <p className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
                     {item.title}
