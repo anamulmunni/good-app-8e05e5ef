@@ -931,9 +931,14 @@ export default function Reels() {
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => { if (selectedVideo) { setSelectedVideo(null); } else { navigate("/feed"); } }} className="h-10 w-10 shrink-0 grid place-items-center">
+              <button onClick={() => navigate("/feed")} className="h-10 w-10 shrink-0 grid place-items-center" title="হোমে ফিরে যান">
                 <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
+              {selectedVideo && (
+                <button onClick={() => { setSelectedVideo(null); setMiniPlayer(false); }} className="h-8 w-8 shrink-0 grid place-items-center rounded-full ml-[-4px]" style={{ background: "#272727" }} title="ভিডিও বন্ধ করুন">
+                  <X className="w-4 h-4" style={{ color: "#fff" }} />
+                </button>
+              )}
               <div className="flex items-center gap-1.5">
                 <img
                   src={goodAppLogo}
