@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, TrendingUp, Newspaper, Download, Sparkles, X } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, TrendingUp, Newspaper, Download, Sparkles, X, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -66,6 +66,8 @@ export default function Dashboard() {
   const [showRequestSection, setShowRequestSection] = useState(false);
   const [showWalletDrawer, setShowWalletDrawer] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
@@ -151,6 +153,17 @@ export default function Dashboard() {
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  // Celebration when key_count increases
+  useEffect(() => {
+    if (user?.key_count != null) {
+      if (prevKeyCount !== null && user.key_count > prevKeyCount) {
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 3000);
+      }
+      setPrevKeyCount(user.key_count);
+    }
+  }, [user?.key_count]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -401,15 +414,16 @@ export default function Dashboard() {
 
       {/* Feed & Chat buttons - top bar */}
       <div className="max-w-md mx-auto px-4 pt-4 relative z-10">
-        <div className="flex gap-3">
+        <div className="flex gap-2">
+          {/* Feed */}
           <motion.button
-            initial={{ x: -40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", damping: 12, delay: 0.1 }}
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => navigate("/feed")}
-            className="flex-1 relative py-3.5 rounded-2xl font-bold text-sm overflow-hidden"
+            className="flex-1 relative py-3 rounded-2xl font-bold text-xs overflow-hidden"
           >
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--amber))] via-[hsl(var(--orange))] to-[hsl(var(--amber))]"
@@ -422,22 +436,52 @@ export default function Dashboard() {
               animate={{ x: ["-100%", "200%"] }}
               transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.5 }}
             />
-            <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+            <span className="relative z-10 flex items-center justify-center gap-1.5 text-primary-foreground">
               <motion.span animate={{ rotate: [0, -10, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
-                <Newspaper className="w-5 h-5" />
+                <Newspaper className="w-4 h-4" />
               </motion.span>
-              নিউজ ফিড
+              ফিড
             </span>
           </motion.button>
 
+          {/* Video */}
           <motion.button
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: "spring", damping: 12, delay: 0.15 }}
+            whileHover={{ scale: 1.04, y: -2 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => navigate("/reels")}
+            className="flex-1 relative py-3 rounded-2xl font-bold text-xs overflow-hidden"
+          >
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-[#ff0000] via-[#cc0000] to-[#ff0000]"
+              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              style={{ backgroundSize: "200% 100%" }}
+            />
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.8 }}
+            />
+            <span className="relative z-10 flex items-center justify-center gap-1.5 text-white font-black">
+              <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                <Play className="w-4 h-4 fill-white" />
+              </motion.span>
+              Video
+            </span>
+          </motion.button>
+
+          {/* Chat */}
+          <motion.button
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", damping: 12, delay: 0.2 }}
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => navigate("/chat")}
-            className="flex-1 relative py-3.5 rounded-2xl font-bold text-sm overflow-hidden"
+            className="flex-1 relative py-3 rounded-2xl font-bold text-xs overflow-hidden"
           >
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--blue))] to-[hsl(var(--cyan))]"
@@ -450,9 +494,9 @@ export default function Dashboard() {
               animate={{ x: ["-100%", "200%"] }}
               transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2 }}
             />
-            <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+            <span className="relative z-10 flex items-center justify-center gap-1.5 text-primary-foreground">
               <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                <MessageCircle className="w-5 h-5" />
+                <MessageCircle className="w-4 h-4" />
               </motion.span>
               মেসেজ
             </span>
@@ -659,6 +703,50 @@ export default function Dashboard() {
                     ✦
                   </motion.div>
                 ))}
+                {/* Full-screen celebration overlay */}
+                <AnimatePresence>
+                  {showCelebration && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center"
+                    >
+                      {/* Confetti burst */}
+                      {[...Array(30)].map((_, i) => (
+                        <motion.div
+                          key={`confetti-${i}`}
+                          className="absolute rounded-full"
+                          style={{
+                            width: 6 + Math.random() * 8,
+                            height: 6 + Math.random() * 8,
+                            background: ['#ff0', '#f0f', '#0ff', '#f00', '#0f0', '#ff6b6b', '#ffd700', '#00e5ff', '#e040fb'][i % 9],
+                          }}
+                          initial={{ x: 0, y: 0, scale: 0 }}
+                          animate={{
+                            x: (Math.random() - 0.5) * 400,
+                            y: (Math.random() - 0.5) * 600,
+                            scale: [0, 1.5, 0],
+                            rotate: Math.random() * 720,
+                          }}
+                          transition={{ duration: 2 + Math.random(), ease: "easeOut" }}
+                        />
+                      ))}
+                      <motion.div
+                        initial={{ scale: 0, rotate: -20 }}
+                        animate={{ scale: [0, 1.3, 1], rotate: [-20, 5, 0] }}
+                        transition={{ type: "spring", damping: 8 }}
+                        className="text-center"
+                      >
+                        <p className="text-5xl mb-2">🎉</p>
+                        <p className="text-2xl font-black text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+                          ভেরিফিকেশন বেড়েছে!
+                        </p>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <p className="text-xs text-muted-foreground uppercase tracking-[0.2em] mb-2 font-semibold relative z-10">মোট ভেরিফিকেশন</p>
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
@@ -668,13 +756,32 @@ export default function Dashboard() {
                 >
                   <motion.p
                     key={user.key_count}
-                    initial={{ y: 20, opacity: 0, rotate: -10 }}
-                    animate={{ y: 0, opacity: 1, rotate: 0 }}
+                    initial={{ y: 40, opacity: 0, rotate: -15, scale: 0.5 }}
+                    animate={{ y: 0, opacity: 1, rotate: 0, scale: 1 }}
+                    transition={{ type: "spring", damping: 10, stiffness: 100 }}
                     className="text-7xl font-black leading-none"
                   >
                     <motion.span
-                      className="inline-block bg-gradient-to-r from-[hsl(var(--purple))] via-[hsl(var(--pink))] to-[hsl(var(--amber))] bg-clip-text text-transparent"
+                      className="inline-block bg-clip-text text-transparent"
+                      style={{
+                        backgroundImage: (user.key_count || 0) >= 50
+                          ? "linear-gradient(135deg, #ffd700, #ff8c00, #ff4500, #ffd700)"
+                          : (user.key_count || 0) >= 20
+                          ? "linear-gradient(135deg, #e040fb, #7c4dff, #536dfe, #e040fb)"
+                          : (user.key_count || 0) >= 10
+                          ? "linear-gradient(135deg, #00e5ff, #1de9b6, #00e676, #00e5ff)"
+                          : "linear-gradient(135deg, hsl(var(--purple)), hsl(var(--pink)), hsl(var(--amber)))",
+                        backgroundSize: "300% 300%",
+                        filter: (user.key_count || 0) >= 50
+                          ? "drop-shadow(0 0 30px rgba(255,215,0,0.6)) drop-shadow(0 0 60px rgba(255,140,0,0.4))"
+                          : (user.key_count || 0) >= 20
+                          ? "drop-shadow(0 0 30px rgba(224,64,251,0.5)) drop-shadow(0 0 60px rgba(124,77,255,0.3))"
+                          : (user.key_count || 0) >= 10
+                          ? "drop-shadow(0 0 30px rgba(0,229,255,0.5)) drop-shadow(0 0 60px rgba(0,230,118,0.3))"
+                          : "drop-shadow(0 0 30px hsl(var(--purple) / 0.5)) drop-shadow(0 0 60px hsl(var(--pink) / 0.3))",
+                      }}
                       animate={{
+                        backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"],
                         scale: [1, 1.12, 0.95, 1.08, 1],
                         rotate: [0, 3, -3, 2, 0],
                         y: [0, -8, 4, -4, 0],
@@ -684,13 +791,28 @@ export default function Dashboard() {
                         repeat: Infinity,
                         ease: "easeInOut",
                       }}
-                      style={{
-                        filter: "drop-shadow(0 0 30px hsl(var(--purple) / 0.5)) drop-shadow(0 0 60px hsl(var(--pink) / 0.3))",
-                      }}
                     >
                       {user.key_count || 0}
                     </motion.span>
                   </motion.p>
+                  {/* Tier label */}
+                  {(user.key_count || 0) >= 10 && (
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-[10px] font-black mt-2 tracking-widest uppercase"
+                      style={{
+                        color: (user.key_count || 0) >= 50 ? "#ffd700" : (user.key_count || 0) >= 20 ? "#e040fb" : "#00e5ff",
+                      }}
+                    >
+                      <motion.span
+                        animate={{ opacity: [0.6, 1, 0.6] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        {(user.key_count || 0) >= 50 ? "⭐ GOLD TIER" : (user.key_count || 0) >= 20 ? "💎 DIAMOND TIER" : "🔥 SILVER TIER"}
+                      </motion.span>
+                    </motion.p>
+                  )}
                 </motion.div>
               </div>
             </div>
