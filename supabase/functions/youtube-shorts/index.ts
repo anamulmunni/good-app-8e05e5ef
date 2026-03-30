@@ -8,14 +8,15 @@ const corsHeaders = {
 
 const streamCache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL = 30 * 60 * 1000;
-
 const KEY_COOLDOWN = 60 * 60 * 1000;
+const API_KEYS_CACHE_TTL = 5 * 60 * 1000;
+const YT_KEY_REGEX = /^AIza[0-9A-Za-z_-]{20,}$/;
+const RESPONSE_LIMIT = 120;
+
 const exhaustedKeys = new Map<string, number>();
 const invalidKeys = new Map<string, string>();
 let cachedApiKeys: string[] = [];
 let apiKeysFetchedAt = 0;
-const API_KEYS_CACHE_TTL = 5 * 60 * 1000;
-const YT_KEY_REGEX = /^AIza[0-9A-Za-z_-]{20,}$/;
 
 const FALLBACK_SHORTS = [
   { videoId: "BddP6PYo2gs", title: "Mon Majhi Re", author: "Arijit Singh" },
@@ -62,15 +63,44 @@ function setCache(key: string, data: any) {
 }
 
 function parseApiKeys(raw: string): string[] {
-  return Array.from(new Set(
-    raw.split(/[\s,]+/).map((k) => k.trim()).filter((k) => YT_KEY_REGEX.test(k)),
-  ));
+  return Array.from(new Set(raw.split(/[\s,]+/).map((k) => k.trim()).filter((k) => YT_KEY_REGEX.test(k))));
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function rotateArray<T>(items: T[], seed: string): T[] {
+  if (items.length <= 1) return [...items];
+  const offset = hashString(seed) % items.length;
+  return [...items.slice(offset), ...items.slice(0, offset)];
+}
+
+function shuffleWithSeed<T>(items: T[], seed: string): T[] {
+  const arr = [...items];
+  let state = hashString(seed) || 1;
+  const rand = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+
+  return arr;
 }
 
 async function getAllApiKeys(): Promise<string[]> {
   if (Date.now() - apiKeysFetchedAt < API_KEYS_CACHE_TTL && cachedApiKeys.length > 0) {
     return cachedApiKeys;
   }
+
   const keys: string[] = [];
   const envKey = Deno.env.get("YOUTUBE_API_KEY")?.trim();
   if (envKey && YT_KEY_REGEX.test(envKey)) keys.push(envKey);
@@ -108,14 +138,11 @@ function getAvailableKey(keys: string[]): string | null {
   return null;
 }
 
-function getFallbackShorts(maxResults = 30): any[] {
-  const shuffled = [...FALLBACK_SHORTS];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled.slice(0, maxResults).map((item) => ({
-    videoId: item.videoId, title: item.title, author: item.author,
+function getFallbackShorts(maxResults = 30, seed = "fallback"): any[] {
+  return shuffleWithSeed(FALLBACK_SHORTS, seed).slice(0, maxResults).map((item) => ({
+    videoId: item.videoId,
+    title: item.title,
+    author: item.author,
     thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
   }));
 }
@@ -123,17 +150,25 @@ function getFallbackShorts(maxResults = 30): any[] {
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = setTimeout(() => reject(new Error("timeout")), ms);
-    promise.then(v => { clearTimeout(id); resolve(v); }).catch(e => { clearTimeout(id); reject(e); });
+    promise.then((v) => {
+      clearTimeout(id);
+      resolve(v);
+    }).catch((e) => {
+      clearTimeout(id);
+      reject(e);
+    });
   });
 }
 
-// ── Piped search for shorts ─────────────────────────────────────────────
 async function searchShortsViaPiped(query: string, maxResults = 30): Promise<any[]> {
   for (const instance of PIPED_INSTANCES) {
     try {
       const url = `${instance}/search?q=${encodeURIComponent(query + " #shorts")}&filter=videos`;
       const res = await withTimeout(fetch(url), 7000);
-      if (!res.ok) { await res.text().catch(() => {}); continue; }
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        continue;
+      }
       const data = await res.json();
       const items = Array.isArray(data?.items) ? data.items : [];
 
@@ -143,22 +178,25 @@ async function searchShortsViaPiped(query: string, maxResults = 30): Promise<any
         .map((item: any) => {
           const videoId = item.url?.replace("/watch?v=", "") || "";
           return {
-            videoId, title: item.title || "", author: item.uploaderName || "",
+            videoId,
+            title: item.title || "",
+            author: item.uploaderName || "",
             thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
           };
         })
-        .filter((r: any) => r.videoId);
+        .filter((item: any) => item.videoId);
 
       if (results.length > 0) {
         console.log(`Piped shorts: ${results.length} results from ${instance}`);
         return results;
       }
-    } catch { continue; }
+    } catch {
+      continue;
+    }
   }
   return [];
 }
 
-// ── YouTube HTML scraping for shorts ─────────────────────────────────────
 async function searchShortsViaHTML(query: string, maxResults = 30): Promise<any[]> {
   try {
     const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query + " #shorts")}&sp=EgIYAQ%3D%3D`;
@@ -168,16 +206,17 @@ async function searchShortsViaHTML(query: string, maxResults = 30): Promise<any[
         "Accept-Language": "bn-BD,bn;q=0.9,en;q=0.8",
       },
     }), 10000);
-    if (!res.ok) { await res.text().catch(() => {}); return []; }
-    const html = await res.text();
+    if (!res.ok) {
+      await res.text().catch(() => {});
+      return [];
+    }
 
-    const match = html.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s)
-      || html.match(/ytInitialData\s*=\s*({.+?});\s*/s);
+    const html = await res.text();
+    const match = html.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s) || html.match(/ytInitialData\s*=\s*({.+?});\s*/s);
     if (!match) return [];
 
     const data = JSON.parse(match[1]);
-    const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
-      ?.sectionListRenderer?.contents || [];
+    const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
 
     const results: any[] = [];
     for (const section of contents) {
@@ -204,33 +243,44 @@ async function searchShortsViaHTML(query: string, maxResults = 30): Promise<any[
   }
 }
 
-// ── Invidious search for shorts ─────────────────────────────────────────
-async function searchShortsFallback(query: string): Promise<any[]> {
+async function searchShortsFallback(query: string, maxResults = 30): Promise<any[]> {
   for (const instance of INVIDIOUS_INSTANCES) {
     try {
       const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort_by=relevance&region=BD`;
       const res = await withTimeout(fetch(url), 6000);
-      if (!res.ok) { await res.text().catch(() => {}); continue; }
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        continue;
+      }
       const data = await res.json();
       if (!Array.isArray(data)) continue;
 
       return data
         .filter((item: any) => item?.videoId && item?.title && (item?.lengthSeconds || 0) <= 180)
         .map((item: any) => ({
-          videoId: item.videoId, title: item.title, author: item.author || "",
+          videoId: item.videoId,
+          title: item.title,
+          author: item.author || "",
           thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
         }))
-        .slice(0, 30);
-    } catch { continue; }
+        .slice(0, maxResults);
+    } catch {
+      continue;
+    }
   }
   return [];
 }
 
-// YouTube API search for shorts
 async function searchShortsWithRotation(keys: string[], query: string, maxResults = 20): Promise<any[]> {
   const params = new URLSearchParams({
-    part: "snippet", q: query, type: "video", videoDuration: "short",
-    maxResults: String(maxResults), order: "relevance", regionCode: "BD", relevanceLanguage: "bn",
+    part: "snippet",
+    q: query,
+    type: "video",
+    videoDuration: "short",
+    maxResults: String(maxResults),
+    order: "relevance",
+    regionCode: "BD",
+    relevanceLanguage: "bn",
   });
   const baseUrl = `https://www.googleapis.com/youtube/v3/search?${params}`;
 
@@ -253,53 +303,62 @@ async function searchShortsWithRotation(keys: string[], query: string, maxResult
         }
         continue;
       }
+
       const data = await res.json();
       return (data?.items || [])
         .filter((item: any) => item?.id?.videoId)
         .map((item: any) => ({
-          videoId: item.id.videoId, title: item.snippet?.title || "",
+          videoId: item.id.videoId,
+          title: item.snippet?.title || "",
           author: item.snippet?.channelTitle || "",
           thumbnail: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
         }));
-    } catch { continue; }
+    } catch {
+      continue;
+    }
   }
   return [];
 }
 
-// Get direct stream URL
 async function getStreamUrl(videoId: string): Promise<string | null> {
   for (const instance of INVIDIOUS_INSTANCES) {
     try {
       const url = `${instance}/api/v1/videos/${videoId}`;
       const res = await withTimeout(fetch(url), 5000);
-      if (!res.ok) { await res.text().catch(() => {}); continue; }
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        continue;
+      }
       const data = await res.json();
       const formats = data?.formatStreams || [];
-      const combined = formats.find((f: any) =>
-        f.container === "mp4" && f.qualityLabel && (f.qualityLabel.includes("360") || f.qualityLabel.includes("720"))
-      ) || formats[0];
+      const combined = formats.find((f: any) => f.container === "mp4" && f.qualityLabel && (f.qualityLabel.includes("360") || f.qualityLabel.includes("720"))) || formats[0];
       if (combined?.url) return combined.url;
+
       const adaptiveFormats = data?.adaptiveFormats || [];
-      const videoStream = adaptiveFormats.find((f: any) =>
-        f.type?.startsWith("video/mp4") && f.qualityLabel?.includes("360")
-      );
+      const videoStream = adaptiveFormats.find((f: any) => f.type?.startsWith("video/mp4") && f.qualityLabel?.includes("360"));
       if (videoStream?.url) return videoStream.url;
-    } catch { continue; }
+    } catch {
+      continue;
+    }
   }
 
   for (const instance of PIPED_INSTANCES) {
     try {
       const url = `${instance}/streams/${videoId}`;
       const res = await withTimeout(fetch(url), 5000);
-      if (!res.ok) { await res.text().catch(() => {}); continue; }
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        continue;
+      }
       const data = await res.json();
       const videoStreams = data?.videoStreams || [];
-      const stream = videoStreams.find((s: any) =>
-        s.mimeType?.includes("video/mp4") && s.quality?.includes("360")
-      ) || videoStreams.find((s: any) => s.mimeType?.includes("video/mp4"));
+      const stream = videoStreams.find((s: any) => s.mimeType?.includes("video/mp4") && s.quality?.includes("360")) || videoStreams.find((s: any) => s.mimeType?.includes("video/mp4"));
       if (stream?.url) return stream.url;
-    } catch { continue; }
+    } catch {
+      continue;
+    }
   }
+
   return null;
 }
 
@@ -315,70 +374,66 @@ serve(async (req) => {
     if (action === "search") {
       const query = String(url.searchParams.get("q") || "bangla short video 2025").trim().slice(0, 140);
       const category = url.searchParams.get("category") || "mixed";
-      const cacheKey = `shorts:${query}:${category}`;
+      const seed = String(url.searchParams.get("seed") || "default").trim().slice(0, 80);
+      const cacheKey = `shorts:${query}:${category}:${seed}`;
       const cached = getCached(cacheKey);
       if (cached) {
         return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const apiKeys = await getAllApiKeys();
+      const queries = getSearchQueries(category, query, seed);
       let results: any[] = [];
-      const queries = getSearchQueries(category, query);
 
       if (apiKeys.length > 0) {
         try {
-          const searchPromises = queries.map((q) => searchShortsWithRotation(apiKeys, q, 15));
-          const allResults = await Promise.all(searchPromises);
+          const allResults = await Promise.all(queries.slice(0, 4).map((q) => searchShortsWithRotation(apiKeys, q, 15)));
           results = allResults.flat();
         } catch {
-          // YouTube API failed
+          // ignore api errors
         }
       }
 
-      // If YouTube API returned nothing, try HTML scraping first
-      if (results.length === 0) {
-        console.log("YouTube API returned 0 shorts, trying HTML scraping...");
-        for (const q of queries.slice(0, 2)) {
-          const htmlResults = await searchShortsViaHTML(q, 20);
+      if (results.length < 24) {
+        console.log("YouTube API returned low shorts, trying HTML scraping...");
+        for (const q of queries.slice(0, 4)) {
+          const htmlResults = await searchShortsViaHTML(q, 24);
           results.push(...htmlResults);
-          if (results.length >= 20) break;
+          if (results.length >= RESPONSE_LIMIT) break;
         }
       }
 
-      // Then try Piped
-      if (results.length === 0) {
-        console.log("HTML scraping returned 0, trying Piped...");
-        for (const q of queries.slice(0, 2)) {
-          const pipedResults = await searchShortsViaPiped(q, 20);
+      if (results.length < 24) {
+        console.log("HTML scraping returned low results, trying Piped...");
+        for (const q of queries.slice(0, 4)) {
+          const pipedResults = await searchShortsViaPiped(q, 24);
           results.push(...pipedResults);
-          if (results.length >= 20) break;
+          if (results.length >= RESPONSE_LIMIT) break;
+        }
+      }
+
+      if (results.length < 12) {
+        console.log("Piped returned low results, trying Invidious...");
+        for (const q of queries.slice(0, 3)) {
+          const fallbackResults = await searchShortsFallback(q, 24);
+          results.push(...fallbackResults);
+          if (results.length >= RESPONSE_LIMIT) break;
         }
       }
 
       if (results.length === 0) {
-        console.log("Piped returned 0, trying Invidious...");
-        results = await searchShortsFallback(query);
+        results = getFallbackShorts(RESPONSE_LIMIT, seed);
       }
 
-      if (results.length === 0) {
-        results = getFallbackShorts(100);
-      }
-
-      // Dedupe
       const seen = new Set<string>();
-      results = results.filter(r => {
-        if (seen.has(r.videoId)) return false;
-        seen.add(r.videoId);
+      results = results.filter((item) => {
+        if (!item?.videoId || seen.has(item.videoId)) return false;
+        seen.add(item.videoId);
         return true;
       });
 
-      // Shuffle
-      for (let i = results.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [results[i], results[j]] = [results[j], results[i]];
-      }
-
-      const response = { results: results.slice(0, 100) };
+      results = shuffleWithSeed(results, seed).slice(0, RESPONSE_LIMIT);
+      const response = { results };
       if (results.length > 0) setCache(cacheKey, response);
 
       return new Response(JSON.stringify(response), {
@@ -390,43 +445,94 @@ serve(async (req) => {
       const videoId = String(url.searchParams.get("videoId") || "").trim();
       if (!videoId) {
         return new Response(JSON.stringify({ error: "missing_videoId" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
       const cacheKey = `stream:${videoId}`;
       const cached = getCached(cacheKey);
       if (cached) {
         return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+
       const streamUrl = await getStreamUrl(videoId);
       const response = { videoId, streamUrl };
       if (streamUrl) setCache(cacheKey, response);
-      return new Response(JSON.stringify(response), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(response), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify({ error: "invalid_action" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("youtube-shorts error:", e);
     return new Response(JSON.stringify({ results: [], error: "failed" }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
 
-function getSearchQueries(category: string, userQuery: string): string[] {
+function getSearchQueries(category: string, userQuery: string, seed: string): string[] {
   const categoryQueries: Record<string, string[]> = {
-    mixed: ["bangla short video 2025", "bangla gojol short 2025", "bangla funny video short", "tiktok viral bangla", "bangla slowed reverb short", "bhojpuri dance short"],
-    gajal: ["bangla gojol short 2025", "islamic gojol bangla kalarab", "bangla islamic short video", "নাতে রাসুল short"],
-    slowed_reverb: ["bangla slowed reverb 2025", "hindi slowed reverb aesthetic", "lofi bangla song short"],
-    funny: ["bangla funny video 2025", "bangla comedy short", "tiktok funny bangla"],
-    dance: ["bhojpuri dance video short", "bangla dance tiktok", "hindi dance short video"],
-    nature: ["nature short video aesthetic", "beautiful nature shorts 4k", "sunset aesthetic short"],
+    mixed: [
+      "bangla short video 2025",
+      "bangla gojol short 2025",
+      "bangla funny video short",
+      "bangla viral reels",
+      "bangla song short video",
+      "nature short video aesthetic",
+      "bangla trending shorts",
+      "bangla dance short video",
+    ],
+    gajal: [
+      "bangla gojol short 2025",
+      "islamic gojol bangla kalarab",
+      "bangla islamic short video",
+      "নাতে রাসুল short",
+      "bangla waz short video",
+    ],
+    funny: [
+      "bangla funny video 2025",
+      "bangla comedy short",
+      "tiktok funny bangla",
+      "bangla prank short",
+      "bangla meme short video",
+    ],
+    dance: [
+      "bangla dance short video",
+      "bhojpuri dance video short",
+      "bangla dance tiktok",
+      "hindi dance short video",
+      "viral dance shorts bd",
+    ],
+    nature: [
+      "nature short video aesthetic",
+      "beautiful nature shorts 4k",
+      "sunset aesthetic short",
+      "river nature short video",
+      "village nature shorts",
+    ],
+    music: [
+      "bangla song short video",
+      "bangla slowed reverb short",
+      "lofi bangla song short",
+      "bangla cover song shorts",
+      "bangla romantic song short",
+    ],
   };
 
-  if (userQuery && userQuery !== "bangla short video 2025") {
-    return [userQuery, ...(categoryQueries[category] || categoryQueries.mixed).slice(0, 2)];
+  const defaultQuery = "bangla short video 2025";
+  const baseQueries = categoryQueries[category] || categoryQueries.mixed;
+  const rotated = rotateArray(baseQueries, seed);
+
+  if (userQuery && userQuery !== defaultQuery) {
+    return [userQuery, ...rotated.filter((item) => item !== userQuery)];
   }
-  return categoryQueries[category] || categoryQueries.mixed;
+
+  return rotated;
 }
