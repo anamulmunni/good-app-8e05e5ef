@@ -144,7 +144,7 @@ export default function ShortReels() {
       try {
         const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
         const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=search&category=${selectedCategory}`,
+          `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=search&category=${selectedCategory}&t=${Date.now()}`,
           { headers: { "Content-Type": "application/json" } }
         );
         if (!res.ok) return [];
@@ -152,7 +152,7 @@ export default function ShortReels() {
         return (data?.results || []).map((item: any) => ({
           id: `yt-${item.videoId}`,
           user_id: 0,
-          video_url: "", // Will be loaded lazily via stream
+          video_url: "",
           content: item.title,
           likes_count: Math.floor(Math.random() * 2000) + 100,
           comments_count: Math.floor(Math.random() * 100),
@@ -168,7 +168,8 @@ export default function ShortReels() {
       }
     },
     enabled: !!user,
-    staleTime: 10 * 60 * 1000, // 10 min cache
+    staleTime: 2 * 60 * 1000, // 2 min cache (short so re-entry shows fresh)
+    refetchOnMount: "always",
   });
 
   // Fetch user-posted short videos
