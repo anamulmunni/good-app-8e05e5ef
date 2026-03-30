@@ -491,10 +491,10 @@ export default function Reels() {
 
   const loadMore = useCallback(async (reset = false) => {
     if (loadingRef.current) return;
-    if (!reset && !hasMore) return;
     loadingRef.current = true;
     setLoading(true);
     const cursor = reset ? 1 : page;
+    // If no nextPageToken, pass undefined so feed-api uses rotating queries
     const currentPageToken = reset ? undefined : nextPageToken;
     try {
       let [externalResult, localResult] = await Promise.all([
@@ -512,7 +512,7 @@ export default function Reels() {
 
       if (!activeQuery && merged.length === 0 && cursor !== 1) {
         [externalResult, localResult] = await Promise.all([
-          getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick),
+          getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick + Date.now() % 1000),
           getUploadedLongVideos(cursor, 12),
         ]);
         merged = dedupeVideos([...externalResult.videos]);
@@ -527,14 +527,15 @@ export default function Reels() {
         const seen = new Set(base.map((v) => v.id));
         return dedupeVideos([...base, ...merged.filter((v) => !seen.has(v.id))]);
       });
-      setHasMore(localResult.hasMore || externalResult.hasMore);
+      // Always keep hasMore true for unlimited scroll
+      setHasMore(true);
       setNextPageToken(externalResult.nextPageToken);
       setPage(cursor + 1);
     } finally {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [hasMore, page, activeQuery, refreshTick, nextPageToken]);
+  }, [page, activeQuery, refreshTick, nextPageToken]);
 
   useEffect(() => {
     if (!user) return;
@@ -582,18 +583,28 @@ export default function Reels() {
     run();
   }, [user, activeQuery, refreshTick]);
 
+  // Infinite scroll observer
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingRef.current) loadMore();
+        if (entries[0].isIntersecting && !loadingRef.current) loadMore();
       },
       { threshold: 0, rootMargin: "800px 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, loadMore]);
+  }, [loadMore]);
+
+  // Auto-refresh: prepend fresh videos every 90 seconds
+  useEffect(() => {
+    if (!user) return;
+    const interval = window.setInterval(() => {
+      setRefreshTick((t) => t + 1);
+    }, 90_000);
+    return () => window.clearInterval(interval);
+  }, [user]);
 
   const allVideos = useMemo<VideoItem[]>(() => {
     return extVideos.map((v) => ({
