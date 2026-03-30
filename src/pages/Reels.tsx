@@ -1008,9 +1008,27 @@ export default function Reels() {
       {selectedVideo && !miniPlayer && (
         <div ref={playerRef} className="shrink-0 z-10" style={{ background: "#000" }}>
           <div ref={playerShellRef} className="w-full aspect-video relative overflow-hidden" style={{ background: "#000" }}>
-            {/* Hide YouTube logo overlay */}
+            {/* Hide YouTube logo with good-app branding */}
             {selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && (
-              <div className="absolute bottom-[38px] right-0 w-[120px] h-[30px] z-[5] pointer-events-none" style={{ background: "#000" }} />
+              <div className="absolute bottom-[34px] right-0 w-[160px] h-[36px] z-[5] pointer-events-none flex items-center justify-end pr-2 overflow-hidden" style={{ background: "linear-gradient(90deg, transparent 0%, #000 20%)" }}>
+                <span className="text-[13px] font-bold tracking-wide" style={{
+                  background: "linear-gradient(135deg, #22c55e 0%, #4ade80 30%, #86efac 50%, #4ade80 70%, #22c55e 100%)",
+                  backgroundSize: "200% 200%",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  animation: "shimmer-text 3s ease-in-out infinite",
+                  textShadow: "none",
+                  letterSpacing: "0.5px",
+                }}>
+                  good-<span style={{
+                    background: "linear-gradient(135deg, #f97316 0%, #fb923c 50%, #f97316 100%)",
+                    backgroundSize: "200% 200%",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    animation: "shimmer-text 3s ease-in-out infinite 0.5s",
+                  }}>app</span>
+                </span>
+              </div>
             )}
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
