@@ -379,10 +379,10 @@ export async function fetchYouTubeSuggestions(query: string): Promise<string[]> 
   }
 }
 
-async function fetchYouTubeViaEdge(query: string, action = "search", order = "relevance", maxResults = 25): Promise<any[]> {
+async function fetchYouTubeViaEdge(query: string, action = "search", order = "relevance", maxResults = 25, pageToken?: string): Promise<{ results: any[]; nextPageToken?: string }> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl) return [];
+  if (!supabaseUrl) return { results: [] };
 
   try {
     const params = new URLSearchParams({ maxResults: String(maxResults), order });
@@ -391,6 +391,7 @@ async function fetchYouTubeViaEdge(query: string, action = "search", order = "re
     } else if (query) {
       params.set("q", query);
     }
+    if (pageToken) params.set("pageToken", pageToken);
     const url = `${supabaseUrl}/functions/v1/youtube-search?${params}`;
     const res = await fetch(url, {
       headers: {
@@ -399,11 +400,14 @@ async function fetchYouTubeViaEdge(query: string, action = "search", order = "re
       },
       signal: AbortSignal.timeout(9500),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { results: [] };
     const data = await res.json();
-    return Array.isArray(data?.results) ? data.results : [];
+    return {
+      results: Array.isArray(data?.results) ? data.results : [],
+      nextPageToken: data?.nextPageToken || undefined,
+    };
   } catch {
-    return [];
+    return { results: [] };
   }
 }
 
