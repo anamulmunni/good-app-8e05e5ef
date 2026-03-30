@@ -57,8 +57,16 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true;
 
+    // Safety timeout - never spin loading longer than 6 seconds
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.warn("Auth safety timeout reached, stopping loading");
+        setIsLoading(false);
+      }
+    }, 6000);
+
     // Get session first, then listen for changes
-    withTimeout(supabase.auth.getSession(), 12000, "Session timeout")
+    withTimeout(supabase.auth.getSession(), 8000, "Session timeout")
       .then(({ data: { session } }) => {
         if (!isMounted) return;
         if (session?.user) {
