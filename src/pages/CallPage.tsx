@@ -38,7 +38,65 @@ export default function CallPage() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const autoStartedRef = useRef(false);
+  const wakeLockRef = useRef<any>(null);
+  const keepAliveAudioRef = useRef<HTMLAudioElement | null>(null);
   const targetUserId = parseInt(userId || "0");
+
+  // Wake Lock — prevent screen from sleeping during call
+  useEffect(() => {
+    const acquireWakeLock = async () => {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        }
+      } catch {}
+    };
+    acquireWakeLock();
+    // Re-acquire on visibility change (browser releases it when tab hidden)
+    const onVisChange = () => { if (document.visibilityState === "visible") acquireWakeLock(); };
+    document.addEventListener("visibilitychange", onVisChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisChange);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, []);
+
+  // Background audio keep-alive — silent audio loop prevents browser from suspending the tab
+  useEffect(() => {
+    if (callState === "calling" || callState === "ringing" || callState === "connected") {
+      if (!keepAliveAudioRef.current) {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.001; // nearly silent
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        // Store for cleanup
+        (keepAliveAudioRef as any).current = { ctx, osc };
+      }
+    } else {
+      if (keepAliveAudioRef.current) {
+        try {
+          const ka = keepAliveAudioRef.current as any;
+          ka.osc?.stop();
+          ka.ctx?.close();
+        } catch {}
+        keepAliveAudioRef.current = null;
+      }
+    }
+    return () => {
+      if (keepAliveAudioRef.current) {
+        try {
+          const ka = keepAliveAudioRef.current as any;
+          ka.osc?.stop();
+          ka.ctx?.close();
+        } catch {}
+        keepAliveAudioRef.current = null;
+      }
+    };
+  }, [callState]);
 
   useEffect(() => {
     callStateRef.current = callState;
