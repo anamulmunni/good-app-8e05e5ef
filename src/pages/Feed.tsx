@@ -58,6 +58,7 @@ export default function Feed() {
   const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
   const [storyEditorFile, setStoryEditorFile] = useState<File | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [page, setPage] = useState(1);
@@ -1230,37 +1231,60 @@ export default function Feed() {
                               <button onClick={() => deleteCommentMutation.mutate(c.id)} className="text-[12px] font-bold text-red-500">মুছুন</button>
                             )}
                           </div>
-                          {/* Replies */}
+                          {/* Replies - collapsed by default like Facebook */}
                           {c.replies && c.replies.length > 0 && (
-                            <div className="ml-5 mt-2 space-y-2 border-l-2 border-gray-200 dark:border-border/30 pl-3">
-                              {c.replies.map((r) => (
-                                <div key={r.id} className="flex gap-2">
-                                  <button onClick={() => navigate(`/user/${r.user_id}`)}
-                                    className="w-7 h-7 rounded-full bg-gray-200 dark:bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
-                                    {r.user?.avatar_url ? <img src={r.user.avatar_url} className="w-full h-full object-cover" /> :
-                                      <span className="text-[9px] text-blue-600 font-bold">{r.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                            <div className="ml-5 mt-1.5">
+                              {!expandedReplies.has(c.id) ? (
+                                <button
+                                  onClick={() => setExpandedReplies(prev => new Set(prev).add(c.id))}
+                                  className="flex items-center gap-1.5 text-[13px] font-bold text-gray-600 dark:text-muted-foreground hover:text-blue-600 dark:hover:text-primary py-1"
+                                >
+                                  <span className="w-6 h-0 border-t-2 border-gray-300 dark:border-border/50" />
+                                  {c.replies.length === 1 ? "১টি রিপ্লাই দেখুন" : `${c.replies.length}টি রিপ্লাই দেখুন`}
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => setExpandedReplies(prev => { const s = new Set(prev); s.delete(c.id); return s; })}
+                                    className="flex items-center gap-1.5 text-[13px] font-bold text-gray-600 dark:text-muted-foreground hover:text-blue-600 dark:hover:text-primary py-1 mb-1.5"
+                                  >
+                                    <span className="w-6 h-0 border-t-2 border-gray-300 dark:border-border/50" />
+                                    রিপ্লাই লুকান
                                   </button>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-2">
-                                      <button onClick={() => navigate(`/user/${r.user_id}`)}
-                                        className="text-[13px] font-bold text-gray-900 dark:text-foreground">
-                                        <NameWithBadge name={r.user?.display_name || "User"} isVerified={r.user?.is_verified_badge} />
-                                      </button>
-                                      <p className="text-[14px] leading-relaxed text-gray-900 dark:text-foreground break-words">
-                                        {renderMentionText(r.content)}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-3 px-1 mt-0.5">
-                                      <span className="text-[11px] text-gray-500">{timeAgo(r.created_at)}</span>
-                                      <button onClick={() => commentLikeMutation.mutate(r.id)}
-                                        className={`text-[11px] font-bold ${r.liked_by_me ? "text-blue-600" : "text-gray-500"}`}>
-                                        পছন্দ {(r.likes_count || 0) > 0 ? `(${r.likes_count})` : ""}
-                                      </button>
-                                      {r.user_id === user.id && <button onClick={() => deleteCommentMutation.mutate(r.id)} className="text-[11px] font-bold text-red-500">মুছুন</button>}
-                                    </div>
+                                  <div className="space-y-2 border-l-2 border-gray-200 dark:border-border/30 pl-3">
+                                    {c.replies.map((r) => (
+                                      <div key={r.id} className="flex gap-2">
+                                        <button onClick={() => navigate(`/user/${r.user_id}`)}
+                                          className="w-7 h-7 rounded-full bg-gray-200 dark:bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
+                                          {r.user?.avatar_url ? <img src={r.user.avatar_url} className="w-full h-full object-cover" /> :
+                                            <span className="text-[9px] text-blue-600 font-bold">{r.user?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-2">
+                                            <button onClick={() => navigate(`/user/${r.user_id}`)}
+                                              className="text-[13px] font-bold text-gray-900 dark:text-foreground">
+                                              <NameWithBadge name={r.user?.display_name || "User"} isVerified={r.user?.is_verified_badge} />
+                                            </button>
+                                            <p className="text-[14px] leading-relaxed text-gray-900 dark:text-foreground break-words">
+                                              {renderMentionText(r.content)}
+                                            </p>
+                                          </div>
+                                          <div className="flex items-center gap-3 px-1 mt-0.5">
+                                            <span className="text-[11px] text-gray-500">{timeAgo(r.created_at)}</span>
+                                            <button onClick={() => commentLikeMutation.mutate(r.id)}
+                                              className={`text-[11px] font-bold ${r.liked_by_me ? "text-blue-600" : "text-gray-500"}`}>
+                                              পছন্দ {(r.likes_count || 0) > 0 ? `(${r.likes_count})` : ""}
+                                            </button>
+                                            <button onClick={() => setReplyingTo({ id: c.id, name: r.user?.display_name || "User" })}
+                                              className="text-[11px] font-bold text-gray-500">Reply</button>
+                                            {r.user_id === user.id && <button onClick={() => deleteCommentMutation.mutate(r.id)} className="text-[11px] font-bold text-red-500">মুছুন</button>}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                </div>
-                              ))}
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
