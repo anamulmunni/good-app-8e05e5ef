@@ -127,7 +127,9 @@ export default function ShortReels() {
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
   const [showLoveAnimation, setShowLoveAnimation] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState("mixed");
+  const [reelQueue, setReelQueue] = useState<ShortVideo[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const lastTapRef = useRef(0);
@@ -237,7 +239,44 @@ export default function ShortReels() {
     }
   }, [user, shuffledVideos]);
 
-  const currentVideo = shuffledVideos[currentIndex];
+  useEffect(() => {
+    setReelQueue(shuffledVideos);
+    setCurrentIndex(0);
+    setPaused(false);
+    setExpandedReplies(new Set());
+    if (containerRef.current) containerRef.current.scrollTop = 0;
+  }, [shuffledVideos]);
+
+  const appendMoreReels = useCallback(() => {
+    if (shuffledVideos.length === 0) return;
+    setReelQueue((prev) => {
+      const nextBatch = [...shuffledVideos].sort(() => Math.random() - 0.5);
+      return [...prev, ...nextBatch];
+    });
+  }, [shuffledVideos]);
+
+  const goToNextReel = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const nextIndex = currentIndex + 1;
+    if (nextIndex >= reelQueue.length - 2) {
+      appendMoreReels();
+    }
+
+    const h = container.clientHeight || window.innerHeight;
+    container.scrollTo({ top: nextIndex * h, behavior: "smooth" });
+    setCurrentIndex(nextIndex);
+    setPaused(false);
+  }, [appendMoreReels, currentIndex, reelQueue.length]);
+
+  useEffect(() => {
+    if (reelQueue.length > 0 && currentIndex >= reelQueue.length - 3) {
+      appendMoreReels();
+    }
+  }, [appendMoreReels, currentIndex, reelQueue.length]);
+
+  const currentVideo = reelQueue[currentIndex];
 
   // Auto-play current video, pause others
   useEffect(() => {
@@ -258,11 +297,11 @@ export default function ShortReels() {
     const scrollTop = container.scrollTop;
     const h = container.clientHeight;
     const newIndex = Math.round(scrollTop / h);
-    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < shuffledVideos.length) {
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < reelQueue.length) {
       setCurrentIndex(newIndex);
       setPaused(false);
     }
-  }, [currentIndex, shuffledVideos.length]);
+  }, [currentIndex, reelQueue.length]);
 
   const handleVideoTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -323,11 +362,13 @@ export default function ShortReels() {
     return `${Math.floor(hrs / 24)}d`;
   };
 
-  // Reset index when category changes
   useEffect(() => {
-    setCurrentIndex(0);
-    if (containerRef.current) containerRef.current.scrollTop = 0;
-  }, [selectedCategory]);
+    if (!currentVideo || !currentVideo.isYouTube || showComments) return;
+    const timer = window.setTimeout(() => {
+      goToNextReel();
+    }, 22000);
+    return () => window.clearTimeout(timer);
+  }, [currentVideo?.id, currentVideo?.isYouTube, goToNextReel, showComments]);
 
   if (isLoading || !user) return null;
 
@@ -368,7 +409,7 @@ export default function ShortReels() {
             <p className="text-white/60 text-sm">ভিডিও খোঁজা হচ্ছে...</p>
           </div>
         </div>
-      ) : shuffledVideos.length === 0 ? (
+      ) : reelQueue.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-white">
           <Play className="w-16 h-16 mb-4 opacity-40" />
           <p className="text-lg font-bold">কোনো Reels নেই</p>
@@ -381,9 +422,9 @@ export default function ShortReels() {
           className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
           style={{ scrollSnapType: "y mandatory" }}
         >
-          {shuffledVideos.map((video, index) => (
+          {reelQueue.map((video, index) => (
             <div
-              key={video.id}
+              key={`${video.id}-${index}`}
               className="h-full w-full relative snap-start snap-always"
               style={{ scrollSnapAlign: "start" }}
             >
@@ -398,7 +439,9 @@ export default function ShortReels() {
                 <video
                   ref={(el) => { videoRefs.current[index] = el; }}
                   src={video.video_url}
-                  loop
+                  onEnded={() => {
+                    if (index === currentIndex) goToNextReel();
+                  }}
                   playsInline
                   className="w-full h-full object-cover"
                   style={{ pointerEvents: "none" }}
@@ -571,24 +614,48 @@ export default function ShortReels() {
                           </button>
                         </div>
                         {c.replies && c.replies.length > 0 && (
-                          <div className="ml-4 mt-2 space-y-2 border-l-2 border-gray-200 dark:border-border/30 pl-3">
-                            {c.replies.map((r) => (
-                              <div key={r.id} className="flex gap-2">
-                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-secondary shrink-0 overflow-hidden">
-                                  {r.user?.avatar_url ? <img src={r.user.avatar_url} className="w-full h-full object-cover" /> :
-                                    <div className="w-full h-full grid place-items-center text-[8px] font-bold text-blue-600">
-                                      {r.user?.display_name?.[0]?.toUpperCase() || "?"}
-                                    </div>}
+                          <div className="ml-4 mt-2">
+                            {!expandedReplies.has(c.id) ? (
+                              <button
+                                onClick={() => setExpandedReplies((prev) => new Set(prev).add(c.id))}
+                                className="text-[12px] font-bold text-gray-500"
+                              >
+                                {c.replies.length}টি রিপ্লাই দেখুন
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setExpandedReplies((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(c.id);
+                                    return next;
+                                  })}
+                                  className="text-[12px] font-bold text-gray-500 mb-2"
+                                >
+                                  রিপ্লাই লুকান
+                                </button>
+                                <div className="space-y-2 border-l-2 border-gray-200 dark:border-border/30 pl-3">
+                                  {c.replies.map((r) => (
+                                    <div key={r.id} className="flex gap-2">
+                                      <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-secondary shrink-0 overflow-hidden">
+                                        {r.user?.avatar_url ? <img src={r.user.avatar_url} className="w-full h-full object-cover" /> :
+                                          <div className="w-full h-full grid place-items-center text-[8px] font-bold text-blue-600">
+                                            {r.user?.display_name?.[0]?.toUpperCase() || "?"}
+                                          </div>}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] text-gray-500 px-1 mb-1">↪️ {c.user?.display_name || "User"}-কে রিপ্লাই</p>
+                                        <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-1.5">
+                                          <p className="text-[12px] font-bold text-gray-900 dark:text-foreground">{r.user?.display_name || "User"}</p>
+                                          <p className="text-[13px] text-gray-900 dark:text-foreground">{r.content}</p>
+                                        </div>
+                                        <span className="text-[11px] text-gray-500 px-1">{timeAgo(r.created_at)}</span>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="bg-gray-100 dark:bg-secondary rounded-xl px-2.5 py-1.5">
-                                    <p className="text-[12px] font-bold text-gray-900 dark:text-foreground">{r.user?.display_name || "User"}</p>
-                                    <p className="text-[13px] text-gray-900 dark:text-foreground">{r.content}</p>
-                                  </div>
-                                  <span className="text-[11px] text-gray-500 px-1">{timeAgo(r.created_at)}</span>
-                                </div>
-                              </div>
-                            ))}
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
