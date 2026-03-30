@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -388,6 +388,11 @@ export default function Feed() {
     setShowMentionSuggestions(false);
     loadComments(postId);
   };
+
+  const commentingPost = useMemo(
+    () => allPosts.find((p) => p.id === commentingPostId) || null,
+    [allPosts, commentingPostId],
+  );
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1158,6 +1163,7 @@ export default function Feed() {
                         {n.type === "mention" && " আপনাকে মেন্টশন করেছে"}
                         {n.type === "like" && " আপনার পোস্টে লাইক দিয়েছে"}
                         {n.type === "comment" && " আপনার পোস্টে মন্তব্য করেছে"}
+                        {n.type === "reply" && " আপনার মন্তব্যে রিপ্লাই দিয়েছে"}
                       </p>
                       {n.content && <p className="text-[12px] text-gray-500 dark:text-muted-foreground truncate mt-0.5">"{n.content}"</p>}
                       <p className="text-[11px] text-gray-400 dark:text-muted-foreground mt-0.5">{timeAgo(n.created_at)}</p>
@@ -1192,6 +1198,26 @@ export default function Feed() {
 
               {/* Comments list */}
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                {commentingPost && (
+                  <div className="rounded-2xl border border-gray-200 dark:border-border/30 p-3 bg-white dark:bg-card">
+                    <div className="flex items-center gap-2 mb-2">
+                      <button onClick={() => navigate(`/user/${commentingPost.user_id}`)} className="text-[13px] font-bold text-gray-900 dark:text-foreground hover:underline">
+                        <NameWithBadge name={commentingPost.user?.display_name || "User"} isVerified={commentingPost.user?.is_verified_badge} />
+                      </button>
+                      <span className="text-[11px] text-gray-500">{timeAgo(commentingPost.created_at)}</span>
+                    </div>
+                    {commentingPost.content && (
+                      <p className="text-[14px] text-gray-900 dark:text-foreground whitespace-pre-wrap break-words">{renderMentionText(commentingPost.content)}</p>
+                    )}
+                    {commentingPost.image_url && (
+                      <img src={commentingPost.image_url} alt="" className="mt-2 rounded-xl w-full max-h-[220px] object-cover" />
+                    )}
+                    {commentingPost.video_url && (
+                      <video src={commentingPost.video_url} controls className="mt-2 rounded-xl w-full max-h-[220px] object-cover" />
+                    )}
+                  </div>
+                )}
+
                 {loadingComments ? (
                   <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>
                 ) : comments.length === 0 ? (
