@@ -976,20 +976,7 @@ export default function Dashboard() {
           </motion.button>
         )}
 
-        {/* Wallet Button removed - now at top */}
-
-        {/* Feed Button */}
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate("/feed")}
-          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--amber))] to-[hsl(var(--orange))] shadow-lg shadow-[hsl(var(--amber))]/30 flex items-center justify-center"
-        >
-          <Newspaper className="w-6 h-6 text-foreground" />
-        </motion.button>
-
-        {/* Chat Button with unread badge */}
-        <ChatButtonWithBadge userId={user?.id} navigate={navigate} />
+        {/* Feed & Chat moved to top bar */}
       </div>
     </div>
   );
