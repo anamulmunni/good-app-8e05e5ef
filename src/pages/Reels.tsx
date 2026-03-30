@@ -1013,11 +1013,6 @@ export default function Reels() {
           ))}
         </div>
 
-        <div className="px-3 pb-2 text-[12px] text-muted-foreground">
-          {searchQuery.trim()
-            ? `Showing search results for "${searchQuery.trim()}"`
-            : "Showing suggested new Bangla HD songs"}
-        </div>
       </header>
 
       {selectedVideo && !miniPlayer && (
