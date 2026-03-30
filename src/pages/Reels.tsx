@@ -1709,37 +1709,6 @@ export default function Reels() {
                   </div>
                 </div>
               </>
-                <>
-                  <div className="w-full aspect-video relative" style={{ background: "#1a1a1a" }}>
-                    {video.thumbnail_url ? (
-                      <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="w-full h-full grid place-items-center" style={{ color: "#555" }}>
-                        <Play className="w-12 h-12" />
-                      </div>
-                    )}
-                    {video.duration ? (
-                      <span className="absolute right-1 bottom-1 text-[11px] font-medium px-1 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.8)", color: "#fff" }}>
-                        {fmt(video.duration)}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex gap-3 px-3 py-3">
-                    <div className="w-9 h-9 rounded-full grid place-items-center shrink-0 text-xs font-bold" style={{ background: "#272727", color: "#aaa" }}>
-                      {(video.creator || "?")[0]?.toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-medium line-clamp-2 leading-[20px]" style={{ color: "#f1f1f1" }}>{video.title}</p>
-                      <p className="text-[12px] mt-0.5 line-clamp-1" style={{ color: "#aaa" }}>
-                        {video.creator || "Unknown"} • {getViewCount(video.id)}{video.duration ? ` • ${fmt(video.duration)}` : ""}
-                      </p>
-                      {!video.isExternal && (
-                        <p className="text-[11px] mt-0.5 text-primary">good-app upload</p>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
             </button>
           ))}
 
