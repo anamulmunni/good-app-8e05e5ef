@@ -687,16 +687,12 @@ export default function Reels() {
     }
   }, [loadMore, longTitle, longVideoDuration, longVideoFile, longThumbnailFile, user]);
 
+  // Only clear selectedVideo if the video list becomes empty, never auto-clear a playing video
   useEffect(() => {
-    if (allVideos.length === 0) {
+    if (allVideos.length === 0 && !loading) {
       setSelectedVideo(null);
-      return;
     }
-    setSelectedVideo((prev) => {
-      if (prev && allVideos.some((v) => v.id === prev.id)) return prev;
-      return null;
-    });
-  }, [allVideos]);
+  }, [allVideos.length, loading]);
 
   const getViewCount = useCallback((id: string) => {
     if (!viewCounts[id]) {
