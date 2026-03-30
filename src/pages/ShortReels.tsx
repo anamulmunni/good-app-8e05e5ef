@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,11 +11,11 @@ import { ArrowLeft, Heart, MessageCircle, Send, X, Loader2, User, Play } from "l
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedBadge from "@/components/VerifiedBadge";
 
-function ReelsCaption({ text }: { text: string }) {
+const ReelsCaption = forwardRef<HTMLDivElement, { text: string }>(function ReelsCaption({ text }, ref) {
   const [expanded, setExpanded] = useState(false);
   const isLong = text.length > 80;
   return (
-    <div onClick={(e) => { e.stopPropagation(); if (isLong) setExpanded(!expanded); }}>
+    <div ref={ref} onClick={(e) => { e.stopPropagation(); if (isLong) setExpanded(!expanded); }}>
       <p className={`text-white text-[14px] leading-[20px] drop-shadow-lg ${expanded ? "" : "line-clamp-2"}`}>
         {text}
       </p>
@@ -24,7 +24,7 @@ function ReelsCaption({ text }: { text: string }) {
       )}
     </div>
   );
-}
+});
 
 type ShortVideo = {
   id: string;
@@ -41,15 +41,15 @@ type ShortVideo = {
 };
 
 // YouTube Reel Player - pre-buffers nearby reels, only active one has autoplay+sound
-function YouTubeReelPlayer({
+const YouTubeReelPlayer = forwardRef<HTMLDivElement, {
+  videoId: string;
+  isActive: boolean;
+  isNearby: boolean;
+}>(function YouTubeReelPlayer({
   videoId,
   isActive,
   isNearby,
-}: {
-  videoId: string;
-  isActive: boolean;
-  isNearby: boolean; // within ±2 of current - pre-buffer iframe
-}) {
+}, ref) {
   const [loaded, setLoaded] = useState(false);
 
   // Reset loaded state when going far away
@@ -90,6 +90,7 @@ function YouTubeReelPlayer({
         </div>
       )}
       <iframe
+        ref={ref as any}
         key={`${videoId}-${isActive ? "active" : "buffer"}`}
         src={`https://www.youtube.com/embed/${videoId}?autoplay=${isActive ? 1 : 0}&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=${isActive ? 0 : 1}&enablejsapi=0`}
         className="w-full h-full border-0"
@@ -100,7 +101,7 @@ function YouTubeReelPlayer({
       />
     </div>
   );
-}
+});
 
 // Category tabs
 const CATEGORIES = [
