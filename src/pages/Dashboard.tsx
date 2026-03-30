@@ -399,7 +399,68 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-4 pt-6 space-y-5 relative z-10">
+      {/* Feed & Chat buttons - top bar */}
+      <div className="max-w-md mx-auto px-4 pt-4 relative z-10">
+        <div className="flex gap-3">
+          <motion.button
+            initial={{ x: -40, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ type: "spring", damping: 12, delay: 0.1 }}
+            whileHover={{ scale: 1.04, y: -2 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => navigate("/feed")}
+            className="flex-1 relative py-3.5 rounded-2xl font-bold text-sm overflow-hidden"
+          >
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--amber))] via-[hsl(var(--orange))] to-[hsl(var(--amber))]"
+              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              style={{ backgroundSize: "200% 100%" }}
+            />
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.5 }}
+            />
+            <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+              <motion.span animate={{ rotate: [0, -10, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
+                <Newspaper className="w-5 h-5" />
+              </motion.span>
+              নিউজ ফিড
+            </span>
+          </motion.button>
+
+          <motion.button
+            initial={{ x: 40, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ type: "spring", damping: 12, delay: 0.2 }}
+            whileHover={{ scale: 1.04, y: -2 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => navigate("/chat")}
+            className="flex-1 relative py-3.5 rounded-2xl font-bold text-sm overflow-hidden"
+          >
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--cyan))] via-[hsl(var(--blue))] to-[hsl(var(--cyan))]"
+              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              style={{ backgroundSize: "200% 100%" }}
+            />
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2 }}
+            />
+            <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+              <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                <MessageCircle className="w-5 h-5" />
+              </motion.span>
+              মেসেজ
+            </span>
+          </motion.button>
+        </div>
+      </div>
+
+      <main className="max-w-md mx-auto px-4 pt-4 space-y-5 relative z-10">
         {/* Premium Balance & Wallet Section - ONLY when payment mode ON */}
         {paymentMode && (
           <motion.div
@@ -915,20 +976,7 @@ export default function Dashboard() {
           </motion.button>
         )}
 
-        {/* Wallet Button removed - now at top */}
-
-        {/* Feed Button */}
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate("/feed")}
-          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(var(--amber))] to-[hsl(var(--orange))] shadow-lg shadow-[hsl(var(--amber))]/30 flex items-center justify-center"
-        >
-          <Newspaper className="w-6 h-6 text-foreground" />
-        </motion.button>
-
-        {/* Chat Button with unread badge */}
-        <ChatButtonWithBadge userId={user?.id} navigate={navigate} />
+        {/* Feed & Chat moved to top bar */}
       </div>
     </div>
   );
