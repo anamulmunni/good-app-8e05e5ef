@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,27 @@ const corsHeaders = {
 // Cache for short video streams
 const streamCache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+const KEY_COOLDOWN = 60 * 60 * 1000;
+const exhaustedKeys = new Map<string, number>();
+const invalidKeys = new Map<string, string>();
+let cachedApiKeys: string[] = [];
+let apiKeysFetchedAt = 0;
+const API_KEYS_CACHE_TTL = 5 * 60 * 1000;
+const YT_KEY_REGEX = /^AIza[0-9A-Za-z_-]{20,}$/;
+
+const FALLBACK_SHORTS = [
+  { videoId: "BddP6PYo2gs", title: "Mon Majhi Re", author: "Arijit Singh" },
+  { videoId: "hT_nvWreIhg", title: "Counting Stars", author: "OneRepublic" },
+  { videoId: "60ItHLz5WEA", title: "Faded", author: "Alan Walker" },
+  { videoId: "PT2_F-1esPk", title: "The Nights", author: "Avicii" },
+  { videoId: "YQHsXMglC9A", title: "Hello", author: "Adele" },
+  { videoId: "AtKZKl7Bgu0", title: "Manike Mage Hithe", author: "Yohani" },
+  { videoId: "bo_efYhYU2A", title: "Tum Hi Ho", author: "Arijit Singh" },
+  { videoId: "nfs8NYg7yQM", title: "Perfect", author: "Ed Sheeran" },
+  { videoId: "koJlIGDImiU", title: "Radioactive", author: "Imagine Dragons" },
+  { videoId: "CevxZvSJLk8", title: "Roar", author: "Katy Perry" },
+];
 
 function getCached(key: string) {
   const entry = streamCache.get(key);
@@ -22,6 +44,71 @@ function setCache(key: string, data: any) {
     if (oldest) streamCache.delete(oldest);
   }
   streamCache.set(key, { data, ts: Date.now() });
+}
+
+function parseApiKeys(raw: string): string[] {
+  return Array.from(new Set(
+    raw
+      .split(/[\s,]+/)
+      .map((k) => k.trim())
+      .filter((k) => YT_KEY_REGEX.test(k)),
+  ));
+}
+
+async function getAllApiKeys(): Promise<string[]> {
+  if (Date.now() - apiKeysFetchedAt < API_KEYS_CACHE_TTL && cachedApiKeys.length > 0) {
+    return cachedApiKeys;
+  }
+
+  const keys: string[] = [];
+  const envKey = Deno.env.get("YOUTUBE_API_KEY")?.trim();
+  if (envKey && YT_KEY_REGEX.test(envKey)) keys.push(envKey);
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (supabaseUrl && serviceKey) {
+      const sb = createClient(supabaseUrl, serviceKey);
+      const { data } = await sb.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle();
+      const dbKeys = parseApiKeys(data?.value || "");
+      for (const key of dbKeys) {
+        if (!keys.includes(key)) keys.push(key);
+      }
+    }
+  } catch (e) {
+    console.log("shorts DB key fetch failed:", String(e));
+  }
+
+  cachedApiKeys = keys;
+  apiKeysFetchedAt = Date.now();
+  return keys;
+}
+
+function getAvailableKey(keys: string[]): string | null {
+  const now = Date.now();
+  for (const key of keys) {
+    if (invalidKeys.has(key)) continue;
+    const exhaustedAt = exhaustedKeys.get(key);
+    if (!exhaustedAt || now - exhaustedAt > KEY_COOLDOWN) {
+      exhaustedKeys.delete(key);
+      return key;
+    }
+  }
+  return null;
+}
+
+function getFallbackShorts(maxResults = 30): any[] {
+  const shuffled = [...FALLBACK_SHORTS];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, maxResults).map((item) => ({
+    videoId: item.videoId,
+    title: item.title,
+    author: item.author,
+    thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
+  }));
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -99,7 +186,7 @@ async function getStreamUrl(videoId: string): Promise<string | null> {
 }
 
 // Search for shorts using YouTube Data API v3
-async function searchShorts(apiKey: string, query: string, maxResults = 20): Promise<any[]> {
+async function searchShortsWithRotation(keys: string[], query: string, maxResults = 20): Promise<any[]> {
   const params = new URLSearchParams({
     part: "snippet",
     q: query,
@@ -107,29 +194,43 @@ async function searchShorts(apiKey: string, query: string, maxResults = 20): Pro
     videoDuration: "short", // Under 4 minutes
     maxResults: String(maxResults),
     order: "relevance",
-    key: apiKey,
     regionCode: "BD",
     relevanceLanguage: "bn",
   });
 
-  const url = `https://www.googleapis.com/youtube/v3/search?${params}`;
-  const res = await withTimeout(fetch(url), 8000);
+  const baseUrl = `https://www.googleapis.com/youtube/v3/search?${params}`;
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error("YouTube Shorts API error:", res.status, errBody);
-    return [];
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const apiKey = getAvailableKey(keys);
+    if (!apiKey) break;
+
+    const res = await withTimeout(fetch(`${baseUrl}&key=${apiKey}`), 8000);
+    if (!res.ok) {
+      const errBody = await res.text();
+      const errLower = errBody.toLowerCase();
+      if (res.status === 403 && errLower.includes("quotaexceeded")) {
+        exhaustedKeys.set(apiKey, Date.now());
+        continue;
+      }
+      if (res.status === 400 || (res.status === 403 && (errLower.includes("apikey") || errLower.includes("accessnotconfigured")))) {
+        invalidKeys.set(apiKey, "invalid_or_restricted_key");
+        continue;
+      }
+      continue;
+    }
+
+    const data = await res.json();
+    return (data?.items || [])
+      .filter((item: any) => item?.id?.videoId)
+      .map((item: any) => ({
+        videoId: item.id.videoId,
+        title: item.snippet?.title || "",
+        author: item.snippet?.channelTitle || "",
+        thumbnail: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
+      }));
   }
 
-  const data = await res.json();
-  return (data?.items || [])
-    .filter((item: any) => item?.id?.videoId)
-    .map((item: any) => ({
-      videoId: item.id.videoId,
-      title: item.snippet?.title || "",
-      author: item.snippet?.channelTitle || "",
-      thumbnail: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
-    }));
+  return [];
 }
 
 // Fallback search using Invidious
@@ -180,15 +281,15 @@ serve(async (req) => {
         });
       }
 
-      const apiKey = Deno.env.get("YOUTUBE_API_KEY");
+      const apiKeys = await getAllApiKeys();
       let results: any[] = [];
 
       // Search multiple queries for variety
       const queries = getSearchQueries(category, query);
 
-      if (apiKey) {
+      if (apiKeys.length > 0) {
         try {
-          const searchPromises = queries.map(q => searchShorts(apiKey, q, 15));
+          const searchPromises = queries.map((q) => searchShortsWithRotation(apiKeys, q, 15));
           const allResults = await Promise.all(searchPromises);
           results = allResults.flat();
         } catch {
@@ -196,6 +297,10 @@ serve(async (req) => {
         }
       } else {
         results = await searchShortsFallback(query);
+      }
+
+      if (results.length === 0) {
+        results = getFallbackShorts(100);
       }
 
       // Dedupe by videoId
