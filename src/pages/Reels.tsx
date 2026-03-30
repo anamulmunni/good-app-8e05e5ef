@@ -1007,7 +1007,11 @@ export default function Reels() {
 
       {selectedVideo && !miniPlayer && (
         <div ref={playerRef} className="shrink-0 z-10" style={{ background: "#000" }}>
-          <div ref={playerShellRef} className="w-full aspect-video relative" style={{ background: "#000" }}>
+          <div ref={playerShellRef} className="w-full aspect-video relative overflow-hidden" style={{ background: "#000" }}>
+            {/* Hide YouTube logo overlay */}
+            {selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && (
+              <div className="absolute bottom-[38px] right-0 w-[120px] h-[30px] z-[5] pointer-events-none" style={{ background: "#000" }} />
+            )}
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
                 key={`${selectedVideo.id}-${playerReloadToken}`}
