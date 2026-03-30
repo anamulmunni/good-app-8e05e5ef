@@ -220,6 +220,7 @@ async function searchViaInvidious(query: string, maxResults = 25): Promise<{ res
           channelId: item.authorId || "",
           thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
           publishedAt: item.publishedText || "",
+          lengthSeconds: item.lengthSeconds || 0,
         }));
 
       if (results.length > 0) {
