@@ -292,7 +292,7 @@ export default function Reels() {
   const [viewCounts] = useState<Record<string, string>>({});
   const [miniPlayer, setMiniPlayer] = useState(false);
   const [showYoutubeTapToPlay, setShowYoutubeTapToPlay] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(() => Math.floor(Math.random() * 10000));
   const [showUpload, setShowUpload] = useState(uploadParam === "1");
   const [uploading, setUploading] = useState(false);
   const [longTitle, setLongTitle] = useState("");

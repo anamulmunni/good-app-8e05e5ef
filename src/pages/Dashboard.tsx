@@ -444,7 +444,7 @@ export default function Dashboard() {
             </span>
           </motion.button>
 
-          {/* Video */}
+          {/* good-app Video */}
           <motion.button
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -455,7 +455,7 @@ export default function Dashboard() {
             className="flex-1 relative py-3 rounded-2xl font-bold text-xs overflow-hidden"
           >
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-[#ff0000] via-[#cc0000] to-[#ff0000]"
+              className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-[hsl(var(--cyan))] to-[hsl(var(--emerald))]"
               animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
               transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
               style={{ backgroundSize: "200% 100%" }}
@@ -465,11 +465,11 @@ export default function Dashboard() {
               animate={{ x: ["-100%", "200%"] }}
               transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.8 }}
             />
-            <span className="relative z-10 flex items-center justify-center gap-1.5 text-white font-black">
+            <span className="relative z-10 flex items-center justify-center gap-1.5 text-primary-foreground font-black">
               <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                <Play className="w-4 h-4 fill-white" />
+                <Play className="w-4 h-4 fill-current" />
               </motion.span>
-              Video
+              ভিডিও
             </span>
           </motion.button>
 
