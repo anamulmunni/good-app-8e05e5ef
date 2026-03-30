@@ -541,22 +541,94 @@ export default function Dashboard() {
                   <span className="text-[10px] font-black text-[hsl(var(--purple))] tracking-wider">LIVE COUNT</span>
                 </motion.div>
               </div>
-              <div className="text-center py-5">
-                <p className="text-xs text-muted-foreground uppercase tracking-[0.2em] mb-2 font-semibold">মোট ভেরিফিকেশন</p>
+              {/* Party confetti / sparkle particles */}
+              <div className="relative text-center py-5 overflow-hidden">
+                {/* Floating party particles */}
+                {[...Array(12)].map((_, i) => (
+                  <motion.div
+                    key={`particle-${i}`}
+                    className="absolute rounded-full pointer-events-none"
+                    style={{
+                      width: [4, 6, 5, 8, 4, 6, 5, 7, 4, 6, 5, 8][i],
+                      height: [4, 6, 5, 8, 4, 6, 5, 7, 4, 6, 5, 8][i],
+                      left: `${8 + i * 7.5}%`,
+                      top: `${10 + (i % 3) * 25}%`,
+                      background: [
+                        'hsl(var(--purple))', 'hsl(var(--pink))', 'hsl(var(--amber))',
+                        'hsl(var(--cyan))', 'hsl(var(--green))', '#ff6b6b',
+                        'hsl(var(--purple))', '#ffd700', 'hsl(var(--pink))',
+                        '#00e5ff', 'hsl(var(--amber))', '#ff4081',
+                      ][i],
+                    }}
+                    animate={{
+                      y: [0, -30, 10, -20, 0],
+                      x: [0, 10, -10, 5, 0],
+                      opacity: [0.7, 1, 0.5, 1, 0.7],
+                      scale: [1, 1.5, 0.8, 1.3, 1],
+                    }}
+                    transition={{
+                      duration: 3 + (i % 3),
+                      repeat: Infinity,
+                      delay: i * 0.3,
+                      ease: "easeInOut",
+                    }}
+                  />
+                ))}
+                {/* Sparkle stars */}
+                {[...Array(6)].map((_, i) => (
+                  <motion.div
+                    key={`star-${i}`}
+                    className="absolute pointer-events-none text-[hsl(var(--amber))]"
+                    style={{
+                      left: `${5 + i * 18}%`,
+                      top: `${15 + (i % 2) * 50}%`,
+                      fontSize: [10, 14, 8, 12, 10, 14][i],
+                    }}
+                    animate={{
+                      opacity: [0, 1, 0],
+                      scale: [0.5, 1.2, 0.5],
+                      rotate: [0, 180, 360],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: i * 0.5,
+                    }}
+                  >
+                    ✦
+                  </motion.div>
+                ))}
+                <p className="text-xs text-muted-foreground uppercase tracking-[0.2em] mb-2 font-semibold relative z-10">মোট ভেরিফিকেশন</p>
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: "spring", damping: 15 }}
+                  className="relative z-10"
                 >
                   <motion.p
                     key={user.key_count}
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
+                    initial={{ y: 20, opacity: 0, rotate: -10 }}
+                    animate={{ y: 0, opacity: 1, rotate: 0 }}
                     className="text-7xl font-black leading-none"
                   >
-                    <span className="bg-gradient-to-r from-[hsl(var(--purple))] via-[hsl(var(--pink))] to-[hsl(var(--amber))] bg-clip-text text-transparent drop-shadow-[0_0_40px_hsl(var(--purple)/0.3)]">
+                    <motion.span
+                      className="inline-block bg-gradient-to-r from-[hsl(var(--purple))] via-[hsl(var(--pink))] to-[hsl(var(--amber))] bg-clip-text text-transparent"
+                      animate={{
+                        scale: [1, 1.12, 0.95, 1.08, 1],
+                        rotate: [0, 3, -3, 2, 0],
+                        y: [0, -8, 4, -4, 0],
+                      }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                      style={{
+                        filter: "drop-shadow(0 0 30px hsl(var(--purple) / 0.5)) drop-shadow(0 0 60px hsl(var(--pink) / 0.3))",
+                      }}
+                    >
                       {user.key_count || 0}
-                    </span>
+                    </motion.span>
                   </motion.p>
                 </motion.div>
               </div>
