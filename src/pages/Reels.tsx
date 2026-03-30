@@ -846,33 +846,32 @@ export default function Reels() {
                       alert("আপনার ব্রাউজার ভয়েস সার্চ সাপোর্ট করে না");
                       return;
                     }
+                    setVoiceListening(true);
                     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
                     const recognition = new SpeechRecognition();
                     recognition.lang = 'bn-BD';
                     recognition.continuous = false;
                     recognition.interimResults = false;
-                    setSearchInput("🎤 শুনছি... বলুন");
                     recognition.onresult = (event: any) => {
                       const transcript = event.results[0][0].transcript;
                       setSearchInput(transcript);
+                      setVoiceListening(false);
                       setTimeout(() => handleSearch(), 300);
                     };
                     recognition.onerror = () => {
+                      setVoiceListening(false);
                       setSearchInput("");
                     };
                     recognition.onend = () => {
-                      setSearchInput((prev) => prev === "🎤 শুনছি... বলুন" ? "" : prev);
+                      setVoiceListening(false);
                     };
                     recognition.start();
                   }}
-                  className="w-8 h-8 rounded-full grid place-items-center relative group"
+                  className="w-8 h-8 rounded-full grid place-items-center"
                   style={{ background: "#333" }}
                   title="🎤 ক্লিক করে বাংলায় বলুন"
                 >
                   <Mic className="w-4 h-4" style={{ color: "#ff4444" }} />
-                  <span className="absolute -bottom-7 right-0 text-[10px] px-2 py-0.5 rounded whitespace-nowrap pointer-events-none" style={{ background: "#333", color: "#fff" }}>
-                    🎤 বলুন
-                  </span>
                 </button>
               </div>
             </div>
