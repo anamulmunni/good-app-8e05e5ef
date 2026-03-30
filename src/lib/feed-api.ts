@@ -593,6 +593,17 @@ export async function getUploadedLongVideoByPostId(postId: string): Promise<Exte
   };
 }
 
+// Rotating queries for endless feed when no user search query
+const ROTATING_QUERIES = [
+  "bangla new song 2026", "bangla music video", "bengali romantic song",
+  "bangla sad song", "bangla hit song", "bangla dj song", "bangla album song",
+  "bangla slowed reverb", "bengali movie song", "bangla folk song",
+  "bangla rap song", "bangla love song 2025", "bangladeshi music video",
+  "bangla cover song", "bangla mashup song", "bangla trending song",
+  "bangla old song", "bengali adhunik gaan", "bangla band song",
+  "bangla song remix", "rabindra sangeet", "nazrul geeti",
+];
+
 export async function getBangladeshExternalVideos(
   page = 1,
   rows = 10,
@@ -606,7 +617,15 @@ export async function getBangladeshExternalVideos(
 
   // Use YouTube only - with viewCount order for trending feel when no query
   const order = trimmedQuery ? "relevance" : "viewCount";
-  const ytResult = await fetchYouTubeVideos(trimmedQuery, Math.max(rows, 30), order, pageToken);
+
+  // If no pageToken and page > 1 and no user query, use rotating queries for variety
+  let effectiveQuery = trimmedQuery;
+  if (!trimmedQuery && !pageToken && page > 1) {
+    const idx = (page + freshnessToken) % ROTATING_QUERIES.length;
+    effectiveQuery = ROTATING_QUERIES[idx];
+  }
+
+  const ytResult = await fetchYouTubeVideos(effectiveQuery, Math.max(rows, 30), order, pageToken);
 
   let videos = ytResult.videos;
 
@@ -615,11 +634,9 @@ export async function getBangladeshExternalVideos(
   const recentArray = Array.from(recentIds);
   const hardBlock = new Set(recentArray.slice(0, 220));
 
-  if (!trimmedQuery) {
-    const unseen = videos.filter((v) => !hardBlock.has(v.id));
-    if (unseen.length >= Math.min(rows, 5)) {
-      videos = unseen;
-    }
+  const unseen = videos.filter((v) => !hardBlock.has(v.id));
+  if (unseen.length >= Math.min(rows, 3)) {
+    videos = unseen;
   }
 
   const finalVideos = videos.slice(0, rows);
@@ -627,7 +644,8 @@ export async function getBangladeshExternalVideos(
 
   return {
     videos: finalVideos,
-    hasMore: ytResult.hasMore,
+    // Always allow more loading - never stop
+    hasMore: true,
     nextPageToken: ytResult.nextPageToken,
   };
 }
