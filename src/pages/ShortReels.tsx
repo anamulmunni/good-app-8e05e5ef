@@ -226,7 +226,7 @@ export default function ShortReels() {
     }
   }, [user, videos]);
 
-  const currentVideo = videos[currentIndex];
+  const currentVideo = shuffledVideos[currentIndex];
 
   // Auto-play current video, pause others
   useEffect(() => {
