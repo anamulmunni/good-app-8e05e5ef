@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Volume2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 type ReelItem = {
   videoId: string;
@@ -45,13 +45,9 @@ export default function ShortReels() {
   const [selectedCategory, setSelectedCategory] = useState("mixed");
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [showAudioHint, setShowAudioHint] = useState(true);
-  const [streamUrlById, setStreamUrlById] = useState<Record<string, string | null | undefined>>({});
-
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
-  const loadingStreamIdsRef = useRef<Set<string>>(new Set());
+  const touchStartY = useRef(0);
+  const isScrolling = useRef(false);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -65,7 +61,7 @@ export default function ShortReels() {
   const { data: candidates = [], isLoading: candidatesLoading } = useQuery({
     queryKey: ["youtube-reels-candidates", selectedCategory],
     enabled: !!user,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const query = CATEGORY_QUERY[selectedCategory] || CATEGORY_QUERY.mixed;
       const res = await fetch(`${baseFnUrl}?action=search&q=${encodeURIComponent(query)}&category=${selectedCategory}`);
@@ -83,113 +79,86 @@ export default function ShortReels() {
     },
   });
 
+  // Build queue from candidates
   useEffect(() => {
-    const next = shuffle(candidates).slice(0, 60);
+    if (candidates.length === 0) return;
+    const next = shuffle(candidates).slice(0, 50);
     setReelQueue(next);
     setCurrentIndex(0);
-    setStreamUrlById({});
-    if (containerRef.current) containerRef.current.scrollTop = 0;
   }, [candidates]);
 
+  // Append more when near end
   const appendMore = useCallback(() => {
     if (candidates.length === 0) return;
-    setReelQueue((prev) => [...prev, ...shuffle(candidates).slice(0, 40)]);
+    setReelQueue((prev) => [...prev, ...shuffle(candidates).slice(0, 30)]);
   }, [candidates]);
 
-  const resolveStreamUrl = useCallback(async (videoId: string) => {
-    if (streamUrlById[videoId] !== undefined) return;
-    if (loadingStreamIdsRef.current.has(videoId)) return;
+  useEffect(() => {
+    if (currentIndex >= reelQueue.length - 5 && reelQueue.length > 0) {
+      appendMore();
+    }
+  }, [currentIndex, reelQueue.length, appendMore]);
 
-    loadingStreamIdsRef.current.add(videoId);
-    try {
-      const res = await fetch(`${baseFnUrl}?action=stream&videoId=${encodeURIComponent(videoId)}`);
-      if (!res.ok) {
-        setStreamUrlById((prev) => ({ ...prev, [videoId]: null }));
-        return;
+  // Scroll by one reel at a time - touch handling
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    isScrolling.current = false;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (isScrolling.current) return;
+    const deltaY = touchStartY.current - e.changedTouches[0].clientY;
+    const threshold = 50;
+
+    if (Math.abs(deltaY) > threshold) {
+      isScrolling.current = true;
+      if (deltaY > 0) {
+        // Swipe up - next
+        setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
+      } else {
+        // Swipe down - previous
+        setCurrentIndex((prev) => Math.max(prev - 1, 0));
       }
-      const data = await res.json();
-      const streamUrl = typeof data?.streamUrl === "string" && data.streamUrl ? data.streamUrl : null;
-      setStreamUrlById((prev) => ({ ...prev, [videoId]: streamUrl }));
-    } catch {
-      setStreamUrlById((prev) => ({ ...prev, [videoId]: null }));
-    } finally {
-      loadingStreamIdsRef.current.delete(videoId);
+      setTimeout(() => { isScrolling.current = false; }, 400);
     }
-  }, [baseFnUrl, streamUrlById]);
+  }, [reelQueue.length]);
 
-  useEffect(() => {
-    const indexes = [currentIndex - 1, currentIndex, currentIndex + 1, currentIndex + 2].filter((i) => i >= 0 && i < reelQueue.length);
-    indexes.forEach((index) => {
-      const item = reelQueue[index];
-      if (item) resolveStreamUrl(item.videoId);
+  // Build YouTube embed URL with autoplay + sound
+  const buildEmbedUrl = useCallback((videoId: string, autoplay: boolean) => {
+    const params = new URLSearchParams({
+      autoplay: autoplay ? "1" : "0",
+      mute: "0",
+      loop: "1",
+      playlist: videoId,
+      controls: "0",
+      modestbranding: "1",
+      playsinline: "1",
+      rel: "0",
+      showinfo: "0",
+      iv_load_policy: "3",
+      fs: "0",
+      disablekb: "1",
+      enablejsapi: "1",
     });
-
-    if (currentIndex >= reelQueue.length - 3) appendMore();
-  }, [appendMore, currentIndex, reelQueue, resolveStreamUrl]);
-
-  const goToNext = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const nextIndex = currentIndex + 1;
-    const h = container.clientHeight || window.innerHeight;
-    container.scrollTo({ top: nextIndex * h, behavior: "smooth" });
-    setCurrentIndex(nextIndex);
-  }, [currentIndex]);
-
-  useEffect(() => {
-    Object.entries(videoRefs.current).forEach(([idx, el]) => {
-      if (!el) return;
-      const isCurrent = Number(idx) === currentIndex;
-      if (!isCurrent) {
-        el.pause();
-        return;
-      }
-
-      el.muted = !audioUnlocked;
-      el.volume = audioUnlocked ? 1 : 0;
-      el.play().catch(() => {});
-    });
-  }, [audioUnlocked, currentIndex, streamUrlById]);
-
-  // Auto skip unavailable stream entries silently
-  useEffect(() => {
-    const current = reelQueue[currentIndex];
-    if (!current) return;
-    if (streamUrlById[current.videoId] === null) {
-      const timer = window.setTimeout(() => goToNext(), 250);
-      return () => window.clearTimeout(timer);
+    if (typeof window !== "undefined") {
+      params.set("origin", window.location.origin);
     }
-  }, [currentIndex, goToNext, reelQueue, streamUrlById]);
-
-  const handleScroll = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const h = container.clientHeight || 1;
-    const index = Math.max(0, Math.round(container.scrollTop / h));
-    if (index !== currentIndex) setCurrentIndex(index);
-  }, [currentIndex]);
-
-  const unlockAudio = useCallback(() => {
-    if (!audioUnlocked) {
-      setAudioUnlocked(true);
-      setShowAudioHint(false);
-    }
-  }, [audioUnlocked]);
+    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  }, []);
 
   if (isLoading || !user) return null;
 
+  const currentReel = reelQueue[currentIndex];
+
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background text-foreground"
-      onTouchStartCapture={unlockAudio}
-      onClickCapture={unlockAudio}
-    >
-      <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-background/90 to-transparent">
+    <div className="fixed inset-0 z-50 bg-black text-white">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 to-transparent">
         <div className="flex items-center justify-between px-3 py-2">
-          <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center text-foreground">
+          <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center text-white">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="font-black text-lg bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <h1 className="font-black text-lg bg-gradient-to-r from-green-400 to-orange-400 bg-clip-text text-transparent">
             Reels
           </h1>
           <div className="w-10 h-10" />
@@ -202,8 +171,8 @@ export default function ShortReels() {
               onClick={() => setSelectedCategory(cat.id)}
               className={`px-3 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-all ${
                 selectedCategory === cat.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground"
+                  ? "bg-white text-black"
+                  : "bg-white/15 text-white/80"
               }`}
             >
               {cat.label}
@@ -214,66 +183,57 @@ export default function ShortReels() {
 
       {candidatesLoading ? (
         <div className="h-full flex items-center justify-center">
-          <Loader2 className="w-10 h-10 animate-spin text-foreground" />
+          <Loader2 className="w-10 h-10 animate-spin text-white" />
         </div>
       ) : reelQueue.length === 0 ? (
-        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-          কোনো ভিডিও পাওয়া যায়নি
+        <div className="h-full flex items-center justify-center text-white/60 text-sm">
+          কোনো ভিডিও পাওয়া যায়নি
         </div>
       ) : (
         <div
           ref={containerRef}
-          onScroll={handleScroll}
-          className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="h-full w-full relative overflow-hidden"
         >
+          {/* Render current, previous and next for smooth transitions */}
           {reelQueue.map((item, index) => {
-            const streamUrl = streamUrlById[item.videoId];
+            const offset = index - currentIndex;
+            // Only render current ± 1
+            if (Math.abs(offset) > 1) return null;
+
             const isActive = index === currentIndex;
 
             return (
-              <div key={`${item.videoId}-${index}`} className="h-full w-full relative snap-start bg-background">
-                {streamUrl ? (
-                  <video
-                    ref={(el) => {
-                      videoRefs.current[index] = el;
-                    }}
-                    src={streamUrl}
-                    className="w-full h-full object-cover"
-                    playsInline
-                    autoPlay={isActive}
-                    muted={!audioUnlocked}
-                    preload={Math.abs(index - currentIndex) <= 1 ? "auto" : "metadata"}
-                    controls={false}
-                    onEnded={() => {
-                      if (isActive) goToNext();
-                    }}
-                    onError={() => {
-                      setStreamUrlById((prev) => ({ ...prev, [item.videoId]: null }));
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-background">
-                    <img
-                      src={item.thumbnail}
-                      alt="reel thumbnail"
-                      className="absolute inset-0 w-full h-full object-cover opacity-40"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-foreground" />
-                    </div>
-                  </div>
-                )}
+              <div
+                key={`${item.videoId}-${index}`}
+                className="absolute inset-0 w-full h-full transition-transform duration-300 ease-out"
+                style={{
+                  transform: `translateY(${offset * 100}%)`,
+                }}
+              >
+                {/* YouTube Embed - fullscreen, no controls */}
+                <iframe
+                  src={buildEmbedUrl(item.videoId, isActive)}
+                  className="w-full h-full border-0"
+                  allow="autoplay; encrypted-media; accelerometer; gyroscope"
+                  allowFullScreen={false}
+                  loading={isActive ? "eager" : "lazy"}
+                  style={{ pointerEvents: isActive ? "auto" : "none" }}
+                />
+
+                {/* Minimal info overlay at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent px-4 pb-5 pt-10 pointer-events-none">
+                  <p className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
+                    {item.title}
+                  </p>
+                  <p className="text-white/70 text-xs mt-1">
+                    {item.author}
+                  </p>
+                </div>
               </div>
             );
           })}
-        </div>
-      )}
-
-      {showAudioHint && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40 rounded-full bg-card/90 border border-border px-4 py-2 flex items-center gap-2 text-sm text-card-foreground animate-fade-in">
-          <Volume2 className="w-4 h-4" />
-          একবার ট্যাপ করুন, এরপর sound auto চলবে
         </div>
       )}
     </div>
