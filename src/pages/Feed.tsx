@@ -1177,7 +1177,7 @@ export default function Feed() {
             className="fixed inset-0 z-[150] bg-black/50" onClick={() => { setCommentingPostId(null); setReplyingTo(null); }}>
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              transition={{ type: "spring", damping: 30, stiffness: 400 }}
               onClick={(e) => e.stopPropagation()}
               className="absolute bottom-0 left-0 right-0 bg-white dark:bg-card rounded-t-2xl max-h-[85vh] flex flex-col">
               {/* Header */}
