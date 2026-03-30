@@ -597,14 +597,27 @@ export default function Reels() {
     return () => obs.disconnect();
   }, [loadMore]);
 
-  // Auto-refresh: prepend fresh videos every 90 seconds
+  // Auto-refresh: prepend fresh videos every 90 seconds (but DON'T reset the list)
   useEffect(() => {
     if (!user) return;
-    const interval = window.setInterval(() => {
-      setRefreshTick((t) => t + 1);
+    const interval = window.setInterval(async () => {
+      // Silently fetch new videos and prepend without clearing current list
+      try {
+        const [externalResult] = await Promise.all([
+          getBangladeshExternalVideos(randomExternalStartPage(Date.now()), 15, undefined, activeQuery || undefined, "long", Date.now()),
+        ]);
+        const fresh = dedupeVideos(externalResult.videos);
+        if (fresh.length > 0) {
+          setExtVideos((prev) => {
+            const seen = new Set(prev.map((v) => v.id));
+            const newOnes = fresh.filter((v) => !seen.has(v.id));
+            return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
+          });
+        }
+      } catch {}
     }, 90_000);
     return () => window.clearInterval(interval);
-  }, [user]);
+  }, [user, activeQuery]);
 
   const allVideos = useMemo<VideoItem[]>(() => {
     return extVideos.map((v) => ({
