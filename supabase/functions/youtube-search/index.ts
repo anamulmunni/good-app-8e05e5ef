@@ -233,9 +233,71 @@ async function searchViaInvidious(query: string, maxResults = 25): Promise<{ res
   return { results: [], source: "invidious" };
 }
 
-// ── Combined fallback search (tries Piped → Invidious → hardcoded) ─────
+// ── Direct YouTube HTML scraping (no API key needed) ────────────────────
+async function searchViaYouTubeHTML(query: string, maxResults = 25): Promise<{ results: any[]; source: "youtube-html" }> {
+  const trimmed = query.trim();
+  if (!trimmed) return { results: [], source: "youtube-html" };
+
+  try {
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`;
+    const res = await withTimeout(fetch(searchUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "bn-BD,bn;q=0.9,en;q=0.8",
+      },
+    }), 10000);
+
+    if (!res.ok) { await res.text().catch(() => {}); return { results: [], source: "youtube-html" }; }
+    const html = await res.text();
+
+    // Extract ytInitialData JSON
+    const match = html.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s)
+      || html.match(/ytInitialData\s*=\s*({.+?});\s*/s);
+    if (!match) {
+      console.log("YouTube HTML: could not find ytInitialData");
+      return { results: [], source: "youtube-html" };
+    }
+
+    const data = JSON.parse(match[1]);
+    const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
+      ?.sectionListRenderer?.contents || [];
+
+    const results: any[] = [];
+    for (const section of contents) {
+      const items = section?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const vr = item?.videoRenderer;
+        if (!vr?.videoId) continue;
+        results.push({
+          videoId: vr.videoId,
+          title: vr.title?.runs?.[0]?.text || "",
+          author: vr.ownerText?.runs?.[0]?.text || "",
+          channelId: vr.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || "",
+          thumbnail: `https://i.ytimg.com/vi/${vr.videoId}/hqdefault.jpg`,
+          publishedAt: vr.publishedTimeText?.simpleText || "",
+        });
+        if (results.length >= maxResults) break;
+      }
+      if (results.length >= maxResults) break;
+    }
+
+    if (results.length > 0) {
+      console.log(`YouTube HTML scraping returned ${results.length} results`);
+    }
+    return { results, source: "youtube-html" };
+  } catch (e) {
+    console.log("YouTube HTML scraping failed:", String(e));
+    return { results: [], source: "youtube-html" };
+  }
+}
+
+// ── Combined fallback search (tries YouTube HTML → Piped → Invidious → hardcoded) ─────
 async function searchFallback(query: string, maxResults = 25): Promise<{ results: any[]; source: string }> {
-  // Try Piped first (more reliable)
+  // Try direct YouTube HTML scraping first (most reliable)
+  const ytHtml = await searchViaYouTubeHTML(query, maxResults);
+  if (ytHtml.results.length > 0) return ytHtml;
+
+  // Try Piped
   const piped = await searchViaPiped(query, maxResults);
   if (piped.results.length > 0) return piped;
 
