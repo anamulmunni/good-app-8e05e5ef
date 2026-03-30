@@ -107,23 +107,33 @@ export default function Login() {
       return;
     }
     setIsSubmitting(true);
-    try {
-      const fakeEmail = `${normalizedPhone}@goodapp.local`;
-      let { error } = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
-      if (error && error.message === "Invalid login credentials") {
-        const { data: userData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
-        if (userData?.email && userData.email !== fakeEmail) {
-          const retryResult = await supabase.auth.signInWithPassword({ email: userData.email, password });
-          error = retryResult.error;
+
+    const tryLogin = async (attempt: number): Promise<void> => {
+      try {
+        const fakeEmail = `${normalizedPhone}@goodapp.local`;
+        let { error } = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
+        if (error && error.message === "Invalid login credentials") {
+          const { data: userData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
+          if (userData?.email && userData.email !== fakeEmail) {
+            const retryResult = await supabase.auth.signInWithPassword({ email: userData.email, password });
+            error = retryResult.error;
+          }
         }
+        if (error) throw error;
+        navigate("/dashboard");
+      } catch (err: unknown) {
+        const msg = String((err as any)?.message || "").toLowerCase();
+        const isNetwork = msg.includes("failed to fetch") || msg.includes("timeout") || msg.includes("network");
+        if (isNetwork && attempt < 2) {
+          await new Promise(r => setTimeout(r, 1500));
+          return tryLogin(attempt + 1);
+        }
+        toast({ title: "লগইন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
       }
-      if (error) throw error;
-      navigate("/dashboard");
-    } catch (err: unknown) {
-      toast({ title: "লগইন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
+    };
+
+    await tryLogin(0);
+    setIsSubmitting(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {

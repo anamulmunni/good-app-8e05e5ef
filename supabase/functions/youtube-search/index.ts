@@ -8,16 +8,26 @@ const corsHeaders = {
 
 // ── Caching ─────────────────────────────────────────────────────────────
 const cache = new Map<string, { data: any; ts: number }>();
-const CACHE_TTL_TRENDING = 60 * 60 * 1000; // 1 hour for trending
-const CACHE_TTL_SEARCH = 30 * 60 * 1000;   // 30 min for search
+const CACHE_TTL_TRENDING = 60 * 60 * 1000;
+const CACHE_TTL_SEARCH = 30 * 60 * 1000;
 const YT_KEY_REGEX = /^AIza[0-9A-Za-z_-]{20,}$/;
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 
+// Multiple fallback APIs
 const INVIDIOUS_INSTANCES = [
   "https://inv.nadeko.net",
   "https://invidious.nerdvpn.de",
   "https://yewtu.be",
   "https://iv.nboeck.de",
+  "https://invidious.protokoll-departed.de",
+  "https://invidious.privacyredirect.com",
+];
+
+const PIPED_INSTANCES = [
+  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.adminforge.de",
+  "https://api.piped.projectsegfau.lt",
+  "https://pipedapi.in.projectsegfau.lt",
 ];
 
 function getCached(key: string, ttl: number) {
@@ -43,19 +53,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 // ── Multi API Key Management ────────────────────────────────────────────
-const exhaustedKeys = new Map<string, number>(); // key -> timestamp when exhausted
-const invalidKeys = new Map<string, string>(); // key -> reason
-const KEY_COOLDOWN = 60 * 60 * 1000; // 1 hour cooldown per key
+const exhaustedKeys = new Map<string, number>();
+const invalidKeys = new Map<string, string>();
+const KEY_COOLDOWN = 60 * 60 * 1000;
 
 let cachedApiKeys: string[] = [];
 let apiKeysFetchedAt = 0;
-const API_KEYS_CACHE_TTL = 5 * 60 * 1000; // Re-fetch keys from DB every 5 min
+const API_KEYS_CACHE_TTL = 5 * 60 * 1000;
 
 async function getAllApiKeys(): Promise<string[]> {
-  // Start with the env key
   const envKey = Deno.env.get("YOUTUBE_API_KEY");
-  
-  // Check if we need to refresh from DB
   if (Date.now() - apiKeysFetchedAt < API_KEYS_CACHE_TTL && cachedApiKeys.length > 0) {
     return cachedApiKeys;
   }
@@ -70,16 +77,13 @@ async function getAllApiKeys(): Promise<string[]> {
       const sb = createClient(supabaseUrl, serviceKey);
       const { data, error } = await sb.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle();
       if (data?.value) {
-        const dbKeys = data.value
-          .split(/[\s,]+/)
-          .map((k: string) => k.trim())
-          .filter((k: string) => YT_KEY_REGEX.test(k));
+        const dbKeys = data.value.split(/[\s,]+/).map((k: string) => k.trim()).filter((k: string) => YT_KEY_REGEX.test(k));
         console.log(`Loaded ${dbKeys.length} API keys from DB`);
         for (const k of dbKeys) {
           if (!keys.includes(k)) keys.push(k);
         }
       } else {
-        console.log("No youtube_api_keys found in DB settings", error?.message || "");
+        console.log("No youtube_api_keys in DB", error?.message || "");
       }
     }
   } catch (e) {
@@ -101,7 +105,7 @@ function getAvailableKey(keys: string[]): string | null {
       return key;
     }
   }
-  return null; // All keys exhausted
+  return null;
 }
 
 function markKeyExhausted(key: string) {
@@ -151,20 +155,57 @@ function getFallbackVideos(maxResults = 25): { results: any[]; source: "fallback
   };
 }
 
-async function searchYouTubeViaInvidious(query: string, maxResults = 25): Promise<{ results: any[]; source: "invidious" | "fallback" }> {
+// ── Piped API search (free, no API key needed) ──────────────────────────
+async function searchViaPiped(query: string, maxResults = 25): Promise<{ results: any[]; source: "piped" }> {
   const trimmed = query.trim();
-  if (!trimmed) return getFallbackVideos(maxResults);
+  if (!trimmed) return { results: [], source: "piped" };
+
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const url = `${instance}/search?q=${encodeURIComponent(trimmed)}&filter=videos`;
+      const res = await withTimeout(fetch(url), 7000);
+      if (!res.ok) { await res.text().catch(() => {}); continue; }
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+
+      const results = items
+        .filter((item: any) => item?.url && item?.title)
+        .slice(0, maxResults)
+        .map((item: any) => {
+          const videoId = item.url?.replace("/watch?v=", "") || "";
+          return {
+            videoId,
+            title: item.title || "",
+            author: item.uploaderName || item.uploader || "",
+            channelId: item.uploaderUrl?.replace("/channel/", "") || "",
+            thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+            publishedAt: item.uploadedDate || "",
+          };
+        })
+        .filter((r: any) => r.videoId);
+
+      if (results.length > 0) {
+        console.log(`Piped returned ${results.length} results from ${instance}`);
+        return { results, source: "piped" };
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return { results: [], source: "piped" };
+}
+
+// ── Invidious search ────────────────────────────────────────────────────
+async function searchViaInvidious(query: string, maxResults = 25): Promise<{ results: any[]; source: "invidious" }> {
+  const trimmed = query.trim();
+  if (!trimmed) return { results: [], source: "invidious" };
 
   for (const instance of INVIDIOUS_INSTANCES) {
     try {
-      const params = new URLSearchParams({
-        q: trimmed,
-        type: "video",
-        sort_by: "relevance",
-        region: "BD",
-      });
+      const params = new URLSearchParams({ q: trimmed, type: "video", sort_by: "relevance", region: "BD" });
       const res = await withTimeout(fetch(`${instance}/api/v1/search?${params}`), 7000);
-      if (!res.ok) continue;
+      if (!res.ok) { await res.text().catch(() => {}); continue; }
       const data = await res.json();
       if (!Array.isArray(data)) continue;
 
@@ -180,17 +221,96 @@ async function searchYouTubeViaInvidious(query: string, maxResults = 25): Promis
           publishedAt: item.publishedText || "",
         }));
 
-      if (results.length > 0) return { results, source: "invidious" };
+      if (results.length > 0) {
+        console.log(`Invidious returned ${results.length} results from ${instance}`);
+        return { results, source: "invidious" };
+      }
     } catch {
       continue;
     }
   }
 
+  return { results: [], source: "invidious" };
+}
+
+// ── Direct YouTube HTML scraping (no API key needed) ────────────────────
+async function searchViaYouTubeHTML(query: string, maxResults = 25): Promise<{ results: any[]; source: "youtube-html" }> {
+  const trimmed = query.trim();
+  if (!trimmed) return { results: [], source: "youtube-html" };
+
+  try {
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`;
+    const res = await withTimeout(fetch(searchUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "bn-BD,bn;q=0.9,en;q=0.8",
+      },
+    }), 10000);
+
+    if (!res.ok) { await res.text().catch(() => {}); return { results: [], source: "youtube-html" }; }
+    const html = await res.text();
+
+    // Extract ytInitialData JSON
+    const match = html.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s)
+      || html.match(/ytInitialData\s*=\s*({.+?});\s*/s);
+    if (!match) {
+      console.log("YouTube HTML: could not find ytInitialData");
+      return { results: [], source: "youtube-html" };
+    }
+
+    const data = JSON.parse(match[1]);
+    const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
+      ?.sectionListRenderer?.contents || [];
+
+    const results: any[] = [];
+    for (const section of contents) {
+      const items = section?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const vr = item?.videoRenderer;
+        if (!vr?.videoId) continue;
+        results.push({
+          videoId: vr.videoId,
+          title: vr.title?.runs?.[0]?.text || "",
+          author: vr.ownerText?.runs?.[0]?.text || "",
+          channelId: vr.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || "",
+          thumbnail: `https://i.ytimg.com/vi/${vr.videoId}/hqdefault.jpg`,
+          publishedAt: vr.publishedTimeText?.simpleText || "",
+        });
+        if (results.length >= maxResults) break;
+      }
+      if (results.length >= maxResults) break;
+    }
+
+    if (results.length > 0) {
+      console.log(`YouTube HTML scraping returned ${results.length} results`);
+    }
+    return { results, source: "youtube-html" };
+  } catch (e) {
+    console.log("YouTube HTML scraping failed:", String(e));
+    return { results: [], source: "youtube-html" };
+  }
+}
+
+// ── Combined fallback search (tries YouTube HTML → Piped → Invidious → hardcoded) ─────
+async function searchFallback(query: string, maxResults = 25): Promise<{ results: any[]; source: string }> {
+  // Try direct YouTube HTML scraping first (most reliable)
+  const ytHtml = await searchViaYouTubeHTML(query, maxResults);
+  if (ytHtml.results.length > 0) return ytHtml;
+
+  // Try Piped
+  const piped = await searchViaPiped(query, maxResults);
+  if (piped.results.length > 0) return piped;
+
+  // Try Invidious
+  const invidious = await searchViaInvidious(query, maxResults);
+  if (invidious.results.length > 0) return invidious;
+
+  // Last resort: hardcoded fallback
+  console.log("All fallback APIs failed, returning hardcoded videos");
   return getFallbackVideos(maxResults);
 }
 
 // ── YouTube API calls with key rotation ─────────────────────────────────
-
 async function youtubeApiFetch(url: string, apiKey: string): Promise<Response> {
   const separator = url.includes("?") ? "&" : "?";
   return withTimeout(fetch(`${url}${separator}key=${apiKey}`), 8000);
@@ -198,7 +318,7 @@ async function youtubeApiFetch(url: string, apiKey: string): Promise<Response> {
 
 async function searchYouTubeWithRotation(
   keys: string[], query: string, pageToken?: string, maxResults = 25, order = "relevance"
-): Promise<{ results: any[]; nextPageToken?: string; source?: "youtube" | "invidious" | "fallback" }> {
+): Promise<{ results: any[]; nextPageToken?: string; source?: string }> {
   const params = new URLSearchParams({
     part: "snippet", q: query, type: "video", maxResults: String(maxResults),
     order, regionCode: "BD", relevanceLanguage: "bn", videoDuration: "medium",
@@ -218,7 +338,7 @@ async function searchYouTubeWithRotation(
         if (res.status === 403 && errBody.includes("quotaExceeded")) {
           console.log(`Key exhausted: ${apiKey.slice(0, 8)}...`);
           markKeyExhausted(apiKey);
-          continue; // Try next key
+          continue;
         }
         if (res.status === 400 || (res.status === 403 && (errLower.includes("apikey") || errLower.includes("accessnotconfigured") || errLower.includes("forbidden")))) {
           console.log(`Key invalid/restricted: ${apiKey.slice(0, 8)}...`);
@@ -243,13 +363,15 @@ async function searchYouTubeWithRotation(
       throw e;
     }
   }
-  const invidious = await searchYouTubeViaInvidious(query, maxResults);
-  return invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults);
+
+  // All keys exhausted → use fallback APIs
+  console.log("All YouTube API keys exhausted, trying fallback APIs...");
+  return await searchFallback(query, maxResults);
 }
 
 async function getTrendingWithRotation(
   keys: string[], maxResults = 25, categoryId?: string
-): Promise<{ results: any[]; source?: "youtube" | "invidious" | "fallback" }> {
+): Promise<{ results: any[]; source?: string }> {
   const categories = categoryId ? [categoryId] : ["10", "24", "1", "22"];
   const perCategory = categoryId ? maxResults : Math.ceil(maxResults / categories.length) + 5;
   const allResults: any[] = [];
@@ -290,7 +412,7 @@ async function getTrendingWithRotation(
           thumbnail: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
           publishedAt: item.snippet?.publishedAt || "",
         })));
-        break; // Success, move to next category
+        break;
       } catch {
         continue;
       }
@@ -304,41 +426,24 @@ async function getTrendingWithRotation(
   }
   const seen = new Set<string>();
   const deduped = allResults.filter(r => { if (seen.has(r.videoId)) return false; seen.add(r.videoId); return true; });
-  const result = { results: deduped.slice(0, maxResults), source: "youtube" as const };
-  if (result.results.length > 0) return result;
-  const invidious = await searchYouTubeViaInvidious("bangla trending song 2026", maxResults);
-  return invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults);
+  if (deduped.length > 0) return { results: deduped.slice(0, maxResults), source: "youtube" };
+
+  // Fallback for trending
+  console.log("YouTube trending failed, trying fallback APIs...");
+  return await searchFallback("bangla trending song 2026", maxResults);
 }
 
 async function probeYouTubeKey(key: string): Promise<{ state: "ok" | "quota" | "invalid" | "error"; message: string }> {
   try {
-    const params = new URLSearchParams({
-      part: "id",
-      id: "UC_x5XG1OV2P6uZZ5FSM9Ttw",
-      key,
-    });
+    const params = new URLSearchParams({ part: "id", id: "UC_x5XG1OV2P6uZZ5FSM9Ttw", key });
     const res = await withTimeout(fetch(`https://www.googleapis.com/youtube/v3/channels?${params}`), 5000);
-    if (res.ok) return { state: "ok", message: "Ready" };
+    if (res.ok) { await res.text(); return { state: "ok", message: "Ready" }; }
 
     const errBody = await res.text();
     const errLower = errBody.toLowerCase();
-
-    if (res.status === 403 && errLower.includes("quotaexceeded")) {
-      return { state: "quota", message: "Quota exceeded" };
-    }
-
-    if (
-      res.status === 400 ||
-      (res.status === 403 && (
-        errLower.includes("apikey") ||
-        errLower.includes("accessnotconfigured") ||
-        errLower.includes("forbidden") ||
-        errLower.includes("iprefererblocked")
-      ))
-    ) {
+    if (res.status === 403 && errLower.includes("quotaexceeded")) return { state: "quota", message: "Quota exceeded" };
+    if (res.status === 400 || (res.status === 403 && (errLower.includes("apikey") || errLower.includes("accessnotconfigured") || errLower.includes("forbidden") || errLower.includes("iprefererblocked"))))
       return { state: "invalid", message: "Invalid/restricted key" };
-    }
-
     return { state: "error", message: `HTTP ${res.status}` };
   } catch {
     return { state: "error", message: "Probe timeout/network error" };
@@ -393,7 +498,7 @@ serve(async (req) => {
     if (action === "key-status") {
       const keys = await getAllApiKeys();
       const shouldProbe = url.searchParams.get("probe") === "1";
-      const probeMap = new Map<string, { state: "ok" | "quota" | "invalid" | "error"; message: string }>();
+      const probeMap = new Map<string, { state: string; message: string }>();
 
       if (shouldProbe) {
         const probeResults = await Promise.all(keys.map(async (k) => ({ key: k, result: await probeYouTubeKey(k) })));
@@ -413,17 +518,11 @@ serve(async (req) => {
         const available = !invalidReason && !exhausted;
         const cooldownMinutes = exhaustedAt ? Math.max(0, Math.ceil((KEY_COOLDOWN - (now - exhaustedAt)) / 60000)) : 0;
         return {
-          index: i,
-          prefix: k.slice(0, 8) + "...",
-          available,
+          index: i, prefix: k.slice(0, 8) + "...", available,
           status: invalidReason ? "invalid/restricted" : exhausted ? "cooldown" : "active",
           exhaustedMinAgo: exhaustedAt ? Math.round((now - exhaustedAt) / 60000) : null,
           cooldownMinutes,
-          message: probe?.message || (invalidReason
-            ? "Key invalid বা API restriction আছে (YouTube Data API v3 enable/restrict check করুন)"
-            : exhausted
-            ? `Quota শেষ, ${cooldownMinutes} মিনিট পরে retry হবে`
-            : "Ready"),
+          message: probe?.message || (invalidReason ? "Key invalid বা API restriction আছে" : exhausted ? `Quota শেষ, ${cooldownMinutes} মিনিট পরে retry` : "Ready"),
         };
       });
       return new Response(JSON.stringify({ totalKeys: keys.length, available: statuses.filter(s => s.available).length, keys: statuses }), {
@@ -432,17 +531,12 @@ serve(async (req) => {
     }
 
     const keys = await getAllApiKeys();
+
+    // No API keys at all → go straight to fallback APIs
     if (keys.length === 0) {
-      if (query) {
-        const invidious = await searchYouTubeViaInvidious(query, maxResults);
-        return new Response(JSON.stringify(invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults)), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const invidious = await searchYouTubeViaInvidious("bangla trending song 2026", maxResults);
-      return new Response(JSON.stringify(invidious.results.length > 0 ? invidious : getFallbackVideos(maxResults)), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.log("No API keys configured, using fallback APIs");
+      const fallback = await searchFallback(query || "bangla trending song 2026", maxResults);
+      return new Response(JSON.stringify(fallback), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Trending

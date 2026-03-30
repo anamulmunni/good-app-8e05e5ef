@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User as AppUser } from "@/lib/api";
 
-function withTimeout(promise: any, timeoutMs = 12000, message = "Request timeout") {
+function withTimeout(promise: any, timeoutMs = 8000, message = "Request timeout") {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
@@ -57,8 +57,16 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true;
 
+    // Safety timeout - never spin loading longer than 6 seconds
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.warn("Auth safety timeout reached, stopping loading");
+        setIsLoading(false);
+      }
+    }, 6000);
+
     // Get session first, then listen for changes
-    withTimeout(supabase.auth.getSession(), 12000, "Session timeout")
+    withTimeout(supabase.auth.getSession(), 8000, "Session timeout")
       .then(({ data: { session } }) => {
         if (!isMounted) return;
         if (session?.user) {
@@ -100,6 +108,7 @@ export function useAuth() {
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, [fetchOrCreateAppUser]);
