@@ -233,8 +233,6 @@ function randomExternalStartPage(seed = 0): number {
 
 function buildExternalPlayerUrl(url: string, autoplay = false) {
   const params = new URLSearchParams();
-  // YouTube autoplay with sound is often force-muted by browser policy.
-  // We keep autoplay off and start playback through a user tap.
   if (isYouTubeEmbed(url)) {
     params.set("autoplay", autoplay ? "1" : "0");
     params.set("mute", "0");
@@ -242,6 +240,9 @@ function buildExternalPlayerUrl(url: string, autoplay = false) {
     params.set("modestbranding", "1");
     params.set("playsinline", "1");
     params.set("enablejsapi", "1");
+    params.set("controls", "1");
+    params.set("showinfo", "0");
+    params.set("iv_load_policy", "3");
     if (typeof window !== "undefined") {
       params.set("origin", window.location.origin);
     }
@@ -544,12 +545,13 @@ export default function Reels() {
     setExtVideos([]);
     setNextPageToken(undefined);
     loadingRef.current = false;
+    const freshSeed = Date.now();
     const run = async () => {
       loadingRef.current = true;
       setLoading(true);
       try {
         let [externalResult, localResult] = await Promise.all([
-          getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long", refreshTick),
+          getBangladeshExternalVideos(randomExternalStartPage(freshSeed), 20, undefined, activeQuery || undefined, "long", freshSeed),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
         // Interleave local videos randomly
@@ -561,7 +563,7 @@ export default function Reels() {
 
         if (!activeQuery && merged.length === 0) {
           [externalResult, localResult] = await Promise.all([
-            getBangladeshExternalVideos(1, 20, undefined, undefined, "long", refreshTick),
+            getBangladeshExternalVideos(1, 20, undefined, undefined, "long", freshSeed),
             getUploadedLongVideos(1, 10),
           ]);
           merged = dedupeVideos([...externalResult.videos]);
@@ -597,14 +599,27 @@ export default function Reels() {
     return () => obs.disconnect();
   }, [loadMore]);
 
-  // Auto-refresh: prepend fresh videos every 90 seconds
+  // Auto-refresh: prepend fresh videos every 90 seconds (but DON'T reset the list)
   useEffect(() => {
     if (!user) return;
-    const interval = window.setInterval(() => {
-      setRefreshTick((t) => t + 1);
+    const interval = window.setInterval(async () => {
+      // Silently fetch new videos and prepend without clearing current list
+      try {
+        const [externalResult] = await Promise.all([
+          getBangladeshExternalVideos(randomExternalStartPage(Date.now()), 15, undefined, activeQuery || undefined, "long", Date.now()),
+        ]);
+        const fresh = dedupeVideos(externalResult.videos);
+        if (fresh.length > 0) {
+          setExtVideos((prev) => {
+            const seen = new Set(prev.map((v) => v.id));
+            const newOnes = fresh.filter((v) => !seen.has(v.id));
+            return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
+          });
+        }
+      } catch {}
     }, 90_000);
     return () => window.clearInterval(interval);
-  }, [user]);
+  }, [user, activeQuery]);
 
   const allVideos = useMemo<VideoItem[]>(() => {
     return extVideos.map((v) => ({
@@ -673,16 +688,12 @@ export default function Reels() {
     }
   }, [loadMore, longTitle, longVideoDuration, longVideoFile, longThumbnailFile, user]);
 
+  // Only clear selectedVideo if the video list becomes empty, never auto-clear a playing video
   useEffect(() => {
-    if (allVideos.length === 0) {
+    if (allVideos.length === 0 && !loading) {
       setSelectedVideo(null);
-      return;
     }
-    setSelectedVideo((prev) => {
-      if (prev && allVideos.some((v) => v.id === prev.id)) return prev;
-      return null;
-    });
-  }, [allVideos]);
+  }, [allVideos.length, loading]);
 
   const getViewCount = useCallback((id: string) => {
     if (!viewCounts[id]) {
@@ -754,6 +765,15 @@ export default function Reels() {
       if (shell.requestFullscreen) {
         await shell.requestFullscreen();
         try { await (screen.orientation as any).lock?.("landscape"); } catch {}
+        
+        // Listen for fullscreen exit to unlock orientation
+        const onFullscreenChange = () => {
+          if (!document.fullscreenElement) {
+            try { (screen.orientation as any).unlock?.(); } catch {}
+            document.removeEventListener("fullscreenchange", onFullscreenChange);
+          }
+        };
+        document.addEventListener("fullscreenchange", onFullscreenChange);
         return;
       }
 
@@ -987,7 +1007,11 @@ export default function Reels() {
 
       {selectedVideo && !miniPlayer && (
         <div ref={playerRef} className="shrink-0 z-10" style={{ background: "#000" }}>
-          <div ref={playerShellRef} className="w-full aspect-video relative" style={{ background: "#000" }}>
+          <div ref={playerShellRef} className="w-full aspect-video relative overflow-hidden" style={{ background: "#000" }}>
+            {/* Hide YouTube logo overlay */}
+            {selectedVideo.isExternal && isYouTubeEmbed(selectedVideo.video_url) && (
+              <div className="absolute bottom-[38px] right-0 w-[120px] h-[30px] z-[5] pointer-events-none" style={{ background: "#000" }} />
+            )}
             {selectedVideo.isExternal && isEmbed(selectedVideo.video_url) ? (
               <iframe
                 key={`${selectedVideo.id}-${playerReloadToken}`}

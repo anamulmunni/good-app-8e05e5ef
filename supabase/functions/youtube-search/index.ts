@@ -140,6 +140,23 @@ const FALLBACK_VIDEOS = [
   { videoId: "PT2_F-1esPk", title: "The Nights - Avicii", author: "Avicii" },
 ];
 
+// Parse duration text like "3:45" or "1:02:30" to seconds
+function parseDurationText(text: string): number {
+  if (!text) return 0;
+  const parts = text.split(":").map(Number);
+  if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+  if (parts.length === 2) return (parts[0] * 60) + parts[1];
+  return parts[0] || 0;
+}
+
+// Parse ISO 8601 duration like "PT3M45S" or "PT1H2M30S"
+function parseISO8601Duration(iso: string): number {
+  if (!iso) return 0;
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  return (parseInt(match[1] || "0") * 3600) + (parseInt(match[2] || "0") * 60) + parseInt(match[3] || "0");
+}
+
 function getFallbackVideos(maxResults = 25): { results: any[]; source: "fallback" } {
   const shuffled = [...FALLBACK_VIDEOS];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -180,6 +197,7 @@ async function searchViaPiped(query: string, maxResults = 25): Promise<{ results
             channelId: item.uploaderUrl?.replace("/channel/", "") || "",
             thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
             publishedAt: item.uploadedDate || "",
+            lengthSeconds: item.duration || 0,
           };
         })
         .filter((r: any) => r.videoId);
@@ -219,6 +237,7 @@ async function searchViaInvidious(query: string, maxResults = 25): Promise<{ res
           channelId: item.authorId || "",
           thumbnail: item.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
           publishedAt: item.publishedText || "",
+          lengthSeconds: item.lengthSeconds || 0,
         }));
 
       if (results.length > 0) {
@@ -275,6 +294,7 @@ async function searchViaYouTubeHTML(query: string, maxResults = 25): Promise<{ r
           channelId: vr.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || "",
           thumbnail: `https://i.ytimg.com/vi/${vr.videoId}/hqdefault.jpg`,
           publishedAt: vr.publishedTimeText?.simpleText || "",
+          lengthSeconds: parseDurationText(vr.lengthText?.simpleText || ""),
         });
         if (results.length >= maxResults) break;
       }
@@ -411,6 +431,7 @@ async function getTrendingWithRotation(
           channelId: item.snippet?.channelId || "",
           thumbnail: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
           publishedAt: item.snippet?.publishedAt || "",
+          lengthSeconds: parseISO8601Duration(item.contentDetails?.duration || ""),
         })));
         break;
       } catch {

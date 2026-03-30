@@ -202,16 +202,22 @@ export default function ShortReels() {
     enabled: !!user,
   });
 
-  // Randomly interleave uploaded videos among YouTube shorts
+  // TikTok-style: only show 2-3 uploaded videos per day, scattered among YouTube shorts
   const videos = useMemo(() => {
+    if (youtubeShorts.length === 0) return userVideos.slice(0, 3);
     if (userVideos.length === 0) return youtubeShorts;
-    if (youtubeShorts.length === 0) return userVideos;
-    // Spread uploaded videos randomly among YouTube shorts
-    const result: ShortVideo[] = [...youtubeShorts];
+    
+    // Pick only 2-3 random uploaded videos to sprinkle in
     const shuffledUploads = [...userVideos].sort(() => Math.random() - 0.5);
-    for (const uv of shuffledUploads) {
-      const pos = Math.floor(Math.random() * (result.length + 1));
-      result.splice(pos, 0, uv);
+    const dailyUploads = shuffledUploads.slice(0, Math.min(3, shuffledUploads.length));
+    
+    const result: ShortVideo[] = [...youtubeShorts];
+    // Space them out: place every ~15-25 items apart
+    for (let i = 0; i < dailyUploads.length; i++) {
+      const minPos = Math.min(8 + i * 20, result.length);
+      const maxPos = Math.min(minPos + 15, result.length);
+      const pos = Math.floor(Math.random() * (maxPos - minPos + 1)) + minPos;
+      result.splice(Math.min(pos, result.length), 0, dailyUploads[i]);
     }
     return result;
   }, [userVideos, youtubeShorts]);
