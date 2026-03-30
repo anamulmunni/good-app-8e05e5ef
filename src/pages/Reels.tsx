@@ -1838,6 +1838,39 @@ export default function Reels() {
           </div>
         </div>
       )}
+
+      {/* Full-screen voice listening overlay */}
+      <AnimatePresence>
+        {voiceListening && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.92)" }}
+            onClick={() => setVoiceListening(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.5 }}
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              className="w-28 h-28 rounded-full flex items-center justify-center mb-6"
+              style={{ background: "linear-gradient(135deg, #ff4444, #ff6b6b)", boxShadow: "0 0 60px rgba(255,68,68,0.5)" }}
+            >
+              <Mic className="w-14 h-14 text-white" />
+            </motion.div>
+            <p className="text-white text-xl font-bold mb-2">🎤 শুনছি...</p>
+            <p className="text-white/60 text-sm">বাংলায় বলুন কী সার্চ করতে চান</p>
+            <button
+              onClick={() => setVoiceListening(false)}
+              className="mt-8 px-6 py-2 rounded-full text-sm font-medium"
+              style={{ background: "#333", color: "#fff" }}
+            >
+              বাতিল করুন
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
