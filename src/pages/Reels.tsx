@@ -495,10 +495,10 @@ export default function Reels() {
     loadingRef.current = true;
     setLoading(true);
     const cursor = reset ? 1 : page;
-    const requestPage = normalizeExternalPage(activeQuery ? cursor : cursor + refreshTick * 5);
+    const currentPageToken = reset ? undefined : nextPageToken;
     try {
       let [externalResult, localResult] = await Promise.all([
-        getBangladeshExternalVideos(requestPage, 30, undefined, activeQuery || undefined, "long", refreshTick + cursor * 17),
+        getBangladeshExternalVideos(cursor, 30, undefined, activeQuery || undefined, "long", refreshTick + cursor * 17, currentPageToken),
         getUploadedLongVideos(cursor, 12, activeQuery || undefined),
       ]);
       // Interleave local videos randomly into external results
@@ -510,7 +510,7 @@ export default function Reels() {
         merged.splice(pos, 0, lv);
       }
 
-      if (!activeQuery && merged.length === 0 && requestPage !== 1) {
+      if (!activeQuery && merged.length === 0 && cursor !== 1) {
         [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick),
           getUploadedLongVideos(cursor, 12),
@@ -528,12 +528,13 @@ export default function Reels() {
         return dedupeVideos([...base, ...merged.filter((v) => !seen.has(v.id))]);
       });
       setHasMore(localResult.hasMore || externalResult.hasMore);
+      setNextPageToken(externalResult.nextPageToken);
       setPage(cursor + 1);
     } finally {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [hasMore, page, activeQuery, refreshTick]);
+  }, [hasMore, page, activeQuery, refreshTick, nextPageToken]);
 
   useEffect(() => {
     if (!user) return;
