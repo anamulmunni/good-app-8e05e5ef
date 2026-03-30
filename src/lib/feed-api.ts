@@ -885,6 +885,26 @@ export async function addComment(postId: string, userId: number, content: string
     await (supabase.from("posts").update({ comments_count: count || 0 } as any).eq("id", postId) as any);
   } catch {}
 
+  // Get sender name for notifications
+  const { data: senderData } = await (supabase.from("users").select("display_name").eq("id", userId).single() as any);
+  const senderName = senderData?.display_name || "কেউ";
+
+  // If this is a reply, notify the parent comment author
+  if (parentCommentId) {
+    try {
+      const { data: parentComment } = await (supabase.from("post_comments").select("user_id").eq("id", parentCommentId).single() as any);
+      if (parentComment && parentComment.user_id !== userId) {
+        await (supabase.from("notifications").insert({
+          user_id: parentComment.user_id,
+          from_user_id: userId,
+          type: "reply",
+          reference_id: postId,
+          content: `${senderName} আপনার মন্তব্যে রিপ্লাই করেছে: "${content.slice(0, 80)}"`,
+        } as any) as any);
+      }
+    } catch {}
+  }
+
   // Parse @mentions and create notifications
   const mentions = content.match(/@([\w\s]+?)(?=\s@|\s*$|[.,!?])/g);
   if (mentions) {
@@ -894,9 +914,6 @@ export async function addComment(postId: string, userId: number, content: string
       const { data: mentionedUsers } = await (supabase.from("users").select("id").ilike("display_name", name).limit(1) as any);
       const mentioned = mentionedUsers && mentionedUsers.length > 0 ? mentionedUsers[0] : null;
       if (mentioned && mentioned.id !== userId) {
-        // Get sender name for notification
-        const { data: senderData } = await (supabase.from("users").select("display_name").eq("id", userId).single() as any);
-        const senderName = senderData?.display_name || "কেউ";
         await (supabase.from("notifications").insert({
           user_id: mentioned.id,
           from_user_id: userId,
