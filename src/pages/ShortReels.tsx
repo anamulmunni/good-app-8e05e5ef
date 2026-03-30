@@ -347,7 +347,7 @@ export default function ShortReels() {
               >
                 {/* Thumbnail shown while iframe loads */}
                 {!loaded && (
-                  <div className="absolute inset-0 z-[1] flex items-center justify-center bg-black">
+                  <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center bg-black">
                     <img
                       src={`https://i.ytimg.com/vi/${item.videoId}/hq720.jpg`}
                       alt=""
@@ -356,8 +356,36 @@ export default function ShortReels() {
                         (e.target as HTMLImageElement).src = `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
                       }}
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="w-10 h-10 animate-spin text-white/80" />
+                    {/* good-app branding overlay on thumbnail */}
+                    <div className="absolute top-[38%] left-0 right-0 flex flex-col items-center justify-center pointer-events-none">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.7 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="flex flex-col items-center gap-2"
+                      >
+                        <motion.span
+                          className="text-[32px] font-black tracking-wider drop-shadow-2xl"
+                          animate={{ opacity: [0.7, 1, 0.7] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          style={{
+                            background: "linear-gradient(135deg, #22c55e 0%, #4ade80 30%, #86efac 50%, #4ade80 70%, #22c55e 100%)",
+                            backgroundSize: "200% 200%",
+                            WebkitBackgroundClip: "text",
+                            WebkitTextFillColor: "transparent",
+                            animation: "shimmer-text 3s ease-in-out infinite",
+                          }}
+                        >
+                          good-<span style={{
+                            background: "linear-gradient(135deg, #f97316 0%, #fb923c 50%, #f97316 100%)",
+                            backgroundSize: "200% 200%",
+                            WebkitBackgroundClip: "text",
+                            WebkitTextFillColor: "transparent",
+                            animation: "shimmer-text 3s ease-in-out infinite 0.5s",
+                          }}>app</span>
+                        </motion.span>
+                        <Loader2 className="w-7 h-7 animate-spin text-white/70" />
+                      </motion.div>
                     </div>
                   </div>
                 )}
