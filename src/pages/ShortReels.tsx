@@ -318,6 +318,17 @@ export default function ShortReels() {
     if (containerRef.current) containerRef.current.scrollTop = 0;
   }, [selectedCategory]);
 
+  // Shuffle videos on each mount so re-entry shows different order
+  const shuffledVideos = useMemo(() => {
+    if (videos.length === 0) return [];
+    const arr = [...videos];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [videos]);
+
   if (isLoading || !user) return null;
 
   return (
