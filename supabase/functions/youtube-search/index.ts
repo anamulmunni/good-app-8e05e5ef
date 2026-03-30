@@ -58,16 +58,19 @@ async function getAllApiKeys(): Promise<string[]> {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (supabaseUrl && serviceKey) {
       const sb = createClient(supabaseUrl, serviceKey);
-      const { data } = await sb.from("settings").select("value").eq("key", "youtube_api_keys").single();
+      const { data, error } = await sb.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle();
       if (data?.value) {
         const dbKeys = data.value.split("\n").map((k: string) => k.trim()).filter((k: string) => k.length > 10);
+        console.log(`Loaded ${dbKeys.length} API keys from DB`);
         for (const k of dbKeys) {
           if (!keys.includes(k)) keys.push(k);
         }
+      } else {
+        console.log("No youtube_api_keys found in DB settings", error?.message || "");
       }
     }
-  } catch {
-    // DB fetch failed, use env key only
+  } catch (e) {
+    console.log("DB key fetch failed:", String(e));
   }
 
   cachedApiKeys = keys;

@@ -953,15 +953,36 @@ export default function AdminPanel() {
 
         {/* ═══════════════════════════════════════ */}
         {/* 🎬 YouTube API Keys */}
-        <Section icon={Youtube} title="YouTube API Keys" color="destructive">
+        <Section icon={Youtube} title={`YouTube API Keys${youtubeApiKeys ? ` (${youtubeApiKeys.split("\n").filter(k => k.trim().length > 10).length})` : ""}`} color="destructive">
           <div className="space-y-4 pt-3">
             <p className="text-xs text-muted-foreground">প্রতিটি API key আলাদা লাইনে দিন। একাধিক key দিলে কোটা শেষ হলে অটো পরের key ব্যবহার হবে।</p>
+            
+            {/* Show saved keys (masked) */}
+            {youtubeApiKeys && (
+              <div className="bg-secondary/30 rounded-xl p-3 space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground mb-1">সেভ করা কীগুলো:</p>
+                {youtubeApiKeys.split("\n").filter(k => k.trim().length > 10).map((k, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs font-mono">
+                    <span className="text-muted-foreground">{i + 1}.</span>
+                    <span>{k.trim().slice(0, 12)}...{k.trim().slice(-4)}</span>
+                    <button onClick={() => {
+                      const keys = youtubeApiKeys.split("\n").filter(line => line.trim().length > 10);
+                      keys.splice(i, 1);
+                      setYoutubeApiKeys(keys.join("\n"));
+                    }} className="text-destructive hover:text-destructive/80 ml-auto">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <textarea
               value={youtubeApiKeys}
               onChange={(e) => setYoutubeApiKeys(e.target.value)}
               placeholder={"AIzaSy...\nAIzaSy...\nAIzaSy..."}
-              className="input-field min-h-[120px] font-mono text-xs"
-              rows={5}
+              className="input-field min-h-[100px] font-mono text-xs"
+              rows={4}
             />
             <div className="flex gap-2">
               <button
@@ -969,16 +990,15 @@ export default function AdminPanel() {
                 onClick={async () => {
                   setYoutubeKeysLoading(true);
                   try {
-                    // Load current keys from settings
-                    const { data } = await supabase.from("settings").select("value").eq("key", "youtube_api_keys").single();
+                    const { data } = await supabase.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle();
                     setYoutubeApiKeys(data?.value || "");
-                    toast({ title: "লোড হয়েছে" });
+                    toast({ title: data?.value ? "লোড হয়েছে" : "কোনো key সেভ নেই" });
                   } catch { toast({ title: "লোড ব্যর্থ", variant: "destructive" }); }
                   finally { setYoutubeKeysLoading(false); }
                 }}
                 className="px-4 py-2 bg-secondary text-secondary-foreground rounded-xl text-sm font-bold"
               >
-                {youtubeKeysLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "লোড"}
+                {youtubeKeysLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "🔄 লোড"}
               </button>
               <button
                 disabled={youtubeKeysLoading}
@@ -986,22 +1006,23 @@ export default function AdminPanel() {
                   setYoutubeKeysLoading(true);
                   try {
                     const trimmedKeys = youtubeApiKeys.split("\n").map(k => k.trim()).filter(k => k.length > 10).join("\n");
-                    // Upsert into settings
-                    const { data: existing } = await supabase.from("settings").select("id").eq("key", "youtube_api_keys").single();
+                    const { data: existing } = await supabase.from("settings").select("id").eq("key", "youtube_api_keys").maybeSingle();
                     if (existing) {
                       await supabase.from("settings").update({ value: trimmedKeys }).eq("key", "youtube_api_keys");
                     } else {
                       await supabase.from("settings").insert({ key: "youtube_api_keys", value: trimmedKeys });
                     }
-                    toast({ title: `${trimmedKeys.split("\n").length} টি API key সেভ হয়েছে ✓` });
+                    toast({ title: `${trimmedKeys.split("\n").filter(k => k).length} টি API key সেভ হয়েছে ✓` });
                   } catch (e: any) { toast({ title: "সেভ ব্যর্থ", description: e.message, variant: "destructive" }); }
                   finally { setYoutubeKeysLoading(false); }
                 }}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold flex-1"
               >
-                সেভ করুন
+                💾 সেভ করুন
               </button>
             </div>
+
+            {/* Key Status Check */}
             <button
               onClick={async () => {
                 try {
@@ -1014,20 +1035,33 @@ export default function AdminPanel() {
                   setYoutubeKeyStatus(data);
                 } catch { toast({ title: "স্ট্যাটাস চেক ব্যর্থ", variant: "destructive" }); }
               }}
-              className="text-xs text-[hsl(var(--cyan))] hover:underline"
+              className="w-full px-4 py-2 bg-secondary/60 rounded-xl text-xs font-bold hover:bg-secondary transition-colors"
             >
-              🔍 Key স্ট্যাটাস চেক করুন
+              🔍 Key স্ট্যাটাস চেক করুন (লাইভ)
             </button>
             {youtubeKeyStatus && (
-              <div className="bg-secondary/50 rounded-xl p-3 text-xs space-y-1">
-                <p className="font-bold">মোট: {youtubeKeyStatus.totalKeys} টি key | সক্রিয়: {youtubeKeyStatus.available} টি</p>
+              <div className="bg-secondary/50 rounded-xl p-3 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-bold">মোট: {youtubeKeyStatus.totalKeys} টি key</p>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${youtubeKeyStatus.available > 0 ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                    {youtubeKeyStatus.available > 0 ? `${youtubeKeyStatus.available} টি সক্রিয় ✓` : "সব শেষ ✗"}
+                  </span>
+                </div>
                 {youtubeKeyStatus.keys?.map((k: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${k.available ? "bg-green-500" : "bg-red-500"}`} />
-                    <span className="font-mono">{k.prefix}</span>
-                    {!k.available && <span className="text-destructive">({k.exhaustedMinAgo} মিনিট আগে শেষ)</span>}
+                  <div key={i} className="flex items-center gap-2 py-1 border-t border-border/30">
+                    <span className={`w-2.5 h-2.5 rounded-full ${k.available ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+                    <span className="font-mono text-[11px]">{k.prefix}</span>
+                    <span className="ml-auto text-[10px]">
+                      {k.available 
+                        ? <span className="text-green-400">✓ সক্রিয়</span> 
+                        : <span className="text-red-400">✗ কোটা শেষ ({k.exhaustedMinAgo} মিনিট আগে, ~{Math.max(0, 60 - (k.exhaustedMinAgo || 0))} মিনিট বাকি)</span>
+                      }
+                    </span>
                   </div>
                 ))}
+                {youtubeKeyStatus.available === 0 && (
+                  <p className="text-[10px] text-amber-400 mt-1">⚠️ সব API key এর কোটা শেষ। নতুন key যোগ করুন অথবা ১ ঘন্টা অপেক্ষা করুন।</p>
+                )}
               </div>
             )}
           </div>
