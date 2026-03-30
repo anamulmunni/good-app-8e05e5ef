@@ -346,7 +346,7 @@ export default function IncomingCallHandler() {
       setCallDuration(0);
       durationTimerRef.current = setInterval(() => setCallDuration(d => d + 1), 1000);
     } catch {
-      endCall(true);
+      endCall(true, "completed");
     }
   };
 
