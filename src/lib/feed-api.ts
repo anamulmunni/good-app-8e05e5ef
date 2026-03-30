@@ -600,12 +600,13 @@ export async function getBangladeshExternalVideos(
   searchQuery?: string,
   mode: "short" | "long" = "long",
   freshnessToken = 0,
-): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
+  pageToken?: string,
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[]; nextPageToken?: string }> {
   const trimmedQuery = searchQuery?.trim();
 
   // Use YouTube only - with viewCount order for trending feel when no query
   const order = trimmedQuery ? "relevance" : "viewCount";
-  const ytResult = await fetchYouTubeVideos(trimmedQuery, Math.max(rows, 30), order);
+  const ytResult = await fetchYouTubeVideos(trimmedQuery, Math.max(rows, 30), order, pageToken);
 
   let videos = ytResult.videos;
 
@@ -627,6 +628,7 @@ export async function getBangladeshExternalVideos(
   return {
     videos: finalVideos,
     hasMore: ytResult.hasMore,
+    nextPageToken: ytResult.nextPageToken,
   };
 }
 
