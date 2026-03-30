@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { startRingtoneLoop } from "@/lib/ringtone";
+import { getOrCreateConversation, sendMessage } from "@/lib/chat-api";
 
 const CALL_REMOTE_AUDIO_CLASS = "call-remote-audio";
 let activeRingtoneStop: (() => void) | null = null;
