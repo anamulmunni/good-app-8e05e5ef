@@ -734,7 +734,7 @@ export default function Dashboard() {
                       ))}
                       <motion.div
                         initial={{ scale: 0, rotate: -20 }}
-                        animate={{ scale: [0, 1.3, 1], rotate: [−20, 5, 0] }}
+                        animate={{ scale: [0, 1.3, 1], rotate: [-20, 5, 0] }}
                         transition={{ type: "spring", damping: 8 }}
                         className="text-center"
                       >
