@@ -227,7 +227,8 @@ export default function IncomingCallHandler() {
         }
 
         if (["call-ended", "call-busy"].includes(signal.signal_type) && isSameCaller) {
-          endCall(false);
+          const wasActive = callActiveRef.current;
+          endCall(false, wasActive ? "completed" : "missed");
         }
 
         if (signal.signal_type === "ice-candidate" && signal.signal_data && isSameCaller) {
