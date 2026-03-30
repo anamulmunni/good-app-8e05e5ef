@@ -565,8 +565,9 @@ serve(async (req) => {
     const cached = getCached(cacheKey, CACHE_TTL_SEARCH);
     if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const response = await searchYouTubeWithRotation(keys, query, pageToken, maxResults, order);
-    if (response.results.length > 0 && response.source !== "fallback") setCache(cacheKey, response);
-    return new Response(JSON.stringify(response), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const responseWithToken = { ...response, nextPageToken: (response as any).nextPageToken };
+    if (response.results.length > 0 && response.source !== "fallback") setCache(cacheKey, responseWithToken);
+    return new Response(JSON.stringify(responseWithToken), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e) {
     console.error("youtube-search error:", e);

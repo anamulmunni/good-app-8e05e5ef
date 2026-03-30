@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { startRingtoneLoop } from "@/lib/ringtone";
+import { getOrCreateConversation, sendMessage } from "@/lib/chat-api";
 
 const CALL_REMOTE_AUDIO_CLASS = "call-remote-audio";
 let activeRingtoneStop: (() => void) | null = null;
@@ -181,3 +182,31 @@ export const rtcConfig: RTCConfiguration = {
   ],
   iceTransportPolicy: "all",
 };
+
+// Send a call-related message to the chat conversation
+export async function sendCallMessage(
+  callerId: number,
+  receiverId: number,
+  type: "missed" | "completed" | "rejected",
+  durationSecs?: number,
+  isVideo?: boolean,
+) {
+  try {
+    const convo = await getOrCreateConversation(callerId, receiverId);
+    const callIcon = isVideo ? "📹" : "📞";
+    let content: string;
+    if (type === "missed") {
+      content = `${callIcon} মিসড কল`;
+    } else if (type === "rejected") {
+      content = `${callIcon} কল রিজেক্ট`;
+    } else {
+      const mins = Math.floor((durationSecs || 0) / 60);
+      const secs = (durationSecs || 0) % 60;
+      const dur = mins > 0 ? `${mins} মিনিট ${secs} সেকেন্ড` : `${secs} সেকেন্ড`;
+      content = `${callIcon} কল শেষ — ${dur}`;
+    }
+    await sendMessage(convo.id, callerId, content, "text");
+  } catch {
+    // Don't block call flow if message fails
+  }
+}

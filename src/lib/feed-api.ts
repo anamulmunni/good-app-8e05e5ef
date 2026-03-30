@@ -379,10 +379,10 @@ export async function fetchYouTubeSuggestions(query: string): Promise<string[]> 
   }
 }
 
-async function fetchYouTubeViaEdge(query: string, action = "search", order = "relevance", maxResults = 25): Promise<any[]> {
+async function fetchYouTubeViaEdge(query: string, action = "search", order = "relevance", maxResults = 25, pageToken?: string): Promise<{ results: any[]; nextPageToken?: string }> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl) return [];
+  if (!supabaseUrl) return { results: [] };
 
   try {
     const params = new URLSearchParams({ maxResults: String(maxResults), order });
@@ -391,6 +391,7 @@ async function fetchYouTubeViaEdge(query: string, action = "search", order = "re
     } else if (query) {
       params.set("q", query);
     }
+    if (pageToken) params.set("pageToken", pageToken);
     const url = `${supabaseUrl}/functions/v1/youtube-search?${params}`;
     const res = await fetch(url, {
       headers: {
@@ -399,11 +400,14 @@ async function fetchYouTubeViaEdge(query: string, action = "search", order = "re
       },
       signal: AbortSignal.timeout(9500),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { results: [] };
     const data = await res.json();
-    return Array.isArray(data?.results) ? data.results : [];
+    return {
+      results: Array.isArray(data?.results) ? data.results : [],
+      nextPageToken: data?.nextPageToken || undefined,
+    };
   } catch {
-    return [];
+    return { results: [] };
   }
 }
 
@@ -436,31 +440,30 @@ async function fetchYouTubeVideos(
   searchQuery?: string,
   rows = 30,
   order = "relevance",
-): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
+  pageToken?: string,
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; nextPageToken?: string }> {
   try {
     const trimmed = (searchQuery || "").trim();
-    let raw: any[];
+    let response: { results: any[]; nextPageToken?: string };
 
     if (trimmed) {
-      // User searched something - use search API
-      raw = await fetchYouTubeViaEdge(trimmed, "search", order, rows);
+      response = await fetchYouTubeViaEdge(trimmed, "search", order, rows, pageToken);
     } else {
-      // No query - fetch trending videos
-      raw = await fetchYouTubeViaEdge("", "trending", "relevance", rows);
+      response = await fetchYouTubeViaEdge("", "trending", "relevance", rows, pageToken);
     }
 
-    const videos = raw
+    const videos = response.results
       .map(youtubeResultToExternal)
       .filter(Boolean) as ExternalReelVideo[];
 
     if (videos.length > 0) {
-      return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
+      return { videos: videos.slice(0, rows), hasMore: videos.length >= rows || !!response.nextPageToken, nextPageToken: response.nextPageToken };
     }
 
     // If trending returned nothing, try a default search
     if (!trimmed) {
-      const fallbackRaw = await fetchYouTubeViaEdge("bangla new song 2026", "search", "viewCount", rows);
-      const fallbackVideos = fallbackRaw.map(youtubeResultToExternal).filter(Boolean) as ExternalReelVideo[];
+      const fallbackResp = await fetchYouTubeViaEdge("bangla new song 2026", "search", "viewCount", rows);
+      const fallbackVideos = fallbackResp.results.map(youtubeResultToExternal).filter(Boolean) as ExternalReelVideo[];
       return { videos: fallbackVideos.slice(0, rows), hasMore: false };
     }
 
@@ -597,12 +600,13 @@ export async function getBangladeshExternalVideos(
   searchQuery?: string,
   mode: "short" | "long" = "long",
   freshnessToken = 0,
-): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[] }> {
+  pageToken?: string,
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; categories?: string[]; nextPageToken?: string }> {
   const trimmedQuery = searchQuery?.trim();
 
   // Use YouTube only - with viewCount order for trending feel when no query
   const order = trimmedQuery ? "relevance" : "viewCount";
-  const ytResult = await fetchYouTubeVideos(trimmedQuery, Math.max(rows, 30), order);
+  const ytResult = await fetchYouTubeVideos(trimmedQuery, Math.max(rows, 30), order, pageToken);
 
   let videos = ytResult.videos;
 
@@ -624,6 +628,7 @@ export async function getBangladeshExternalVideos(
   return {
     videos: finalVideos,
     hasMore: ytResult.hasMore,
+    nextPageToken: ytResult.nextPageToken,
   };
 }
 

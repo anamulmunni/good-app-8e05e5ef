@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification } from "@/lib/call-api";
+import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification, sendCallMessage } from "@/lib/call-api";
 import { Phone, PhoneOff, User } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -66,10 +66,12 @@ export default function IncomingCallHandler() {
     document.querySelectorAll(".call-remote-audio").forEach((el) => el.remove());
   };
 
-  const endCall = (sendSignal = true) => {
+  const endCall = (sendSignal = true, reason?: "missed" | "rejected" | "completed") => {
     stopRingtone();
     clearInterval(durationTimerRef.current);
     clearRemoteAudio();
+    const finalDuration = callDuration;
+    const wasConnected = callActiveRef.current;
 
     if (peerRef.current) {
       peerRef.current.close();
@@ -86,8 +88,18 @@ export default function IncomingCallHandler() {
       sendCallSignal(user.id, currentIncomingCall.callerId, "call-ended");
     }
 
+    // Send call message to chat
+    if (user && currentIncomingCall) {
+      if (reason === "completed" && wasConnected && finalDuration > 0) {
+        sendCallMessage(currentIncomingCall.callerId, user.id, "completed", finalDuration);
+      } else if (reason === "missed") {
+        sendCallMessage(currentIncomingCall.callerId, user.id, "missed");
+      }
+    }
+
     setCallActive(false);
     setIsMuted(false);
+    setCallDuration(0);
     setIncomingCall(null);
   };
 
@@ -215,7 +227,8 @@ export default function IncomingCallHandler() {
         }
 
         if (["call-ended", "call-busy"].includes(signal.signal_type) && isSameCaller) {
-          endCall(false);
+          const wasActive = callActiveRef.current;
+          endCall(false, wasActive ? "completed" : "missed");
         }
 
         if (signal.signal_type === "ice-candidate" && signal.signal_data && isSameCaller) {
@@ -333,13 +346,14 @@ export default function IncomingCallHandler() {
       setCallDuration(0);
       durationTimerRef.current = setInterval(() => setCallDuration(d => d + 1), 1000);
     } catch {
-      endCall(true);
+      endCall(true, "completed");
     }
   };
 
   const rejectCall = () => {
     if (user && incomingCall) {
       sendCallSignal(user.id, incomingCall.callerId, "call-rejected");
+      sendCallMessage(incomingCall.callerId, user.id, "rejected");
     }
     stopRingtone();
     pendingIceCandidatesRef.current = [];

@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification } from "@/lib/call-api";
+import { sendCallSignal, cleanupCallSignals, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification, sendCallMessage } from "@/lib/call-api";
 import { Phone, PhoneOff, Mic, MicOff, User, ArrowLeft, Volume2, Video, VideoOff, CameraIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -93,6 +93,9 @@ export default function CallPage() {
             break;
           case "call-rejected":
           case "call-ended":
+            if (signal.signal_type === "call-rejected" && user) {
+              sendCallMessage(user.id, targetUserId, "rejected", undefined, isVideoCall);
+            }
             endCall(false);
             toast({ title: signal.signal_type === "call-rejected" ? "কল রিজেক্ট করা হয়েছে" : "কল শেষ" });
             break;
@@ -253,6 +256,8 @@ export default function CallPage() {
 
       noAnswerTimerRef.current = window.setTimeout(() => {
         if (["calling", "ringing"].includes(callStateRef.current)) {
+          // Send missed call message
+          if (user) sendCallMessage(user.id, targetUserId, "missed", undefined, isVideoCall);
           endCall(true);
           toast({ title: "কোনো উত্তর নেই" });
         }
@@ -265,6 +270,8 @@ export default function CallPage() {
   const endCall = useCallback((sendSignal = true) => {
     stopRingtone();
     if (noAnswerTimerRef.current) { clearTimeout(noAnswerTimerRef.current); noAnswerTimerRef.current = null; }
+    const finalDuration = callDuration;
+    const wasConnected = callStateRef.current === "connected";
     clearInterval(durationTimerRef.current);
     clearRemoteAudio();
     pendingIceCandidatesRef.current = [];
@@ -272,10 +279,14 @@ export default function CallPage() {
     if (peerRef.current) { peerRef.current.close(); peerRef.current = null; }
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
     if (sendSignal && user && targetUserId) { sendCallSignal(user.id, targetUserId, "call-ended"); }
+    // Send call duration or missed call message
+    if (user && targetUserId && wasConnected && finalDuration > 0) {
+      sendCallMessage(user.id, targetUserId, "completed", finalDuration, isVideoCall);
+    }
     setCallState("ended");
     setIsMuted(false);
     setTimeout(() => navigate(-1), 1500);
-  }, [user, targetUserId, navigate]);
+  }, [user, targetUserId, navigate, callDuration, isVideoCall]);
 
   const toggleMute = () => {
     if (localStreamRef.current) {

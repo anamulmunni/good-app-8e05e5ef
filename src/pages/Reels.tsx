@@ -283,6 +283,7 @@ export default function Reels() {
   const [selectedChip, setSelectedChip] = useState("All");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [extVideos, setExtVideos] = useState<ExternalReelVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
@@ -494,10 +495,10 @@ export default function Reels() {
     loadingRef.current = true;
     setLoading(true);
     const cursor = reset ? 1 : page;
-    const requestPage = normalizeExternalPage(activeQuery ? cursor : cursor + refreshTick * 5);
+    const currentPageToken = reset ? undefined : nextPageToken;
     try {
       let [externalResult, localResult] = await Promise.all([
-        getBangladeshExternalVideos(requestPage, 30, undefined, activeQuery || undefined, "long", refreshTick + cursor * 17),
+        getBangladeshExternalVideos(cursor, 30, undefined, activeQuery || undefined, "long", refreshTick + cursor * 17, currentPageToken),
         getUploadedLongVideos(cursor, 12, activeQuery || undefined),
       ]);
       // Interleave local videos randomly into external results
@@ -509,7 +510,7 @@ export default function Reels() {
         merged.splice(pos, 0, lv);
       }
 
-      if (!activeQuery && merged.length === 0 && requestPage !== 1) {
+      if (!activeQuery && merged.length === 0 && cursor !== 1) {
         [externalResult, localResult] = await Promise.all([
           getBangladeshExternalVideos(1, 30, undefined, undefined, "long", refreshTick),
           getUploadedLongVideos(cursor, 12),
@@ -527,26 +528,27 @@ export default function Reels() {
         return dedupeVideos([...base, ...merged.filter((v) => !seen.has(v.id))]);
       });
       setHasMore(localResult.hasMore || externalResult.hasMore);
+      setNextPageToken(externalResult.nextPageToken);
       setPage(cursor + 1);
     } finally {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [hasMore, page, activeQuery, refreshTick]);
+  }, [hasMore, page, activeQuery, refreshTick, nextPageToken]);
 
   useEffect(() => {
     if (!user) return;
     setPage(1);
     setHasMore(true);
     setExtVideos([]);
+    setNextPageToken(undefined);
     loadingRef.current = false;
     const run = async () => {
       loadingRef.current = true;
       setLoading(true);
       try {
-        let externalStartPage = activeQuery ? 1 : randomExternalStartPage(refreshTick);
         let [externalResult, localResult] = await Promise.all([
-          getBangladeshExternalVideos(externalStartPage, 20, undefined, activeQuery || undefined, "long", refreshTick),
+          getBangladeshExternalVideos(1, 20, undefined, activeQuery || undefined, "long", refreshTick),
           getUploadedLongVideos(1, 10, activeQuery || undefined),
         ]);
         // Interleave local videos randomly
@@ -556,8 +558,7 @@ export default function Reels() {
           merged.splice(pos, 0, lv);
         }
 
-        if (!activeQuery && merged.length === 0 && externalStartPage !== 1) {
-          externalStartPage = 1;
+        if (!activeQuery && merged.length === 0) {
           [externalResult, localResult] = await Promise.all([
             getBangladeshExternalVideos(1, 20, undefined, undefined, "long", refreshTick),
             getUploadedLongVideos(1, 10),
@@ -571,6 +572,7 @@ export default function Reels() {
 
         setExtVideos(merged);
         setHasMore(localResult.hasMore || externalResult.hasMore);
+        setNextPageToken(externalResult.nextPageToken);
         setPage(2);
       } finally {
         loadingRef.current = false;

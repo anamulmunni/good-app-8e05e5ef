@@ -144,7 +144,7 @@ export default function ShortReels() {
       try {
         const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
         const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=search&category=${selectedCategory}`,
+          `https://${projectId}.supabase.co/functions/v1/youtube-shorts?action=search&category=${selectedCategory}&t=${Date.now()}`,
           { headers: { "Content-Type": "application/json" } }
         );
         if (!res.ok) return [];
@@ -152,7 +152,7 @@ export default function ShortReels() {
         return (data?.results || []).map((item: any) => ({
           id: `yt-${item.videoId}`,
           user_id: 0,
-          video_url: "", // Will be loaded lazily via stream
+          video_url: "",
           content: item.title,
           likes_count: Math.floor(Math.random() * 2000) + 100,
           comments_count: Math.floor(Math.random() * 100),
@@ -168,7 +168,8 @@ export default function ShortReels() {
       }
     },
     enabled: !!user,
-    staleTime: 10 * 60 * 1000, // 10 min cache
+    staleTime: 2 * 60 * 1000, // 2 min cache (short so re-entry shows fresh)
+    refetchOnMount: "always",
   });
 
   // Fetch user-posted short videos
@@ -215,17 +216,28 @@ export default function ShortReels() {
 
   const videosLoading = userLoading || ytLoading;
 
+  // Shuffle videos on each mount so re-entry shows different order
+  const shuffledVideos = useMemo(() => {
+    if (videos.length === 0) return [];
+    const arr = [...videos];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [videos]);
+
   // Load reactions
   useEffect(() => {
-    if (user && videos.length > 0) {
-      const nonSampleIds = videos.filter(v => !v.isSample).map(v => v.id);
+    if (user && shuffledVideos.length > 0) {
+      const nonSampleIds = shuffledVideos.filter(v => !v.isSample).map(v => v.id);
       if (nonSampleIds.length > 0) {
         getUserReactions(user.id, nonSampleIds).then(setUserReactions);
       }
     }
-  }, [user, videos]);
+  }, [user, shuffledVideos]);
 
-  const currentVideo = videos[currentIndex];
+  const currentVideo = shuffledVideos[currentIndex];
 
   // Auto-play current video, pause others
   useEffect(() => {
@@ -246,11 +258,11 @@ export default function ShortReels() {
     const scrollTop = container.scrollTop;
     const h = container.clientHeight;
     const newIndex = Math.round(scrollTop / h);
-    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videos.length) {
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < shuffledVideos.length) {
       setCurrentIndex(newIndex);
       setPaused(false);
     }
-  }, [currentIndex, videos.length]);
+  }, [currentIndex, shuffledVideos.length]);
 
   const handleVideoTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -356,7 +368,7 @@ export default function ShortReels() {
             <p className="text-white/60 text-sm">ভিডিও খোঁজা হচ্ছে...</p>
           </div>
         </div>
-      ) : videos.length === 0 ? (
+      ) : shuffledVideos.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-white">
           <Play className="w-16 h-16 mb-4 opacity-40" />
           <p className="text-lg font-bold">কোনো Reels নেই</p>
@@ -369,7 +381,7 @@ export default function ShortReels() {
           className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
           style={{ scrollSnapType: "y mandatory" }}
         >
-          {videos.map((video, index) => (
+          {shuffledVideos.map((video, index) => (
             <div
               key={video.id}
               className="h-full w-full relative snap-start snap-always"
