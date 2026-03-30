@@ -66,6 +66,8 @@ export default function Dashboard() {
   const [showRequestSection, setShowRequestSection] = useState(false);
   const [showWalletDrawer, setShowWalletDrawer] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
