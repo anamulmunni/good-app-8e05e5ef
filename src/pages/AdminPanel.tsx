@@ -328,6 +328,48 @@ export default function AdminPanel() {
           </div>
         </div>
 
+        {/* Account Stats */}
+        <div className="grid grid-cols-2 gap-3">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="glass-card p-4 rounded-2xl border-2 border-[hsl(var(--cyan))]/30 text-center relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg, hsl(var(--cyan) / 0.08), hsl(var(--blue) / 0.08))" }}
+          >
+            <motion.div
+              className="absolute inset-0 opacity-20"
+              style={{ background: "linear-gradient(90deg, transparent, hsl(var(--cyan) / 0.3), transparent)", backgroundSize: "200% 100%" }}
+              animate={{ backgroundPosition: ["200% 0%", "-200% 0%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            />
+            <div className="relative z-10">
+              <Users className="w-6 h-6 text-[hsl(var(--cyan))] mx-auto mb-1" />
+              <p className="text-3xl font-black text-[hsl(var(--cyan))]">{users?.length || 0}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold">মোট অ্যাকাউন্ট</p>
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="glass-card p-4 rounded-2xl border-2 border-[hsl(var(--amber))]/30 text-center relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg, hsl(var(--amber) / 0.08), hsl(var(--orange) / 0.08))" }}
+          >
+            <motion.div
+              className="absolute inset-0 opacity-20"
+              style={{ background: "linear-gradient(90deg, transparent, hsl(var(--amber) / 0.3), transparent)", backgroundSize: "200% 100%" }}
+              animate={{ backgroundPosition: ["200% 0%", "-200% 0%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 0.5 }}
+            />
+            <div className="relative z-10">
+              <ShieldCheck className="w-6 h-6 text-[hsl(var(--amber))] mx-auto mb-1" />
+              <p className="text-3xl font-black text-[hsl(var(--amber))]">{users?.filter(u => u.key_count >= 5).length || 0}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold">৫+ ভেরিফাইড</p>
+            </div>
+          </motion.div>
+        </div>
+
         {showActiveUsers && (
           <div className="glass-card p-4 rounded-2xl border border-[hsl(var(--blue))]/30">
             <h3 className="text-sm font-bold mb-3 text-[hsl(var(--blue))]">Active Users</h3>
