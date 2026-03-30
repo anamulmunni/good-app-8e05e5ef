@@ -371,6 +371,25 @@ export default function Reels() {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
 
+  // Browser back button: close video player or go back
+  useEffect(() => {
+    const handlePopState = () => {
+      if (selectedVideo) {
+        // Push state again so we stay on the page
+        window.history.pushState(null, "", window.location.href);
+        setSelectedVideo(null);
+        setMiniPlayer(false);
+      }
+    };
+
+    if (selectedVideo) {
+      window.history.pushState(null, "", window.location.href);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [selectedVideo]);
+
   // Handle ?play=postId to auto-play a specific video
   useEffect(() => {
     if (!playParam || !user || playParamHandledRef.current) return;
