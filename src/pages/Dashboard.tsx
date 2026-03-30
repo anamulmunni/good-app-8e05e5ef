@@ -154,6 +154,17 @@ export default function Dashboard() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // Celebration when key_count increases
+  useEffect(() => {
+    if (user?.key_count != null) {
+      if (prevKeyCount !== null && user.key_count > prevKeyCount) {
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 3000);
+      }
+      setPrevKeyCount(user.key_count);
+    }
+  }, [user?.key_count]);
+
   useEffect(() => {
     if (!user?.id) return;
 
