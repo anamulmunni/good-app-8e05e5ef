@@ -66,10 +66,12 @@ export default function IncomingCallHandler() {
     document.querySelectorAll(".call-remote-audio").forEach((el) => el.remove());
   };
 
-  const endCall = (sendSignal = true) => {
+  const endCall = (sendSignal = true, reason?: "missed" | "rejected" | "completed") => {
     stopRingtone();
     clearInterval(durationTimerRef.current);
     clearRemoteAudio();
+    const finalDuration = callDuration;
+    const wasConnected = callActiveRef.current;
 
     if (peerRef.current) {
       peerRef.current.close();
@@ -86,8 +88,18 @@ export default function IncomingCallHandler() {
       sendCallSignal(user.id, currentIncomingCall.callerId, "call-ended");
     }
 
+    // Send call message to chat
+    if (user && currentIncomingCall) {
+      if (reason === "completed" && wasConnected && finalDuration > 0) {
+        sendCallMessage(currentIncomingCall.callerId, user.id, "completed", finalDuration);
+      } else if (reason === "missed") {
+        sendCallMessage(currentIncomingCall.callerId, user.id, "missed");
+      }
+    }
+
     setCallActive(false);
     setIsMuted(false);
+    setCallDuration(0);
     setIncomingCall(null);
   };
 
