@@ -440,31 +440,30 @@ async function fetchYouTubeVideos(
   searchQuery?: string,
   rows = 30,
   order = "relevance",
-): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean }> {
+  pageToken?: string,
+): Promise<{ videos: ExternalReelVideo[]; hasMore: boolean; nextPageToken?: string }> {
   try {
     const trimmed = (searchQuery || "").trim();
-    let raw: any[];
+    let response: { results: any[]; nextPageToken?: string };
 
     if (trimmed) {
-      // User searched something - use search API
-      raw = await fetchYouTubeViaEdge(trimmed, "search", order, rows);
+      response = await fetchYouTubeViaEdge(trimmed, "search", order, rows, pageToken);
     } else {
-      // No query - fetch trending videos
-      raw = await fetchYouTubeViaEdge("", "trending", "relevance", rows);
+      response = await fetchYouTubeViaEdge("", "trending", "relevance", rows, pageToken);
     }
 
-    const videos = raw
+    const videos = response.results
       .map(youtubeResultToExternal)
       .filter(Boolean) as ExternalReelVideo[];
 
     if (videos.length > 0) {
-      return { videos: videos.slice(0, rows), hasMore: videos.length >= rows };
+      return { videos: videos.slice(0, rows), hasMore: videos.length >= rows || !!response.nextPageToken, nextPageToken: response.nextPageToken };
     }
 
     // If trending returned nothing, try a default search
     if (!trimmed) {
-      const fallbackRaw = await fetchYouTubeViaEdge("bangla new song 2026", "search", "viewCount", rows);
-      const fallbackVideos = fallbackRaw.map(youtubeResultToExternal).filter(Boolean) as ExternalReelVideo[];
+      const fallbackResp = await fetchYouTubeViaEdge("bangla new song 2026", "search", "viewCount", rows);
+      const fallbackVideos = fallbackResp.results.map(youtubeResultToExternal).filter(Boolean) as ExternalReelVideo[];
       return { videos: fallbackVideos.slice(0, rows), hasMore: false };
     }
 
