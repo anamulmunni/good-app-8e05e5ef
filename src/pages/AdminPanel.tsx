@@ -96,6 +96,7 @@ export default function AdminPanel() {
   const [youtubeApiKeys, setYoutubeApiKeys] = useState("");
   const [youtubeKeysLoading, setYoutubeKeysLoading] = useState(false);
   const [youtubeKeyStatus, setYoutubeKeyStatus] = useState<any>(null);
+  const [youtubeKeysLoaded, setYoutubeKeysLoaded] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
