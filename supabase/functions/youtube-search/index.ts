@@ -277,6 +277,7 @@ async function searchViaYouTubeHTML(query: string, maxResults = 25): Promise<{ r
           channelId: vr.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || "",
           thumbnail: `https://i.ytimg.com/vi/${vr.videoId}/hqdefault.jpg`,
           publishedAt: vr.publishedTimeText?.simpleText || "",
+          lengthSeconds: parseDurationText(vr.lengthText?.simpleText || ""),
         });
         if (results.length >= maxResults) break;
       }
