@@ -267,6 +267,8 @@ export default function CallPage() {
   const endCall = useCallback((sendSignal = true) => {
     stopRingtone();
     if (noAnswerTimerRef.current) { clearTimeout(noAnswerTimerRef.current); noAnswerTimerRef.current = null; }
+    const finalDuration = callDuration;
+    const wasConnected = callStateRef.current === "connected";
     clearInterval(durationTimerRef.current);
     clearRemoteAudio();
     pendingIceCandidatesRef.current = [];
@@ -274,10 +276,14 @@ export default function CallPage() {
     if (peerRef.current) { peerRef.current.close(); peerRef.current = null; }
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
     if (sendSignal && user && targetUserId) { sendCallSignal(user.id, targetUserId, "call-ended"); }
+    // Send call duration or missed call message
+    if (user && targetUserId && wasConnected && finalDuration > 0) {
+      sendCallMessage(user.id, targetUserId, "completed", finalDuration, isVideoCall);
+    }
     setCallState("ended");
     setIsMuted(false);
     setTimeout(() => navigate(-1), 1500);
-  }, [user, targetUserId, navigate]);
+  }, [user, targetUserId, navigate, callDuration, isVideoCall]);
 
   const toggleMute = () => {
     if (localStreamRef.current) {
