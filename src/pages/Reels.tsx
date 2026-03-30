@@ -233,8 +233,6 @@ function randomExternalStartPage(seed = 0): number {
 
 function buildExternalPlayerUrl(url: string, autoplay = false) {
   const params = new URLSearchParams();
-  // YouTube autoplay with sound is often force-muted by browser policy.
-  // We keep autoplay off and start playback through a user tap.
   if (isYouTubeEmbed(url)) {
     params.set("autoplay", autoplay ? "1" : "0");
     params.set("mute", "0");
@@ -242,6 +240,9 @@ function buildExternalPlayerUrl(url: string, autoplay = false) {
     params.set("modestbranding", "1");
     params.set("playsinline", "1");
     params.set("enablejsapi", "1");
+    params.set("controls", "1");
+    params.set("showinfo", "0");
+    params.set("iv_load_policy", "3");
     if (typeof window !== "undefined") {
       params.set("origin", window.location.origin);
     }
