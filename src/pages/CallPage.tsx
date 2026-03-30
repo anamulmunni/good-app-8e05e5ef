@@ -93,6 +93,9 @@ export default function CallPage() {
             break;
           case "call-rejected":
           case "call-ended":
+            if (signal.signal_type === "call-rejected" && user) {
+              sendCallMessage(user.id, targetUserId, "rejected", undefined, isVideoCall);
+            }
             endCall(false);
             toast({ title: signal.signal_type === "call-rejected" ? "কল রিজেক্ট করা হয়েছে" : "কল শেষ" });
             break;
