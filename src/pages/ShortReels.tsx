@@ -192,10 +192,16 @@ export default function ShortReels() {
       ) : (
         <div
           ref={containerRef}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
           className="h-full w-full relative overflow-hidden"
         >
+          {/* Touch overlay to capture swipes above iframe */}
+          <div
+            className="absolute inset-0 z-10"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            style={{ touchAction: "none" }}
+          />
+
           {/* Render current, previous and next for smooth transitions */}
           {reelQueue.map((item, index) => {
             const offset = index - currentIndex;
@@ -219,7 +225,7 @@ export default function ShortReels() {
                   allow="autoplay; encrypted-media; accelerometer; gyroscope"
                   allowFullScreen={false}
                   loading={isActive ? "eager" : "lazy"}
-                  style={{ pointerEvents: isActive ? "auto" : "none" }}
+                  style={{ pointerEvents: "none" }}
                 />
 
                 {/* Minimal info overlay at bottom */}
