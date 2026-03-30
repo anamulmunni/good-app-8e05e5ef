@@ -353,6 +353,7 @@ export default function IncomingCallHandler() {
   const rejectCall = () => {
     if (user && incomingCall) {
       sendCallSignal(user.id, incomingCall.callerId, "call-rejected");
+      sendCallMessage(incomingCall.callerId, user.id, "rejected");
     }
     stopRingtone();
     pendingIceCandidatesRef.current = [];
