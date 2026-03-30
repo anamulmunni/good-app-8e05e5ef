@@ -100,6 +100,15 @@ export default function AdminPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Auto-load YouTube API keys
+  useEffect(() => {
+    if (isLoggedIn && !youtubeKeysLoaded) {
+      setYoutubeKeysLoaded(true);
+      supabase.from("settings").select("value").eq("key", "youtube_api_keys").maybeSingle()
+        .then(({ data }) => { if (data?.value) setYoutubeApiKeys(data.value); });
+    }
+  }, [isLoggedIn, youtubeKeysLoaded]);
+
   const trimmedRequesterSearch = requesterRequestSearch.trim();
 
   // Queries
