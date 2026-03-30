@@ -158,6 +158,52 @@ async function searchShortsViaPiped(query: string, maxResults = 30): Promise<any
   return [];
 }
 
+// ── YouTube HTML scraping for shorts ─────────────────────────────────────
+async function searchShortsViaHTML(query: string, maxResults = 30): Promise<any[]> {
+  try {
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query + " #shorts")}&sp=EgIYAQ%3D%3D`;
+    const res = await withTimeout(fetch(searchUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "bn-BD,bn;q=0.9,en;q=0.8",
+      },
+    }), 10000);
+    if (!res.ok) { await res.text().catch(() => {}); return []; }
+    const html = await res.text();
+
+    const match = html.match(/var\s+ytInitialData\s*=\s*({.+?});\s*<\/script>/s)
+      || html.match(/ytInitialData\s*=\s*({.+?});\s*/s);
+    if (!match) return [];
+
+    const data = JSON.parse(match[1]);
+    const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
+      ?.sectionListRenderer?.contents || [];
+
+    const results: any[] = [];
+    for (const section of contents) {
+      const items = section?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const vr = item?.videoRenderer;
+        if (!vr?.videoId) continue;
+        results.push({
+          videoId: vr.videoId,
+          title: vr.title?.runs?.[0]?.text || "",
+          author: vr.ownerText?.runs?.[0]?.text || "",
+          thumbnail: `https://i.ytimg.com/vi/${vr.videoId}/hqdefault.jpg`,
+        });
+        if (results.length >= maxResults) break;
+      }
+      if (results.length >= maxResults) break;
+    }
+
+    if (results.length > 0) console.log(`YouTube HTML shorts: ${results.length} results`);
+    return results;
+  } catch (e) {
+    console.log("YouTube HTML shorts scraping failed:", String(e));
+    return [];
+  }
+}
+
 // ── Invidious search for shorts ─────────────────────────────────────────
 async function searchShortsFallback(query: string): Promise<any[]> {
   for (const instance of INVIDIOUS_INSTANCES) {
