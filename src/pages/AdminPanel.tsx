@@ -345,8 +345,8 @@ export default function AdminPanel() {
             />
             <div className="relative z-10">
               <Users className="w-6 h-6 text-[hsl(var(--cyan))] mx-auto mb-1" />
-              <p className="text-3xl font-black text-[hsl(var(--cyan))]">{users?.length || 0}</p>
-              <p className="text-[10px] text-muted-foreground font-semibold">মোট অ্যাকাউন্ট</p>
+              <p className="text-3xl font-black text-[hsl(var(--cyan))]">{users?.reduce((sum, u) => sum + (u.key_count || 0), 0) || 0}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold">মোট ভেরিফাইড</p>
             </div>
           </motion.div>
           <motion.div
