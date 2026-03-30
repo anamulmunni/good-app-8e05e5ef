@@ -283,6 +283,7 @@ export default function Reels() {
   const [selectedChip, setSelectedChip] = useState("All");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [extVideos, setExtVideos] = useState<ExternalReelVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
