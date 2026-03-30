@@ -247,11 +247,11 @@ export default function ShortReels() {
     const scrollTop = container.scrollTop;
     const h = container.clientHeight;
     const newIndex = Math.round(scrollTop / h);
-    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videos.length) {
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < shuffledVideos.length) {
       setCurrentIndex(newIndex);
       setPaused(false);
     }
-  }, [currentIndex, videos.length]);
+  }, [currentIndex, shuffledVideos.length]);
 
   const handleVideoTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
