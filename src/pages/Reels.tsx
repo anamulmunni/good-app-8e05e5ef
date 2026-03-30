@@ -1332,12 +1332,6 @@ export default function Reels() {
             )}
           </div>
 
-          <div className="px-3 py-2 flex items-center gap-2" style={{ background: "#0f0f0f", borderBottom: "1px solid #272727" }}>
-            <span className="text-[14px] font-semibold" style={{ color: "#f1f1f1" }}>Up next</span>
-            <span className="text-[12px]" style={{ color: "#aaa" }}>
-              • {searchQuery.trim() ? `search results for "${searchQuery.trim()}"` : "suggested new Bangla HD songs"}
-            </span>
-          </div>
         </div>
       )}
 
