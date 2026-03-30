@@ -29,6 +29,9 @@ const CATEGORY_QUERY: Record<string, string> = {
   music: "bangla song short video",
 };
 
+const SEEN_REELS_KEY = "goodapp-short-reels-seen-v2";
+const MAX_SEEN_REELS = 500;
+
 function shuffle<T>(items: T[]): T[] {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -38,17 +41,44 @@ function shuffle<T>(items: T[]): T[] {
   return arr;
 }
 
+function buildSessionSeed() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readSeenReels(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(SEEN_REELS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSeenReel(videoId: string) {
+  if (typeof window === "undefined" || !videoId) return;
+  try {
+    const existing = readSeenReels();
+    const next = [videoId, ...existing.filter((item) => item !== videoId)].slice(0, MAX_SEEN_REELS);
+    window.localStorage.setItem(SEEN_REELS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export default function ShortReels() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
   const [selectedCategory, setSelectedCategory] = useState("mixed");
+  const [sessionSeed, setSessionSeed] = useState(() => buildSessionSeed());
+  const [fetchBatch, setFetchBatch] = useState(0);
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
-  const canSwipe = useRef(true);
-  const seenVideoIds = useRef(new Set<string>());
+  const swipeLocked = useRef(false);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -59,13 +89,19 @@ export default function ShortReels() {
     return `https://${projectId}.supabase.co/functions/v1/youtube-shorts`;
   }, []);
 
-  const { data: candidates = [], isLoading: candidatesLoading } = useQuery({
-    queryKey: ["youtube-reels-candidates", selectedCategory],
+  const { data: candidates = [], isLoading: candidatesLoading, isFetching } = useQuery({
+    queryKey: ["youtube-reels-candidates", selectedCategory, sessionSeed, fetchBatch],
     enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const query = CATEGORY_QUERY[selectedCategory] || CATEGORY_QUERY.mixed;
-      const res = await fetch(`${baseFnUrl}?action=search&q=${encodeURIComponent(query)}&category=${selectedCategory}`);
+      const params = new URLSearchParams({
+        action: "search",
+        q: query,
+        category: selectedCategory,
+        seed: `${sessionSeed}-${fetchBatch}`,
+      });
+      const res = await fetch(`${baseFnUrl}?${params.toString()}`);
       if (!res.ok) throw new Error("failed to fetch shorts list");
       const data = await res.json();
       const items = Array.isArray(data?.results) ? data.results : [];
@@ -80,76 +116,92 @@ export default function ShortReels() {
     },
   });
 
-  // Build initial queue from candidates - avoid duplicates
-  useEffect(() => {
-    if (candidates.length === 0) return;
-    seenVideoIds.current.clear();
-    const unique = shuffle(candidates).filter((c) => {
-      if (seenVideoIds.current.has(c.videoId)) return false;
-      seenVideoIds.current.add(c.videoId);
-      return true;
-    });
-    setReelQueue(unique);
+  const handleCategoryChange = useCallback((categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setSessionSeed(buildSessionSeed());
+    setFetchBatch(0);
+    setReelQueue([]);
     setCurrentIndex(0);
-  }, [candidates]);
-
-  // Append more unique reels when near the end
-  const appendMore = useCallback(() => {
-    if (candidates.length === 0) return;
-    // If all candidates are seen, allow repeats but re-shuffle
-    const unseen = candidates.filter((c) => !seenVideoIds.current.has(c.videoId));
-    const pool = unseen.length > 3 ? unseen : candidates;
-    const next = shuffle(pool).slice(0, 20);
-    next.forEach((c) => seenVideoIds.current.add(c.videoId));
-    setReelQueue((prev) => [...prev, ...next]);
-  }, [candidates]);
+    swipeLocked.current = false;
+  }, []);
 
   useEffect(() => {
-    if (currentIndex >= reelQueue.length - 4 && reelQueue.length > 0) {
-      appendMore();
-    }
-  }, [currentIndex, reelQueue.length, appendMore]);
+    if (candidates.length === 0) return;
 
-  // Touch swipe handling
+    const recentlySeen = new Set(readSeenReels());
+    setReelQueue((prev) => {
+      const existingIds = new Set(prev.map((item) => item.videoId));
+      const freshItems = candidates.filter((item) => !existingIds.has(item.videoId) && !recentlySeen.has(item.videoId));
+
+      if (freshItems.length > 0) {
+        return [...prev, ...freshItems];
+      }
+
+      if (prev.length === 0) {
+        return candidates.filter((item) => !existingIds.has(item.videoId));
+      }
+
+      return prev;
+    });
+  }, [candidates]);
+
+  const currentReel = reelQueue[currentIndex];
+
+  useEffect(() => {
+    if (!currentReel?.videoId) return;
+    saveSeenReel(currentReel.videoId);
+  }, [currentReel?.videoId]);
+
+  useEffect(() => {
+    if (!user || isFetching || reelQueue.length === 0) return;
+    if (currentIndex < reelQueue.length - 3) return;
+    setFetchBatch((prev) => prev + 1);
+  }, [currentIndex, isFetching, reelQueue.length, user]);
+
+  const moveToNext = useCallback(() => {
+    setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
+  }, [reelQueue.length]);
+
+  const moveToPrev = useCallback(() => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  }, []);
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     touchStartX.current = e.touches[0].clientX;
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!canSwipe.current) return;
+    if (swipeLocked.current) return;
+
     const deltaY = touchStartY.current - e.changedTouches[0].clientY;
     const deltaX = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
 
-    // Ignore horizontal swipes
     if (deltaX > Math.abs(deltaY)) return;
+    if (Math.abs(deltaY) < 45) return;
 
-    const threshold = 40;
-    if (Math.abs(deltaY) < threshold) return;
+    swipeLocked.current = true;
+    if (deltaY > 0) moveToNext();
+    else moveToPrev();
 
-    canSwipe.current = false;
-    if (deltaY > 0) {
-      setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
-    } else {
-      setCurrentIndex((prev) => Math.max(prev - 1, 0));
-    }
-    setTimeout(() => { canSwipe.current = true; }, 350);
-  }, [reelQueue.length]);
+    window.setTimeout(() => {
+      swipeLocked.current = false;
+    }, 320);
+  }, [moveToNext, moveToPrev]);
 
-  // Mouse wheel for desktop
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!canSwipe.current) return;
-    if (Math.abs(e.deltaY) < 30) return;
-    canSwipe.current = false;
-    if (e.deltaY > 0) {
-      setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
-    } else {
-      setCurrentIndex((prev) => Math.max(prev - 1, 0));
-    }
-    setTimeout(() => { canSwipe.current = true; }, 400);
-  }, [reelQueue.length]);
+    if (swipeLocked.current) return;
+    if (Math.abs(e.deltaY) < 28) return;
 
-  // Build YouTube embed URL
+    swipeLocked.current = true;
+    if (e.deltaY > 0) moveToNext();
+    else moveToPrev();
+
+    window.setTimeout(() => {
+      swipeLocked.current = false;
+    }, 320);
+  }, [moveToNext, moveToPrev]);
+
   const buildEmbedUrl = useCallback((videoId: string, autoplay: boolean) => {
     const params = new URLSearchParams({
       autoplay: autoplay ? "1" : "0",
@@ -176,7 +228,6 @@ export default function ShortReels() {
 
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
-      {/* Header - above touch overlay */}
       <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 to-transparent">
         <div className="flex items-center justify-between px-3 py-2">
           <button onClick={() => navigate("/feed")} className="w-10 h-10 grid place-items-center text-white">
@@ -192,11 +243,9 @@ export default function ShortReels() {
           {CATEGORIES.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
+              onClick={() => handleCategoryChange(cat.id)}
               className={`px-3 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-all ${
-                selectedCategory === cat.id
-                  ? "bg-white text-black"
-                  : "bg-white/15 text-white/80"
+                selectedCategory === cat.id ? "bg-white text-black" : "bg-white/15 text-white/80"
               }`}
             >
               {cat.label}
@@ -205,7 +254,7 @@ export default function ShortReels() {
         </div>
       </div>
 
-      {candidatesLoading ? (
+      {candidatesLoading && reelQueue.length === 0 ? (
         <div className="h-full flex items-center justify-center">
           <Loader2 className="w-10 h-10 animate-spin text-white" />
         </div>
@@ -214,19 +263,14 @@ export default function ShortReels() {
           কোনো ভিডিও পাওয়া যায়নি
         </div>
       ) : (
-        <div
-          className="h-full w-full relative overflow-hidden"
-          onWheel={handleWheel}
-        >
-          {/* Touch overlay - starts below header (top ~90px) */}
+        <div className="h-full w-full relative overflow-hidden" onWheel={handleWheel}>
           <div
             className="absolute left-0 right-0 bottom-0 z-10"
-            style={{ top: "90px", touchAction: "none" }}
+            style={{ top: "92px", touchAction: "none" }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           />
 
-          {/* Render current ± 1 for smooth transitions */}
           {reelQueue.map((item, index) => {
             const offset = index - currentIndex;
             if (Math.abs(offset) > 1) return null;
@@ -248,7 +292,6 @@ export default function ShortReels() {
                   style={{ pointerEvents: "none" }}
                 />
 
-                {/* Info overlay at bottom */}
                 <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent px-4 pb-5 pt-10 pointer-events-none">
                   <p className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
                     {item.title}
