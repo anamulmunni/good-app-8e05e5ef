@@ -60,7 +60,7 @@ const YouTubeReelPlayer = forwardRef<HTMLDivElement, {
   // Far away - just show thumbnail
   if (!isActive && !isNearby) {
     return (
-      <div className="w-full h-full relative bg-black">
+      <div ref={ref} className="w-full h-full relative bg-black">
         <img
           src={`https://i.ytimg.com/vi/${videoId}/hq720.jpg`}
           className="w-full h-full object-cover"
@@ -78,7 +78,7 @@ const YouTubeReelPlayer = forwardRef<HTMLDivElement, {
 
   // Active = autoplay + sound, nearby = muted pre-buffer (hidden)
   return (
-    <div className="w-full h-full relative bg-black">
+    <div ref={ref} className="w-full h-full relative bg-black">
       {!loaded && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
           <img
@@ -90,7 +90,6 @@ const YouTubeReelPlayer = forwardRef<HTMLDivElement, {
         </div>
       )}
       <iframe
-        ref={ref as any}
         key={`${videoId}-${isActive ? "active" : "buffer"}`}
         src={`https://www.youtube.com/embed/${videoId}?autoplay=${isActive ? 1 : 0}&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&playsinline=1&mute=${isActive ? 0 : 1}&enablejsapi=0`}
         className="w-full h-full border-0"

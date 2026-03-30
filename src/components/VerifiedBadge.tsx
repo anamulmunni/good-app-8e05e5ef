@@ -1,12 +1,14 @@
+import { forwardRef } from "react";
 import { Check } from "lucide-react";
 
 type VerifiedBadgeProps = {
   className?: string;
 };
 
-export default function VerifiedBadge({ className = "" }: VerifiedBadgeProps) {
+const VerifiedBadge = forwardRef<HTMLSpanElement, VerifiedBadgeProps>(function VerifiedBadge({ className = "" }, ref) {
   return (
     <span
+      ref={ref}
       className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-full shadow-[0_0_6px_rgba(59,130,246,0.5)] ${className}`}
       style={{
         background: "linear-gradient(135deg, #1877F2, #42a5f5)",
@@ -22,4 +24,6 @@ export default function VerifiedBadge({ className = "" }: VerifiedBadgeProps) {
       `}</style>
     </span>
   );
-}
+});
+
+export default VerifiedBadge;
