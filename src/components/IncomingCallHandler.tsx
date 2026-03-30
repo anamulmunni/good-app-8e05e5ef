@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getUser } from "@/lib/api";
-import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification } from "@/lib/call-api";
+import { sendCallSignal, playRingtone, attachRemoteAudio, rtcConfig, showCallNotification, sendCallMessage } from "@/lib/call-api";
 import { Phone, PhoneOff, User } from "lucide-react";
 import { motion } from "framer-motion";
 
