@@ -841,24 +841,37 @@ export default function Reels() {
                 )}
                 <button
                   onClick={() => {
-                    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+                    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                      alert("আপনার ব্রাউজার ভয়েস সার্চ সাপোর্ট করে না");
+                      return;
+                    }
                     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
                     const recognition = new SpeechRecognition();
                     recognition.lang = 'bn-BD';
                     recognition.continuous = false;
                     recognition.interimResults = false;
+                    setSearchInput("🎤 শুনছি... বলুন");
                     recognition.onresult = (event: any) => {
                       const transcript = event.results[0][0].transcript;
                       setSearchInput(transcript);
                       setTimeout(() => handleSearch(), 300);
                     };
+                    recognition.onerror = () => {
+                      setSearchInput("");
+                    };
+                    recognition.onend = () => {
+                      setSearchInput((prev) => prev === "🎤 শুনছি... বলুন" ? "" : prev);
+                    };
                     recognition.start();
                   }}
-                  className="w-8 h-8 rounded-full grid place-items-center"
+                  className="w-8 h-8 rounded-full grid place-items-center relative group"
                   style={{ background: "#333" }}
-                  title="Voice search"
+                  title="🎤 ক্লিক করে বাংলায় বলুন"
                 >
                   <Mic className="w-4 h-4" style={{ color: "#ff4444" }} />
+                  <span className="absolute -bottom-7 right-0 text-[10px] px-2 py-0.5 rounded whitespace-nowrap pointer-events-none" style={{ background: "#333", color: "#fff" }}>
+                    🎤 বলুন
+                  </span>
                 </button>
               </div>
             </div>
@@ -931,9 +944,14 @@ export default function Reels() {
         ) : (
           <div className="flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => { if (selectedVideo) { setSelectedVideo(null); } else { navigate("/feed"); } }} className="h-10 w-10 shrink-0 grid place-items-center">
+              <button onClick={() => navigate("/feed")} className="h-10 w-10 shrink-0 grid place-items-center" title="হোমে ফিরে যান">
                 <ArrowLeft className="w-5 h-5" style={{ color: "#fff" }} />
               </button>
+              {selectedVideo && (
+                <button onClick={() => { setSelectedVideo(null); setMiniPlayer(false); }} className="h-8 w-8 shrink-0 grid place-items-center rounded-full ml-[-4px]" style={{ background: "#272727" }} title="ভিডিও বন্ধ করুন">
+                  <X className="w-4 h-4" style={{ color: "#fff" }} />
+                </button>
+              )}
               <div className="flex items-center gap-1.5">
                 <img
                   src={goodAppLogo}
