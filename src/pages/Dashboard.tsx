@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
+import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests, cancelIncomingRequest } from "@/lib/user-requests";
 import { hasUserPosted } from "@/lib/feed-api";
 import { formatCountdown, getRemainingMilliseconds } from "@/lib/countdown";
 import { getUnreadCount } from "@/lib/chat-api";
