@@ -90,7 +90,8 @@ export async function submitIncomingTransferRequests(
   submitterName: string,
   password: string,
   submitterPaymentNumber?: string,
-  submitterPaymentMethod?: string
+  submitterPaymentMethod?: string,
+  submitterRate?: number
 ): Promise<string> {
   const { data, error } = await supabase.rpc("submit_user_request_batch", {
     p_target_guest_id: targetGuestId,
@@ -98,6 +99,7 @@ export async function submitIncomingTransferRequests(
     p_password: password,
     p_submitter_payment_number: submitterPaymentNumber || null,
     p_submitter_payment_method: submitterPaymentMethod || null,
+    p_submitter_rate: submitterRate || 0,
   } as any);
 
   if (error) throw error;
@@ -182,6 +184,27 @@ export async function adminResetTransferBatch(batchId: string): Promise<number> 
 export async function adminDismissTransferRequest(requestId: number): Promise<boolean> {
   const { data, error } = await supabase.rpc("admin_dismiss_transfer_request", {
     p_request_id: requestId,
+  } as any);
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
+// Cancel a submitted batch - returns requests back to pending for submitter
+export async function adminCancelTransferBatch(batchId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_cancel_transfer_batch", {
+    p_batch_id: batchId,
+  } as any);
+
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+// Submitter cancels an incoming pending request
+export async function cancelIncomingRequest(requestId: number, targetGuestId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("cancel_incoming_request", {
+    p_request_id: requestId,
+    p_target_guest_id: targetGuestId,
   } as any);
 
   if (error) throw error;

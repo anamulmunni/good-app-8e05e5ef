@@ -17,6 +17,7 @@ import {
   adminResetTransferRequest,
   adminResetTransferBatch,
   adminDismissTransferRequest,
+  adminCancelTransferBatch,
 } from "@/lib/user-requests";
 import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff, ToggleLeft, ToggleRight, Wallet, Settings, FileText, CreditCard, Clock, Youtube } from "lucide-react";
 import { motion } from "framer-motion";
@@ -94,6 +95,7 @@ export default function AdminPanel() {
   const [requestLockUntilSetting, setRequestLockUntilSetting] = useState("");
   const [resetHistorySearch, setResetHistorySearch] = useState("");
   const [youtubeApiKeyInput, setYoutubeApiKeyInput] = useState("");
+  const [minRequestTargetSetting, setMinRequestTargetSetting] = useState("0");
   const [savedYoutubeKeys, setSavedYoutubeKeys] = useState<string[]>([]);
   const [youtubeKeysLoading, setYoutubeKeysLoading] = useState(false);
   const [youtubeKeyStatus, setYoutubeKeyStatus] = useState<any>(null);
@@ -173,6 +175,7 @@ export default function AdminPanel() {
       setVideoUrl(settingsData.videoUrl || "");
       setRequestSubmitPasswordSetting(settingsData.requestSubmitPassword || "");
       setMinRequestVerifiedSetting(String(settingsData.minRequestVerified || 10));
+      setMinRequestTargetSetting(String(settingsData.minRequestTarget || 0));
       setPaymentModeSetting(settingsData.paymentMode || "off");
       setMinWithdrawSetting(String(settingsData.minWithdraw || 50));
       setWithdrawLockUntilSetting(isoToDatetimeLocal(settingsData.withdrawLockUntil));
@@ -208,7 +211,7 @@ export default function AdminPanel() {
   });
 
   const rateMutation = useMutation({
-    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string; requestSubmitPassword?: string; minRequestVerified?: number; minWithdraw?: number; withdrawLockUntil?: string; requestLockUntil?: string }) => {
+    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string; requestSubmitPassword?: string; minRequestVerified?: number; minRequestTarget?: number; minWithdraw?: number; withdrawLockUntil?: string; requestLockUntil?: string }) => {
       if (data.rate !== undefined && Number.isFinite(data.rate)) await updateSetting("rewardRate", String(data.rate));
       if (data.status !== undefined) await updateSetting("buyStatus", data.status);
       if (data.bonusStatus !== undefined) await updateSetting("bonusStatus", data.bonusStatus);
@@ -217,6 +220,7 @@ export default function AdminPanel() {
       if (data.videoUrl !== undefined) await updateSetting("videoUrl", data.videoUrl);
       if (data.requestSubmitPassword !== undefined) await updateSetting("requestSubmitPassword", data.requestSubmitPassword);
       if (data.minRequestVerified !== undefined && Number.isFinite(data.minRequestVerified)) await updateSetting("minRequestVerified", String(data.minRequestVerified));
+      if (data.minRequestTarget !== undefined && Number.isFinite(data.minRequestTarget)) await updateSetting("minRequestTarget", String(data.minRequestTarget));
       if (data.minWithdraw !== undefined && Number.isFinite(data.minWithdraw)) await updateSetting("minWithdraw", String(data.minWithdraw));
       if (data.withdrawLockUntil !== undefined) await updateSetting("withdrawLockUntil", data.withdrawLockUntil);
       if (data.requestLockUntil !== undefined) await updateSetting("requestLockUntil", data.requestLockUntil);
@@ -276,6 +280,10 @@ export default function AdminPanel() {
   const cancelRequesterRequestsMutation = useMutation({
     mutationFn: adminCancelRequestsByRequester,
     onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি active request cancel হয়েছে` }); },
+  });
+  const cancelTransferBatchMutation = useMutation({
+    mutationFn: adminCancelTransferBatch,
+    onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি request ফিরে গেছে submitter এর কাছে` }); },
   });
 
   const filteredUsers = users?.filter(u => searchQuery ? u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) : true);
@@ -647,10 +655,21 @@ export default function AdminPanel() {
                   <div key={batch.id} className="glass-card border border-border rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between bg-primary/10 rounded-lg px-3 py-2">
                       <p className="text-sm font-bold text-primary">📋 {batch.request_count} টি নম্বর • মোট {totalBatchVerified} ভেরিফাইড</p>
-                      <button onClick={() => resetTransferBatchMutation.mutate(batch.id)} disabled={resetTransferBatchMutation.isPending} className="p-2 rounded-lg bg-primary/20 hover:bg-primary/40 transition" title="Reset Batch">
-                        <RefreshCcw className="w-4 h-4 text-primary" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button onClick={() => { if (confirm("এই ব্যাচ Cancel করলে request গুলো submitter এর কাছে ফিরে যাবে। নিশ্চিত?")) cancelTransferBatchMutation.mutate(batch.id); }} disabled={cancelTransferBatchMutation.isPending} className="p-2 rounded-lg bg-[hsl(var(--amber))]/20 hover:bg-[hsl(var(--amber))]/40 transition" title="Cancel Batch (ফিরে যাবে)">
+                          <XCircle className="w-4 h-4 text-[hsl(var(--amber))]" />
+                        </button>
+                        <button onClick={() => resetTransferBatchMutation.mutate(batch.id)} disabled={resetTransferBatchMutation.isPending} className="p-2 rounded-lg bg-primary/20 hover:bg-primary/40 transition" title="Reset Batch">
+                          <RefreshCcw className="w-4 h-4 text-primary" />
+                        </button>
+                      </div>
                     </div>
+                    {/* Rate info */}
+                    {(batch as any).submitter_rate > 0 && (
+                      <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-lg px-3 py-1.5">
+                        <p className="text-xs font-bold text-[hsl(var(--amber))]">💰 রেট: {(batch as any).submitter_rate} TK/ভেরিফাই</p>
+                      </div>
+                    )}
                     <div className="bg-[hsl(var(--emerald))]/10 border border-[hsl(var(--emerald))]/20 rounded-lg px-3 py-2">
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mb-1">🧑 যে সাবমিট করেছে:</p>
                       <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || "Unknown"})</span></p>
@@ -1009,10 +1028,35 @@ export default function AdminPanel() {
                 <input type="number" value={minRequestVerifiedSetting} onChange={(e) => setMinRequestVerifiedSetting(e.target.value)} className="input-field text-sm" />
               </div>
             </div>
-            <button onClick={() => rateMutation.mutate({ requestSubmitPassword: requestSubmitPasswordSetting, minRequestVerified: parseInt(minRequestVerifiedSetting) || 10 })}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">সর্বনিম্ন Request টার্গেট (List Submit এ)</label>
+              <input type="number" value={minRequestTargetSetting} onChange={(e) => setMinRequestTargetSetting(e.target.value)} className="input-field text-sm" placeholder="0 = কোনো লিমিট নেই" />
+              <p className="text-[10px] text-muted-foreground mt-1">এর কম request থাকলে List Submit করতে পারবে না</p>
+            </div>
+            <button onClick={() => rateMutation.mutate({ requestSubmitPassword: requestSubmitPasswordSetting, minRequestVerified: parseInt(minRequestVerifiedSetting) || 10, minRequestTarget: parseInt(minRequestTargetSetting) || 0 })}
               disabled={rateMutation.isPending} className="btn-primary py-2.5 bg-[hsl(var(--cyan))] text-sm">
               {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "রিকুয়েস্ট সেটিংস সেভ"}
             </button>
+
+            {/* App Version - Force Refresh */}
+            <div className="pt-2 border-t border-border/50 space-y-3">
+              <div className="flex items-center gap-2">
+                <RefreshCcw className="w-4 h-4 text-[hsl(var(--amber))]" />
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Force Page Refresh</p>
+              </div>
+              <p className="text-[10px] text-muted-foreground">এটি চাপলে সব ইউজারের পেজ অটো রিফ্রেশ হবে</p>
+              <button
+                onClick={async () => {
+                  const currentVersion = settingsData?.appVersion || 0;
+                  await updateSetting("appVersion", String(currentVersion + 1));
+                  queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
+                  toast({ title: "সব ইউজারের পেজ রিফ্রেশ হবে" });
+                }}
+                className="btn-primary py-2.5 bg-[hsl(var(--amber))] text-sm w-full"
+              >
+                🔄 Force Refresh All Users
+              </button>
+            </div>
 
             <div className="pt-2 border-t border-border/50 space-y-3">
               <div className="flex items-center gap-2">

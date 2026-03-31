@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPublicSettings, updateUserPaymentStatus } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests } from "@/lib/user-requests";
+import { createUserTransferRequest, getIncomingTransferRequests, submitIncomingTransferRequests, cancelIncomingRequest } from "@/lib/user-requests";
 import { hasUserPosted } from "@/lib/feed-api";
 import { formatCountdown, getRemainingMilliseconds } from "@/lib/countdown";
 import { getUnreadCount } from "@/lib/chat-api";
@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [nowMs, setNowMs] = useState(Date.now());
   const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
@@ -94,6 +95,12 @@ export default function Dashboard() {
   const createUserRequestMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
+      // Re-fetch latest settings to prevent stale page issue
+      const freshSettings = await getPublicSettings();
+      const freshMinVerified = freshSettings.minRequestVerified || 10;
+      if ((user.key_count || 0) < freshMinVerified) {
+        throw new Error(`সর্বনিম্ন ${freshMinVerified} টি ভেরিফাইড কাউন্ট দরকার। আপনার আছে ${user.key_count || 0} টি।`);
+      }
       await createUserTransferRequest({
         requesterUserId: user.id,
         requesterGuestId: user.guest_id,
@@ -116,12 +123,19 @@ export default function Dashboard() {
   const submitIncomingRequestsMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
+      // Re-fetch latest settings to prevent stale submissions
+      const freshSettings = await getPublicSettings();
+      const minTarget = freshSettings.minRequestTarget || 0;
+      if (minTarget > 0 && incomingRequests.length < minTarget) {
+        throw new Error(`সর্বনিম্ন ${minTarget} টি request দরকার, আপনার আছে ${incomingRequests.length} টি। কম হলে বাড়তি request গুলো Cancel করুন।`);
+      }
       return submitIncomingTransferRequests(
         user.guest_id,
         user.display_name || user.guest_id,
         requestSubmitPassword,
         submitterPaymentNumber.trim() || undefined,
-        submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined
+        submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined,
+        freshSettings.rewardRate || 0
       );
     },
     onSuccess: () => {
@@ -135,6 +149,20 @@ export default function Dashboard() {
     },
     onError: (error: Error) => {
       toast({ title: "সাবমিট ব্যর্থ হয়েছে", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelIncomingRequestMutation = useMutation({
+    mutationFn: async (requestId: number) => {
+      if (!user) throw new Error("ইউজার পাওয়া যায়নি");
+      return cancelIncomingRequest(requestId, user.guest_id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests", user?.guest_id] });
+      toast({ title: "Request cancel হয়েছে" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Cancel ব্যর্থ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -164,6 +192,17 @@ export default function Dashboard() {
       setPrevKeyCount(user.key_count);
     }
   }, [user?.key_count]);
+
+  // Auto-refresh: track appVersion changes and reload page
+  useEffect(() => {
+    if (publicSettings?.appVersion != null) {
+      if (loadedAppVersion === null) {
+        setLoadedAppVersion(publicSettings.appVersion);
+      } else if (publicSettings.appVersion !== loadedAppVersion) {
+        window.location.reload();
+      }
+    }
+  }, [publicSettings?.appVersion, loadedAppVersion]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -201,10 +240,12 @@ export default function Dashboard() {
   const targetAmount = publicSettings?.bonusTarget || 10;
   const customNoticeText = publicSettings?.customNotice;
   const minRequestVerified = publicSettings?.minRequestVerified || 10;
+  const minRequestTarget = publicSettings?.minRequestTarget || 0;
   const paymentMode = publicSettings?.paymentMode === "on";
   const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
+  const canSubmitList = minRequestTarget <= 0 || incomingRequests.length >= minRequestTarget;
   const requestLockRemainingMs = !paymentMode ? getRemainingMilliseconds(publicSettings?.requestLockUntil, nowMs) : 0;
   const isRequestLocked = requestLockRemainingMs > 0;
   const requestCountdownText = formatCountdown(requestLockRemainingMs);
@@ -980,11 +1021,42 @@ export default function Dashboard() {
                   )}
 
                   <div className="border-t border-border/50 pt-4 space-y-3">
-                    <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">আসা Request ({incomingRequests.length})</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">আসা Request ({incomingRequests.length})</h3>
+                      {minRequestTarget > 0 && (
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${canSubmitList ? "bg-[hsl(var(--emerald))]/20 text-[hsl(var(--emerald))]" : "bg-destructive/20 text-destructive"}`}>
+                          {incomingRequests.length}/{minRequestTarget} টার্গেট
+                        </span>
+                      )}
+                    </div>
                     {incomingRequests.length === 0 ? (
                       <p className="text-xs text-muted-foreground text-center py-3">কোনো request আসেনি</p>
                     ) : (
                       <>
+                        {/* Rate Info Box */}
+                        <motion.div
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-gradient-to-r from-[hsl(var(--amber))]/15 to-[hsl(var(--orange))]/10 border border-[hsl(var(--amber))]/30 rounded-xl p-3"
+                        >
+                          <p className="text-xs font-bold text-[hsl(var(--amber))]">💰 বর্তমান রেট: <span className="text-base">{currentRate} TK</span>/ভেরিফাই</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">এই রেটে Admin প্যানেলে সাবমিট হবে</p>
+                        </motion.div>
+
+                        {/* Minimum target warning */}
+                        {minRequestTarget > 0 && !canSubmitList && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 text-center"
+                          >
+                            <p className="text-xs font-bold text-destructive">
+                              সর্বনিম্ন {minRequestTarget} টি request দরকার। আপনার আছে {incomingRequests.length} টি।
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1">কম হলে বাড়তি request Cancel করে নতুন request আনুন।</p>
+                          </motion.div>
+                        )}
+
                         <div className="space-y-2 max-h-80 overflow-y-auto">
                           {incomingRequests.map((item) => (
                             <motion.div
@@ -995,9 +1067,20 @@ export default function Dashboard() {
                             >
                               <div className="flex items-center justify-between">
                                 <p className="text-sm font-bold font-mono">{item.requester_guest_id}</p>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-primary/20 text-primary">
-                                  {item.requester_verified_count} ✓
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-primary/20 text-primary">
+                                    {item.requester_verified_count} ✓
+                                  </span>
+                                  <motion.button
+                                    whileTap={{ scale: 0.85 }}
+                                    onClick={() => cancelIncomingRequestMutation.mutate(item.id)}
+                                    disabled={cancelIncomingRequestMutation.isPending}
+                                    className="p-1 rounded-lg bg-destructive/15 hover:bg-destructive/25 text-destructive transition-colors"
+                                    title="Cancel request"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </motion.button>
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
@@ -1058,7 +1141,7 @@ export default function Dashboard() {
                                 whileHover={{ scale: 1.03 }}
                                 onClick={() => submitIncomingRequestsMutation.mutate()}
                                 className="relative py-3 rounded-xl font-black text-sm overflow-hidden"
-                                disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}>
+                                disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim() || !canSubmitList}>
                                 <motion.div
                                   className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-primary to-[hsl(var(--emerald))]"
                                   animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
@@ -1086,8 +1169,14 @@ export default function Dashboard() {
                           <motion.button
                             whileTap={{ scale: 0.92 }}
                             whileHover={{ scale: 1.03, y: -2 }}
-                            onClick={() => setShowRequestSubmitPassword(true)}
-                            className="w-full relative py-3.5 rounded-2xl font-black overflow-hidden"
+                            onClick={() => {
+                              if (!canSubmitList) {
+                                toast({ title: `সর্বনিম্ন ${minRequestTarget} টি request দরকার`, description: `আপনার আছে ${incomingRequests.length} টি`, variant: "destructive" });
+                                return;
+                              }
+                              setShowRequestSubmitPassword(true);
+                            }}
+                            className={`w-full relative py-3.5 rounded-2xl font-black overflow-hidden ${!canSubmitList ? "opacity-50" : ""}`}
                           >
                             <motion.div
                               className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--purple))] via-[hsl(var(--pink))] to-[hsl(var(--purple))]"
@@ -1101,7 +1190,7 @@ export default function Dashboard() {
                               transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
                             />
                             <span className="relative z-10 text-primary-foreground flex items-center justify-center gap-2">
-                              📋 Full List Submit
+                              📋 Full List Submit {minRequestTarget > 0 ? `(${incomingRequests.length}/${minRequestTarget})` : ""}
                             </span>
                           </motion.button>
                         )}

@@ -721,6 +721,7 @@ export type Database = {
           submitted_to_admin_by: string
           submitter_payment_method: string | null
           submitter_payment_number: string | null
+          submitter_rate: number
           target_display_name: string | null
           target_guest_id: string
           target_user_id: number | null
@@ -733,6 +734,7 @@ export type Database = {
           submitted_to_admin_by?: string
           submitter_payment_method?: string | null
           submitter_payment_number?: string | null
+          submitter_rate?: number
           target_display_name?: string | null
           target_guest_id: string
           target_user_id?: number | null
@@ -745,6 +747,7 @@ export type Database = {
           submitted_to_admin_by?: string
           submitter_payment_method?: string | null
           submitter_payment_number?: string | null
+          submitter_rate?: number
           target_display_name?: string | null
           target_guest_id?: string
           target_user_id?: number | null
@@ -923,6 +926,10 @@ export type Database = {
         Args: { p_requester_guest_id: string }
         Returns: number
       }
+      admin_cancel_transfer_batch: {
+        Args: { p_batch_id: string }
+        Returns: number
+      }
       admin_dismiss_transfer_request: {
         Args: { p_request_id: number }
         Returns: boolean
@@ -935,17 +942,33 @@ export type Database = {
         Args: { p_admin_name?: string; p_request_id: number }
         Returns: boolean
       }
-      recalculate_all_balances: { Args: { p_rate: number }; Returns: undefined }
-      submit_user_request_batch: {
-        Args: {
-          p_password: string
-          p_submitter_name: string
-          p_submitter_payment_method?: string
-          p_submitter_payment_number?: string
-          p_target_guest_id: string
-        }
-        Returns: string
+      cancel_incoming_request: {
+        Args: { p_request_id: number; p_target_guest_id: string }
+        Returns: boolean
       }
+      recalculate_all_balances: { Args: { p_rate: number }; Returns: undefined }
+      submit_user_request_batch:
+        | {
+            Args: {
+              p_password: string
+              p_submitter_name: string
+              p_submitter_payment_method?: string
+              p_submitter_payment_number?: string
+              p_target_guest_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_password: string
+              p_submitter_name: string
+              p_submitter_payment_method?: string
+              p_submitter_payment_number?: string
+              p_submitter_rate?: number
+              p_target_guest_id: string
+            }
+            Returns: string
+          }
       sync_user_request_submission_count: {
         Args: { p_batch_id: string }
         Returns: undefined
