@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [requestSubmitPassword, setRequestSubmitPassword] = useState("");
   const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
+  const [submitterRate, setSubmitterRate] = useState("");
   const [showRequestSection, setShowRequestSection] = useState(false);
   const [showWalletDrawer, setShowWalletDrawer] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
@@ -73,9 +74,10 @@ export default function Dashboard() {
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
+    staleTime: 10000,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    refetchInterval: 15000,
   });
 
   const { data: incomingRequests = [] } = useQuery({
@@ -126,8 +128,18 @@ export default function Dashboard() {
       // Re-fetch latest settings to prevent stale submissions
       const freshSettings = await getPublicSettings();
       const minTarget = freshSettings.minRequestTarget || 0;
+      const freshMinVerified = freshSettings.minRequestVerified || 10;
       if (minTarget > 0 && incomingRequests.length < minTarget) {
-        throw new Error(`সর্বনিম্ন ${minTarget} টি request দরকার, আপনার আছে ${incomingRequests.length} টি। কম হলে বাড়তি request গুলো Cancel করুন।`);
+        throw new Error(`সর্বনিম্ন ${minTarget} টি request দরকার, আপনার আছে ${incomingRequests.length} টি।`);
+      }
+      // Check if any request has verified count below minimum
+      const belowMinRequests = incomingRequests.filter(r => (r.requester_verified_count || 0) < freshMinVerified);
+      if (belowMinRequests.length > 0) {
+        throw new Error(`${belowMinRequests.length} টি request এ verified count ${freshMinVerified} এর কম। ওইগুলো Cancel করুন তারপর submit করুন।`);
+      }
+      const rateToSubmit = parseInt(submitterRate) || 0;
+      if (rateToSubmit <= 0) {
+        throw new Error("রেট লিখুন (সংখ্যা)");
       }
       return submitIncomingTransferRequests(
         user.guest_id,
@@ -135,7 +147,7 @@ export default function Dashboard() {
         requestSubmitPassword,
         submitterPaymentNumber.trim() || undefined,
         submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined,
-        freshSettings.rewardRate || 0
+        rateToSubmit
       );
     },
     onSuccess: () => {
@@ -229,10 +241,18 @@ export default function Dashboard() {
       })
       .subscribe();
 
+    const requestsChannel = supabase
+      .channel('dashboard-requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_transfer_requests' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests", user?.guest_id] });
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(settingsChannel);
       supabase.removeChannel(usersChannel);
       supabase.removeChannel(txChannel);
+      supabase.removeChannel(requestsChannel);
     };
   }, [user?.id, queryClient, refreshUser]);
 
@@ -245,7 +265,8 @@ export default function Dashboard() {
   const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
-  const canSubmitList = minRequestTarget <= 0 || incomingRequests.length >= minRequestTarget;
+  const belowMinIncoming = incomingRequests.filter(r => (r.requester_verified_count || 0) < minRequestVerified);
+  const canSubmitList = (minRequestTarget <= 0 || incomingRequests.length >= minRequestTarget) && belowMinIncoming.length === 0;
   const requestLockRemainingMs = !paymentMode ? getRemainingMilliseconds(publicSettings?.requestLockUntil, nowMs) : 0;
   const isRequestLocked = requestLockRemainingMs > 0;
   const requestCountdownText = formatCountdown(requestLockRemainingMs);
@@ -687,62 +708,22 @@ export default function Dashboard() {
                   <span className="text-[10px] font-black text-[hsl(var(--purple))] tracking-wider">LIVE COUNT</span>
                 </motion.div>
               </div>
-              {/* Party confetti / sparkle particles */}
-              <div className="relative text-center py-5 overflow-hidden">
-                {/* Floating party particles */}
-                {[...Array(12)].map((_, i) => (
+               <div className="relative text-center py-5 overflow-hidden">
+                {/* Minimal floating particles */}
+                {[...Array(4)].map((_, i) => (
                   <motion.div
                     key={`particle-${i}`}
                     className="absolute rounded-full pointer-events-none"
                     style={{
-                      width: [4, 6, 5, 8, 4, 6, 5, 7, 4, 6, 5, 8][i],
-                      height: [4, 6, 5, 8, 4, 6, 5, 7, 4, 6, 5, 8][i],
-                      left: `${8 + i * 7.5}%`,
-                      top: `${10 + (i % 3) * 25}%`,
-                      background: [
-                        'hsl(var(--purple))', 'hsl(var(--pink))', 'hsl(var(--amber))',
-                        'hsl(var(--cyan))', 'hsl(var(--green))', '#ff6b6b',
-                        'hsl(var(--purple))', '#ffd700', 'hsl(var(--pink))',
-                        '#00e5ff', 'hsl(var(--amber))', '#ff4081',
-                      ][i],
+                      width: [5, 7, 5, 7][i],
+                      height: [5, 7, 5, 7][i],
+                      left: `${15 + i * 20}%`,
+                      top: `${20 + (i % 2) * 40}%`,
+                      background: ['hsl(var(--purple))', 'hsl(var(--pink))', 'hsl(var(--cyan))', 'hsl(var(--amber))'][i],
                     }}
-                    animate={{
-                      y: [0, -30, 10, -20, 0],
-                      x: [0, 10, -10, 5, 0],
-                      opacity: [0.7, 1, 0.5, 1, 0.7],
-                      scale: [1, 1.5, 0.8, 1.3, 1],
-                    }}
-                    transition={{
-                      duration: 3 + (i % 3),
-                      repeat: Infinity,
-                      delay: i * 0.3,
-                      ease: "easeInOut",
-                    }}
+                    animate={{ y: [0, -15, 0], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 3, repeat: Infinity, delay: i * 0.8 }}
                   />
-                ))}
-                {/* Sparkle stars */}
-                {[...Array(6)].map((_, i) => (
-                  <motion.div
-                    key={`star-${i}`}
-                    className="absolute pointer-events-none text-[hsl(var(--amber))]"
-                    style={{
-                      left: `${5 + i * 18}%`,
-                      top: `${15 + (i % 2) * 50}%`,
-                      fontSize: [10, 14, 8, 12, 10, 14][i],
-                    }}
-                    animate={{
-                      opacity: [0, 1, 0],
-                      scale: [0.5, 1.2, 0.5],
-                      rotate: [0, 180, 360],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      delay: i * 0.5,
-                    }}
-                  >
-                    ✦
-                  </motion.div>
                 ))}
                 {/* Full-screen celebration overlay */}
                 <AnimatePresence>
@@ -754,7 +735,7 @@ export default function Dashboard() {
                       className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center"
                     >
                       {/* Confetti burst */}
-                      {[...Array(30)].map((_, i) => (
+                      {[...Array(10)].map((_, i) => (
                         <motion.div
                           key={`confetti-${i}`}
                           className="absolute rounded-full"
@@ -1033,18 +1014,22 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground text-center py-3">কোনো request আসেনি</p>
                     ) : (
                       <>
-                        {/* Rate Info Box */}
-                        <motion.div
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-gradient-to-r from-[hsl(var(--amber))]/15 to-[hsl(var(--orange))]/10 border border-[hsl(var(--amber))]/30 rounded-xl p-3"
-                        >
-                          <p className="text-xs font-bold text-[hsl(var(--amber))]">💰 বর্তমান রেট: <span className="text-base">{currentRate} TK</span>/ভেরিফাই</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">এই রেটে Admin প্যানেলে সাবমিট হবে</p>
-                        </motion.div>
+                        {/* Below-min verified warning */}
+                        {belowMinIncoming.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 text-center"
+                          >
+                            <p className="text-xs font-bold text-destructive">
+                              ⚠️ {belowMinIncoming.length} টি request এ verified count {minRequestVerified} এর কম আছে।
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1">ওইগুলো Cancel করুন তারপর list submit দিতে পারবেন।</p>
+                          </motion.div>
+                        )}
 
                         {/* Minimum target warning */}
-                        {minRequestTarget > 0 && !canSubmitList && (
+                        {minRequestTarget > 0 && incomingRequests.length < minRequestTarget && (
                           <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1053,7 +1038,6 @@ export default function Dashboard() {
                             <p className="text-xs font-bold text-destructive">
                               সর্বনিম্ন {minRequestTarget} টি request দরকার। আপনার আছে {incomingRequests.length} টি।
                             </p>
-                            <p className="text-[10px] text-muted-foreground mt-1">কম হলে বাড়তি request Cancel করে নতুন request আনুন।</p>
                           </motion.div>
                         )}
 
@@ -1063,7 +1047,7 @@ export default function Dashboard() {
                               key={item.id}
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              className="bg-secondary/30 border border-border/50 rounded-xl p-3.5 space-y-2"
+                              className={`rounded-xl p-3.5 space-y-2 ${(item.requester_verified_count || 0) < minRequestVerified ? "bg-destructive/10 border-2 border-destructive/40" : "bg-secondary/30 border border-border/50"}`}
                             >
                               <div className="flex items-center justify-between">
                                 <p className="text-sm font-bold font-mono">{item.requester_guest_id}</p>
@@ -1100,34 +1084,33 @@ export default function Dashboard() {
                           <div className="space-y-3 bg-secondary/20 p-4 rounded-xl border border-border/50">
                             <input type="password" value={requestSubmitPassword} onChange={(e) => setRequestSubmitPassword(e.target.value)}
                               placeholder="পাসওয়ার্ড দিন" className="input-field" />
+                            {/* Custom Rate Input */}
+                            <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-xl p-3 space-y-2">
+                              <p className="text-xs font-bold text-[hsl(var(--amber))]">💰 আপনার ইউজারের নির্ধারিত রেট লিখুন</p>
+                              <input type="number" value={submitterRate} onChange={(e) => setSubmitterRate(e.target.value)}
+                                placeholder="যেমন: 35" className="input-field text-center text-lg font-black" />
+                              <p className="text-[10px] text-muted-foreground">এই রেটে Admin প্যানেলে দেখাবে</p>
+                            </div>
                             <div className="bg-secondary/30 p-3 rounded-xl border border-border/50 space-y-3">
                               <p className="text-xs font-bold">আপনার bKash/Nagad নম্বর</p>
                                <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
                                  <motion.button
                                    onClick={() => setSubmitterPaymentMethod("bkash")}
                                    whileTap={{ scale: 0.9 }}
-                                   whileHover={{ scale: 1.05 }}
                                    className={`px-3 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${submitterPaymentMethod === "bkash" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
                                  >
                                    {submitterPaymentMethod === "bkash" && (
-                                     <>
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--pink))] to-[hsl(340,80%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
-                                     </>
+                                     <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--pink))] to-[hsl(340,80%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
                                    )}
                                    <span className="relative z-10">bKash</span>
                                  </motion.button>
                                  <motion.button
                                    onClick={() => setSubmitterPaymentMethod("nagad")}
                                    whileTap={{ scale: 0.9 }}
-                                   whileHover={{ scale: 1.05 }}
                                    className={`px-3 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${submitterPaymentMethod === "nagad" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
                                  >
                                    {submitterPaymentMethod === "nagad" && (
-                                     <>
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--orange))] to-[hsl(25,85%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
-                                     </>
+                                     <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--orange))] to-[hsl(25,85%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
                                    )}
                                    <span className="relative z-10">Nagad</span>
                                  </motion.button>
@@ -1138,10 +1121,9 @@ export default function Dashboard() {
                             <div className="grid grid-cols-2 gap-2">
                               <motion.button
                                 whileTap={{ scale: 0.92 }}
-                                whileHover={{ scale: 1.03 }}
                                 onClick={() => submitIncomingRequestsMutation.mutate()}
                                 className="relative py-3 rounded-xl font-black text-sm overflow-hidden"
-                                disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim() || !canSubmitList}>
+                                disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim() || !submitterRate.trim() || !canSubmitList}>
                                 <motion.div
                                   className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-primary to-[hsl(var(--emerald))]"
                                   animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
