@@ -497,29 +497,71 @@ export default function Login() {
           </a>
         </motion.div>
 
-        {/* Features Section - faster stagger */}
+        {/* Features Section - premium animated */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="mt-5"
         >
-          <h2 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" /> আমাদের ফিচারসমূহ
-          </h2>
+          <motion.h2
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-lg font-bold mb-3 flex items-center gap-2"
+          >
+            <motion.span
+              animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              <Sparkles className="w-5 h-5 text-[hsl(var(--amber))]" />
+            </motion.span>
+            <span className="bg-gradient-to-r from-[hsl(var(--amber))] via-[hsl(var(--orange))] to-[hsl(var(--pink))] bg-clip-text text-transparent font-black">
+              আমাদের ফিচারসমূহ
+            </span>
+          </motion.h2>
           <div className="grid grid-cols-2 gap-2.5">
             {FEATURES.map((f, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 + i * 0.04 }}
-                className="p-3 rounded-2xl bg-secondary/40 border border-border/30 backdrop-blur-sm"
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.35 + i * 0.08, type: "spring", damping: 15 }}
+                whileHover={{ scale: 1.05, y: -4 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-3.5 rounded-2xl border border-border/30 backdrop-blur-sm relative overflow-hidden group cursor-pointer"
+                style={{
+                  background: `linear-gradient(135deg, ${
+                    ['hsl(var(--cyan) / 0.12)', 'hsl(var(--pink) / 0.12)', 'hsl(var(--amber) / 0.12)', 'hsl(var(--emerald) / 0.12)', 'hsl(var(--purple) / 0.12)', 'hsl(var(--blue) / 0.12)'][i]
+                  }, ${
+                    ['hsl(var(--blue) / 0.06)', 'hsl(var(--purple) / 0.06)', 'hsl(var(--orange) / 0.06)', 'hsl(var(--cyan) / 0.06)', 'hsl(var(--pink) / 0.06)', 'hsl(var(--emerald) / 0.06)'][i]
+                  })`
+                }}
               >
-                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center mb-2">
-                  <f.icon className="w-4 h-4 text-primary" />
-                </div>
-                <p className="text-xs font-bold text-foreground">{f.title}</p>
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100"
+                  animate={{ x: ["-100%", "200%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 2 }}
+                />
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                  transition={{ duration: 4, repeat: Infinity, delay: i * 0.3 }}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center mb-2"
+                  style={{
+                    background: `linear-gradient(135deg, ${
+                      ['hsl(var(--cyan) / 0.3)', 'hsl(var(--pink) / 0.3)', 'hsl(var(--amber) / 0.3)', 'hsl(var(--emerald) / 0.3)', 'hsl(var(--purple) / 0.3)', 'hsl(var(--blue) / 0.3)'][i]
+                    }, ${
+                      ['hsl(var(--blue) / 0.2)', 'hsl(var(--purple) / 0.2)', 'hsl(var(--orange) / 0.2)', 'hsl(var(--cyan) / 0.2)', 'hsl(var(--pink) / 0.2)', 'hsl(var(--emerald) / 0.2)'][i]
+                    })`
+                  }}
+                >
+                  <f.icon className="w-4.5 h-4.5" style={{
+                    color: ['hsl(var(--cyan))', 'hsl(var(--pink))', 'hsl(var(--amber))', 'hsl(var(--emerald))', 'hsl(var(--purple))', 'hsl(var(--blue))'][i]
+                  }} />
+                </motion.div>
+                <p className="text-xs font-black" style={{
+                  color: ['hsl(var(--cyan))', 'hsl(var(--pink))', 'hsl(var(--amber))', 'hsl(var(--emerald))', 'hsl(var(--purple))', 'hsl(var(--blue))'][i]
+                }}>{f.title}</p>
                 <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5">{f.desc}</p>
               </motion.div>
             ))}
@@ -528,20 +570,28 @@ export default function Login() {
 
         {/* About Section */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
           className="mt-4"
         >
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setShowAbout(!showAbout)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-secondary/40 border border-border/30"
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-[hsl(var(--cyan))]/20 relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg, hsl(var(--cyan) / 0.08), hsl(var(--blue) / 0.06))" }}
           >
-            <span className="text-sm font-bold text-foreground">📖 আমাদের সম্পর্কে</span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-[hsl(var(--cyan))]/10 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 4, repeat: Infinity, repeatDelay: 2 }}
+            />
+            <span className="text-sm font-black bg-gradient-to-r from-[hsl(var(--cyan))] to-[hsl(var(--blue))] bg-clip-text text-transparent relative z-10">📖 আমাদের সম্পর্কে</span>
             <motion.div animate={{ rotate: showAbout ? 180 : 0 }} transition={{ duration: 0.15 }}>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              <ChevronDown className="w-4 h-4 text-[hsl(var(--cyan))]" />
             </motion.div>
-          </button>
+          </motion.button>
           <AnimatePresence>
             {showAbout && (
               <motion.div
@@ -568,18 +618,31 @@ export default function Login() {
 
         {/* Terms Button */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.45 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
           className="mt-3 mb-8"
         >
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setShowTerms(true)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-secondary/40 border border-border/30"
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-[hsl(var(--amber))]/20 relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg, hsl(var(--amber) / 0.08), hsl(var(--orange) / 0.06))" }}
           >
-            <span className="text-sm font-bold text-foreground">📜 শর্তাবলী ও নীতিমালা</span>
-            <ArrowRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-[hsl(var(--amber))]/10 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 4, repeat: Infinity, repeatDelay: 3 }}
+            />
+            <span className="text-sm font-black bg-gradient-to-r from-[hsl(var(--amber))] to-[hsl(var(--orange))] bg-clip-text text-transparent relative z-10">📜 শর্তাবলী ও নীতিমালা</span>
+            <motion.div
+              animate={{ x: [0, 4, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              <ArrowRight className="w-4 h-4 text-[hsl(var(--amber))]" />
+            </motion.div>
+          </motion.button>
         </motion.div>
 
         {/* Footer */}

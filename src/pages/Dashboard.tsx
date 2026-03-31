@@ -923,20 +923,58 @@ export default function Dashboard() {
                       <div className="bg-secondary/30 p-4 rounded-xl border border-border/50 space-y-3">
                         <p className="text-sm font-bold">আপনার পেমেন্ট নম্বর</p>
                         <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
-                          <button onClick={() => setRequestPaymentMethod("bkash")}
-                            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
-                          <button onClick={() => setRequestPaymentMethod("nagad")}
-                            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
+                          <motion.button
+                            onClick={() => setRequestPaymentMethod("bkash")}
+                            whileTap={{ scale: 0.9 }}
+                            whileHover={{ scale: 1.05 }}
+                            className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${requestPaymentMethod === "bkash" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
+                          >
+                            {requestPaymentMethod === "bkash" && (
+                              <>
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--pink))] to-[hsl(340,80%,55%)]" layoutId="payment-method-bg" transition={{ type: "spring", bounce: 0.2 }} />
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
+                              </>
+                            )}
+                            <span className="relative z-10">bKash</span>
+                          </motion.button>
+                          <motion.button
+                            onClick={() => setRequestPaymentMethod("nagad")}
+                            whileTap={{ scale: 0.9 }}
+                            whileHover={{ scale: 1.05 }}
+                            className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${requestPaymentMethod === "nagad" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
+                          >
+                            {requestPaymentMethod === "nagad" && (
+                              <>
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--orange))] to-[hsl(25,85%,55%)]" layoutId="payment-method-bg" transition={{ type: "spring", bounce: 0.2 }} />
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
+                              </>
+                            )}
+                            <span className="relative z-10">Nagad</span>
+                          </motion.button>
                         </div>
                         <input type="text" placeholder="01XXXXXXXXX" value={requestPaymentNumber}
                           onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field" />
                       </div>
                       <motion.button
-                        whileTap={{ scale: 0.95 }}
+                        whileTap={{ scale: 0.92 }}
+                        whileHover={{ scale: 1.03, y: -2 }}
                         onClick={() => createUserRequestMutation.mutate()}
-                        className="btn-primary py-3.5 font-black relative overflow-hidden"
+                        className="w-full relative py-3.5 rounded-2xl font-black overflow-hidden"
                         disabled={isRequestLocked || createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
-                        {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-4 h-4" /> Request পাঠান</>}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-primary via-[hsl(var(--cyan))] to-primary"
+                          animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                          style={{ backgroundSize: "200% 100%" }}
+                        />
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                          animate={{ x: ["-100%", "200%"] }}
+                          transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                        />
+                        <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+                          {createUserRequestMutation.isPending ? <Loader2 className="animate-spin w-5 h-5" /> : <><Send className="w-4 h-4" /> Request পাঠান</>}
+                        </span>
                       </motion.button>
                     </div>
                   )}
@@ -981,30 +1019,91 @@ export default function Dashboard() {
                               placeholder="পাসওয়ার্ড দিন" className="input-field" />
                             <div className="bg-secondary/30 p-3 rounded-xl border border-border/50 space-y-3">
                               <p className="text-xs font-bold">আপনার bKash/Nagad নম্বর</p>
-                              <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
-                                <button onClick={() => setSubmitterPaymentMethod("bkash")}
-                                  className={`px-3 py-2 rounded-lg text-xs font-black transition-all ${submitterPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
-                                <button onClick={() => setSubmitterPaymentMethod("nagad")}
-                                  className={`px-3 py-2 rounded-lg text-xs font-black transition-all ${submitterPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
-                              </div>
+                               <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
+                                 <motion.button
+                                   onClick={() => setSubmitterPaymentMethod("bkash")}
+                                   whileTap={{ scale: 0.9 }}
+                                   whileHover={{ scale: 1.05 }}
+                                   className={`px-3 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${submitterPaymentMethod === "bkash" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
+                                 >
+                                   {submitterPaymentMethod === "bkash" && (
+                                     <>
+                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--pink))] to-[hsl(340,80%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
+                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
+                                     </>
+                                   )}
+                                   <span className="relative z-10">bKash</span>
+                                 </motion.button>
+                                 <motion.button
+                                   onClick={() => setSubmitterPaymentMethod("nagad")}
+                                   whileTap={{ scale: 0.9 }}
+                                   whileHover={{ scale: 1.05 }}
+                                   className={`px-3 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${submitterPaymentMethod === "nagad" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
+                                 >
+                                   {submitterPaymentMethod === "nagad" && (
+                                     <>
+                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--orange))] to-[hsl(25,85%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
+                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
+                                     </>
+                                   )}
+                                   <span className="relative z-10">Nagad</span>
+                                 </motion.button>
+                               </div>
                               <input type="text" placeholder="01XXXXXXXXX" value={submitterPaymentNumber}
                                 onChange={(e) => setSubmitterPaymentNumber(e.target.value)} className="input-field" />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              <button onClick={() => submitIncomingRequestsMutation.mutate()} className="btn-primary py-3"
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                whileHover={{ scale: 1.03 }}
+                                onClick={() => submitIncomingRequestsMutation.mutate()}
+                                className="relative py-3 rounded-xl font-black text-sm overflow-hidden"
                                 disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}>
-                                {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin" /> : "Admin এ পাঠান"}
-                              </button>
-                              <button onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
+                                <motion.div
+                                  className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-primary to-[hsl(var(--emerald))]"
+                                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                  style={{ backgroundSize: "200% 100%" }}
+                                />
+                                <motion.div
+                                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                                  animate={{ x: ["-100%", "200%"] }}
+                                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                                />
+                                <span className="relative z-10 text-primary-foreground flex items-center justify-center gap-1.5">
+                                  {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin w-4 h-4" /> : "Admin এ পাঠান"}
+                                </span>
+                              </motion.button>
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
                                 className="px-4 py-3 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-colors font-bold text-sm">
                                 Cancel
-                              </button>
+                              </motion.button>
                             </div>
                           </div>
                         ) : (
-                          <button onClick={() => setShowRequestSubmitPassword(true)} className="btn-primary py-3">
-                            Full List Submit
-                          </button>
+                          <motion.button
+                            whileTap={{ scale: 0.92 }}
+                            whileHover={{ scale: 1.03, y: -2 }}
+                            onClick={() => setShowRequestSubmitPassword(true)}
+                            className="w-full relative py-3.5 rounded-2xl font-black overflow-hidden"
+                          >
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--purple))] via-[hsl(var(--pink))] to-[hsl(var(--purple))]"
+                              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                              style={{ backgroundSize: "200% 100%" }}
+                            />
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                              animate={{ x: ["-100%", "200%"] }}
+                              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                            />
+                            <span className="relative z-10 text-primary-foreground flex items-center justify-center gap-2">
+                              📋 Full List Submit
+                            </span>
+                          </motion.button>
                         )}
                       </>
                     )}

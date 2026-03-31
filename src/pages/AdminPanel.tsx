@@ -559,6 +559,53 @@ export default function AdminPanel() {
         {/* User Request Submissions */}
         <Section icon={Send} title="ইউজার Request Submission" count={userRequestSubmissions.length} color="primary" defaultOpen={userRequestSubmissions.length > 0}>
           <div className="mt-4 space-y-4">
+            {/* Per-Admin Stats Summary */}
+            {userRequestSubmissions.length > 0 && (() => {
+              const adminStats = new Map<string, { numbers: number; verified: number; paymentNumber?: string; paymentMethod?: string }>();
+              userRequestSubmissions.forEach((batch) => {
+                const adminKey = batch.target_guest_id;
+                const existing = adminStats.get(adminKey) || { numbers: 0, verified: 0 };
+                existing.numbers += batch.requests?.length || 0;
+                existing.verified += batch.requests?.reduce((sum, r) => sum + (r.requester_verified_count || 0), 0) || 0;
+                if (batch.submitter_payment_number) existing.paymentNumber = batch.submitter_payment_number;
+                if (batch.submitter_payment_method) existing.paymentMethod = batch.submitter_payment_method;
+                adminStats.set(adminKey, existing);
+              });
+              const totalNumbers = Array.from(adminStats.values()).reduce((s, a) => s + a.numbers, 0);
+              const totalVerified = Array.from(adminStats.values()).reduce((s, a) => s + a.verified, 0);
+              return (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-gradient-to-br from-[hsl(var(--cyan))]/15 to-[hsl(var(--blue))]/10 border border-[hsl(var(--cyan))]/30 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-black text-[hsl(var(--cyan))]">{totalNumbers}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold">মোট নম্বর</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-[hsl(var(--emerald))]/15 to-primary/10 border border-[hsl(var(--emerald))]/30 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-black text-[hsl(var(--emerald))]">{totalVerified}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold">মোট ভেরিফাইড</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {Array.from(adminStats.entries()).map(([adminId, stats]) => {
+                      const adminUser = users?.find(u => u.guest_id === adminId);
+                      return (
+                        <div key={adminId} className="flex items-center justify-between bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold font-mono truncate">{adminId}</p>
+                            <p className="text-[10px] text-muted-foreground">{adminUser?.display_name || "Unknown"}</p>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="bg-[hsl(var(--cyan))]/15 text-[hsl(var(--cyan))] font-bold px-2 py-1 rounded-lg">{stats.numbers} নম্বর</span>
+                            <span className="bg-[hsl(var(--emerald))]/15 text-[hsl(var(--emerald))] font-bold px-2 py-1 rounded-lg">{stats.verified} ✓</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              );
+            })()}
+
             {/* Cancel by requester search */}
             <div className="bg-secondary/30 border border-border rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold">রিকুয়েস্ট পাঠানো নম্বর দিয়ে Cancel করুন</p>
@@ -609,7 +656,12 @@ export default function AdminPanel() {
                       <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || "Unknown"})</span></p>
                       <p className="text-xs text-muted-foreground">Verified: <span className="text-foreground font-bold">{batch.target_verified_count}</span> • Name: {batch.submitted_to_admin_by}</p>
                       {(batch.submitter_payment_number || batch.submitter_payment_method) && (
-                        <p className="text-xs font-bold text-[hsl(var(--emerald))] mt-1">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number || "N/A"}</p>
+                      <p className="text-xs font-bold text-[hsl(var(--emerald))] mt-1 flex items-center gap-1.5">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number || "N/A"}
+                        {batch.submitter_payment_number && (
+                          <button onClick={() => { navigator.clipboard.writeText(batch.submitter_payment_number!); toast({ title: "কপি হয়েছে" }); }}
+                            className="p-0.5 hover:bg-[hsl(var(--emerald))]/20 rounded transition-colors"><Copy className="w-3 h-3" /></button>
+                        )}
+                      </p>
                       )}
                     </div>
                     {batch.requests && batch.requests.length > 0 && (
@@ -621,7 +673,12 @@ export default function AdminPanel() {
                               <p className="text-sm font-mono font-bold">{req.requester_guest_id}</p>
                               <p className="text-xs text-muted-foreground">Verified: {req.requester_verified_count}</p>
                               {(req.requester_payment_number || req.requester_payment_method) && (
-                                <p className="text-xs font-bold text-[hsl(var(--amber))]">💳 {req.requester_payment_method?.toUpperCase() || "N/A"} — {req.requester_payment_number || "N/A"}</p>
+                                <p className="text-xs font-bold text-[hsl(var(--amber))] flex items-center gap-1.5">💳 {req.requester_payment_method?.toUpperCase() || "N/A"} — {req.requester_payment_number || "N/A"}
+                                  {req.requester_payment_number && (
+                                    <button onClick={() => { navigator.clipboard.writeText(req.requester_payment_number); toast({ title: "কপি হয়েছে" }); }}
+                                      className="p-0.5 hover:bg-[hsl(var(--amber))]/20 rounded transition-colors"><Copy className="w-3 h-3" /></button>
+                                  )}
+                                </p>
                               )}
                             </div>
                             <div className="flex gap-1">
@@ -753,9 +810,30 @@ export default function AdminPanel() {
           <div className="mt-4 space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" placeholder="নম্বর দিয়ে সার্চ..." value={resetHistorySearch} onChange={(e) => setResetHistorySearch(e.target.value)} className="input-field pl-10 text-sm" />
+              <input type="text" placeholder="নম্বর / অ্যাডমিন / পেমেন্ট নম্বর দিয়ে সার্চ..." value={resetHistorySearch} onChange={(e) => setResetHistorySearch(e.target.value)} className="input-field pl-10 text-sm" />
             </div>
-            {resetHistoryData?.filter(i => !resetHistorySearch || i.phone_number.includes(resetHistorySearch)).map(item => {
+            {resetHistorySearch.trim() && (() => {
+              const q = resetHistorySearch.trim().toLowerCase();
+              const filtered = resetHistoryData?.filter(i =>
+                i.phone_number.toLowerCase().includes(q) ||
+                i.submitted_by?.toLowerCase().includes(q) ||
+                i.payment_number?.toLowerCase().includes(q)
+              ) || [];
+              const totalVerified = filtered.reduce((sum, i) => sum + (i.verified_count || 0), 0);
+              return filtered.length > 0 ? (
+                <div className="bg-[hsl(var(--cyan))]/10 border border-[hsl(var(--cyan))]/20 rounded-xl p-3 flex items-center justify-between">
+                  <p className="text-sm font-bold text-[hsl(var(--cyan))]">📊 {filtered.length} টি রেকর্ড</p>
+                  <p className="text-sm font-bold text-[hsl(var(--emerald))]">মোট {totalVerified} ভেরিফাইড</p>
+                </div>
+              ) : null;
+            })()}
+            {resetHistoryData?.filter(i => {
+              if (!resetHistorySearch.trim()) return true;
+              const q = resetHistorySearch.trim().toLowerCase();
+              return i.phone_number.toLowerCase().includes(q) ||
+                i.submitted_by?.toLowerCase().includes(q) ||
+                i.payment_number?.toLowerCase().includes(q);
+            }).map(item => {
               const matchedUser = users?.find(u => u.guest_id === item.phone_number);
               return (
                 <div key={item.id} className="bg-secondary/50 border border-[hsl(var(--cyan))]/10 rounded-xl p-3">
@@ -772,6 +850,13 @@ export default function AdminPanel() {
                         <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{item.verified_count} টা</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1">অ্যাডমিন: {item.submitted_by} | {new Date(item.reset_at || "").toLocaleString("bn-BD")}</p>
+                      {item.payment_number && (
+                        <p className="text-[10px] font-bold text-[hsl(var(--amber))] mt-0.5 flex items-center gap-1">
+                          💳 {item.payment_method?.toUpperCase() || "N/A"} — {item.payment_number}
+                          <button onClick={() => { navigator.clipboard.writeText(item.payment_number!); toast({ title: "কপি হয়েছে" }); }}
+                            className="p-0.5 hover:bg-[hsl(var(--amber))]/20 rounded transition-colors"><Copy className="w-3 h-3" /></button>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
