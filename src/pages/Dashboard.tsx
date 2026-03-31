@@ -1116,34 +1116,33 @@ export default function Dashboard() {
                           <div className="space-y-3 bg-secondary/20 p-4 rounded-xl border border-border/50">
                             <input type="password" value={requestSubmitPassword} onChange={(e) => setRequestSubmitPassword(e.target.value)}
                               placeholder="পাসওয়ার্ড দিন" className="input-field" />
+                            {/* Custom Rate Input */}
+                            <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-xl p-3 space-y-2">
+                              <p className="text-xs font-bold text-[hsl(var(--amber))]">💰 আপনার ইউজারের নির্ধারিত রেট লিখুন</p>
+                              <input type="number" value={submitterRate} onChange={(e) => setSubmitterRate(e.target.value)}
+                                placeholder="যেমন: 35" className="input-field text-center text-lg font-black" />
+                              <p className="text-[10px] text-muted-foreground">এই রেটে Admin প্যানেলে দেখাবে</p>
+                            </div>
                             <div className="bg-secondary/30 p-3 rounded-xl border border-border/50 space-y-3">
                               <p className="text-xs font-bold">আপনার bKash/Nagad নম্বর</p>
                                <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
                                  <motion.button
                                    onClick={() => setSubmitterPaymentMethod("bkash")}
                                    whileTap={{ scale: 0.9 }}
-                                   whileHover={{ scale: 1.05 }}
                                    className={`px-3 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${submitterPaymentMethod === "bkash" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
                                  >
                                    {submitterPaymentMethod === "bkash" && (
-                                     <>
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--pink))] to-[hsl(340,80%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
-                                     </>
+                                     <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--pink))] to-[hsl(340,80%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
                                    )}
                                    <span className="relative z-10">bKash</span>
                                  </motion.button>
                                  <motion.button
                                    onClick={() => setSubmitterPaymentMethod("nagad")}
                                    whileTap={{ scale: 0.9 }}
-                                   whileHover={{ scale: 1.05 }}
                                    className={`px-3 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${submitterPaymentMethod === "nagad" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
                                  >
                                    {submitterPaymentMethod === "nagad" && (
-                                     <>
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--orange))] to-[hsl(25,85%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
-                                       <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
-                                     </>
+                                     <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--orange))] to-[hsl(25,85%,55%)]" layoutId="submitter-payment-bg" transition={{ type: "spring", bounce: 0.2 }} />
                                    )}
                                    <span className="relative z-10">Nagad</span>
                                  </motion.button>
@@ -1154,10 +1153,9 @@ export default function Dashboard() {
                             <div className="grid grid-cols-2 gap-2">
                               <motion.button
                                 whileTap={{ scale: 0.92 }}
-                                whileHover={{ scale: 1.03 }}
                                 onClick={() => submitIncomingRequestsMutation.mutate()}
                                 className="relative py-3 rounded-xl font-black text-sm overflow-hidden"
-                                disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim() || !canSubmitList}>
+                                disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim() || !submitterRate.trim() || !canSubmitList}>
                                 <motion.div
                                   className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-primary to-[hsl(var(--emerald))]"
                                   animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
