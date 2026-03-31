@@ -74,9 +74,10 @@ export default function Dashboard() {
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
+    staleTime: 10000,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    refetchInterval: 15000,
   });
 
   const { data: incomingRequests = [] } = useQuery({
