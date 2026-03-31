@@ -94,6 +94,12 @@ export default function Dashboard() {
   const createUserRequestMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
+      // Re-fetch latest settings to prevent stale page issue
+      const freshSettings = await getPublicSettings();
+      const freshMinVerified = freshSettings.minRequestVerified || 10;
+      if ((user.key_count || 0) < freshMinVerified) {
+        throw new Error(`সর্বনিম্ন ${freshMinVerified} টি ভেরিফাইড কাউন্ট দরকার। আপনার আছে ${user.key_count || 0} টি।`);
+      }
       await createUserTransferRequest({
         requesterUserId: user.id,
         requesterGuestId: user.guest_id,
