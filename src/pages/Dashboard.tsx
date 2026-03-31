@@ -923,10 +923,34 @@ export default function Dashboard() {
                       <div className="bg-secondary/30 p-4 rounded-xl border border-border/50 space-y-3">
                         <p className="text-sm font-bold">আপনার পেমেন্ট নম্বর</p>
                         <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
-                          <button onClick={() => setRequestPaymentMethod("bkash")}
-                            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${requestPaymentMethod === "bkash" ? "bg-[hsl(var(--pink))] text-foreground shadow-lg" : "text-muted-foreground"}`}>bKash</button>
-                          <button onClick={() => setRequestPaymentMethod("nagad")}
-                            className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${requestPaymentMethod === "nagad" ? "bg-[hsl(var(--orange))] text-foreground shadow-lg" : "text-muted-foreground"}`}>Nagad</button>
+                          <motion.button
+                            onClick={() => setRequestPaymentMethod("bkash")}
+                            whileTap={{ scale: 0.9 }}
+                            whileHover={{ scale: 1.05 }}
+                            className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${requestPaymentMethod === "bkash" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
+                          >
+                            {requestPaymentMethod === "bkash" && (
+                              <>
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--pink))] to-[hsl(340,80%,55%)]" layoutId="payment-method-bg" transition={{ type: "spring", bounce: 0.2 }} />
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
+                              </>
+                            )}
+                            <span className="relative z-10">bKash</span>
+                          </motion.button>
+                          <motion.button
+                            onClick={() => setRequestPaymentMethod("nagad")}
+                            whileTap={{ scale: 0.9 }}
+                            whileHover={{ scale: 1.05 }}
+                            className={`px-4 py-2.5 rounded-lg text-xs font-black transition-all relative overflow-hidden ${requestPaymentMethod === "nagad" ? "text-foreground shadow-lg" : "text-muted-foreground"}`}
+                          >
+                            {requestPaymentMethod === "nagad" && (
+                              <>
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--orange))] to-[hsl(25,85%,55%)]" layoutId="payment-method-bg" transition={{ type: "spring", bounce: 0.2 }} />
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ["-100%", "200%"] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
+                              </>
+                            )}
+                            <span className="relative z-10">Nagad</span>
+                          </motion.button>
                         </div>
                         <input type="text" placeholder="01XXXXXXXXX" value={requestPaymentNumber}
                           onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field" />
