@@ -203,6 +203,16 @@ export default function AdminPanel() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-users"] }); queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] }); toast({ title: "কাউন্ট রিসেট হয়েছে" }); },
   });
 
+  const updateKeyCountMutation = useMutation({
+    mutationFn: ({ id, keyCount }: { id: number; keyCount: number }) => updateUserKeyCount(id, keyCount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      setEditingKeyCountUserId(null);
+      setNewKeyCountValue("");
+      toast({ title: "Verified count আপডেট হয়েছে ✓" });
+    },
+  });
+
   const verifiedBadgeMutation = useMutation({
     mutationFn: ({ id, isVerifiedBadge }: { id: number; isVerifiedBadge: boolean }) => updateUserVerifiedBadge(id, isVerifiedBadge),
     onSuccess: () => {
