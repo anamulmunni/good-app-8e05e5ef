@@ -1027,10 +1027,35 @@ export default function AdminPanel() {
                 <input type="number" value={minRequestVerifiedSetting} onChange={(e) => setMinRequestVerifiedSetting(e.target.value)} className="input-field text-sm" />
               </div>
             </div>
-            <button onClick={() => rateMutation.mutate({ requestSubmitPassword: requestSubmitPasswordSetting, minRequestVerified: parseInt(minRequestVerifiedSetting) || 10 })}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">সর্বনিম্ন Request টার্গেট (List Submit এ)</label>
+              <input type="number" value={minRequestTargetSetting} onChange={(e) => setMinRequestTargetSetting(e.target.value)} className="input-field text-sm" placeholder="0 = কোনো লিমিট নেই" />
+              <p className="text-[10px] text-muted-foreground mt-1">এর কম request থাকলে List Submit করতে পারবে না</p>
+            </div>
+            <button onClick={() => rateMutation.mutate({ requestSubmitPassword: requestSubmitPasswordSetting, minRequestVerified: parseInt(minRequestVerifiedSetting) || 10, minRequestTarget: parseInt(minRequestTargetSetting) || 0 })}
               disabled={rateMutation.isPending} className="btn-primary py-2.5 bg-[hsl(var(--cyan))] text-sm">
               {rateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "রিকুয়েস্ট সেটিংস সেভ"}
             </button>
+
+            {/* App Version - Force Refresh */}
+            <div className="pt-2 border-t border-border/50 space-y-3">
+              <div className="flex items-center gap-2">
+                <RefreshCcw className="w-4 h-4 text-[hsl(var(--amber))]" />
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Force Page Refresh</p>
+              </div>
+              <p className="text-[10px] text-muted-foreground">এটি চাপলে সব ইউজারের পেজ অটো রিফ্রেশ হবে</p>
+              <button
+                onClick={async () => {
+                  const currentVersion = settingsData?.appVersion || 0;
+                  await updateSetting("appVersion", String(currentVersion + 1));
+                  queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
+                  toast({ title: "সব ইউজারের পেজ রিফ্রেশ হবে" });
+                }}
+                className="btn-primary py-2.5 bg-[hsl(var(--amber))] text-sm w-full"
+              >
+                🔄 Force Refresh All Users
+              </button>
+            </div>
 
             <div className="pt-2 border-t border-border/50 space-y-3">
               <div className="flex items-center gap-2">
