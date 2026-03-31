@@ -241,10 +241,18 @@ export default function Dashboard() {
       })
       .subscribe();
 
+    const requestsChannel = supabase
+      .channel('dashboard-requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_transfer_requests' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests", user?.guest_id] });
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(settingsChannel);
       supabase.removeChannel(usersChannel);
       supabase.removeChannel(txChannel);
+      supabase.removeChannel(requestsChannel);
     };
   }, [user?.id, queryClient, refreshUser]);
 
