@@ -656,7 +656,12 @@ export default function AdminPanel() {
                       <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || "Unknown"})</span></p>
                       <p className="text-xs text-muted-foreground">Verified: <span className="text-foreground font-bold">{batch.target_verified_count}</span> • Name: {batch.submitted_to_admin_by}</p>
                       {(batch.submitter_payment_number || batch.submitter_payment_method) && (
-                        <p className="text-xs font-bold text-[hsl(var(--emerald))] mt-1">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number || "N/A"}</p>
+                      <p className="text-xs font-bold text-[hsl(var(--emerald))] mt-1 flex items-center gap-1.5">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number || "N/A"}
+                        {batch.submitter_payment_number && (
+                          <button onClick={() => { navigator.clipboard.writeText(batch.submitter_payment_number!); toast({ title: "কপি হয়েছে" }); }}
+                            className="p-0.5 hover:bg-[hsl(var(--emerald))]/20 rounded transition-colors"><Copy className="w-3 h-3" /></button>
+                        )}
+                      </p>
                       )}
                     </div>
                     {batch.requests && batch.requests.length > 0 && (
