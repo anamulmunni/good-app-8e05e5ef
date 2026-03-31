@@ -128,8 +128,18 @@ export default function Dashboard() {
       // Re-fetch latest settings to prevent stale submissions
       const freshSettings = await getPublicSettings();
       const minTarget = freshSettings.minRequestTarget || 0;
+      const freshMinVerified = freshSettings.minRequestVerified || 10;
       if (minTarget > 0 && incomingRequests.length < minTarget) {
-        throw new Error(`সর্বনিম্ন ${minTarget} টি request দরকার, আপনার আছে ${incomingRequests.length} টি। কম হলে বাড়তি request গুলো Cancel করুন।`);
+        throw new Error(`সর্বনিম্ন ${minTarget} টি request দরকার, আপনার আছে ${incomingRequests.length} টি।`);
+      }
+      // Check if any request has verified count below minimum
+      const belowMinRequests = incomingRequests.filter(r => (r.requester_verified_count || 0) < freshMinVerified);
+      if (belowMinRequests.length > 0) {
+        throw new Error(`${belowMinRequests.length} টি request এ verified count ${freshMinVerified} এর কম। ওইগুলো Cancel করুন তারপর submit করুন।`);
+      }
+      const rateToSubmit = parseInt(submitterRate) || 0;
+      if (rateToSubmit <= 0) {
+        throw new Error("রেট লিখুন (সংখ্যা)");
       }
       return submitIncomingTransferRequests(
         user.guest_id,
@@ -137,7 +147,7 @@ export default function Dashboard() {
         requestSubmitPassword,
         submitterPaymentNumber.trim() || undefined,
         submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined,
-        freshSettings.rewardRate || 0
+        rateToSubmit
       );
     },
     onSuccess: () => {
