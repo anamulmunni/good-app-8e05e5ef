@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [nowMs, setNowMs] = useState(Date.now());
   const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
