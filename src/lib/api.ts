@@ -140,10 +140,12 @@ export async function getPublicSettings(): Promise<Settings> {
     if (s.key === "videoUrl") settings.videoUrl = s.value;
     if (s.key === "requestSubmitPassword") settings.requestSubmitPassword = s.value;
     if (s.key === "minRequestVerified") settings.minRequestVerified = parseInt(s.value) || 10;
+    if (s.key === "minRequestTarget") settings.minRequestTarget = parseInt(s.value) || 0;
     if (s.key === "paymentMode") settings.paymentMode = s.value;
     if (s.key === "minWithdraw") settings.minWithdraw = parseInt(s.value) || 50;
     if (s.key === "withdrawLockUntil") settings.withdrawLockUntil = s.value || null;
     if (s.key === "requestLockUntil") settings.requestLockUntil = s.value || null;
+    if (s.key === "appVersion") settings.appVersion = parseInt(s.value) || 0;
   });
 
   return settings;
