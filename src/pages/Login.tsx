@@ -570,20 +570,28 @@ export default function Login() {
 
         {/* About Section */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
           className="mt-4"
         >
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setShowAbout(!showAbout)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-secondary/40 border border-border/30"
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-[hsl(var(--cyan))]/20 relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg, hsl(var(--cyan) / 0.08), hsl(var(--blue) / 0.06))" }}
           >
-            <span className="text-sm font-bold text-foreground">📖 আমাদের সম্পর্কে</span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-[hsl(var(--cyan))]/10 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 4, repeat: Infinity, repeatDelay: 2 }}
+            />
+            <span className="text-sm font-black bg-gradient-to-r from-[hsl(var(--cyan))] to-[hsl(var(--blue))] bg-clip-text text-transparent relative z-10">📖 আমাদের সম্পর্কে</span>
             <motion.div animate={{ rotate: showAbout ? 180 : 0 }} transition={{ duration: 0.15 }}>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              <ChevronDown className="w-4 h-4 text-[hsl(var(--cyan))]" />
             </motion.div>
-          </button>
+          </motion.button>
           <AnimatePresence>
             {showAbout && (
               <motion.div
@@ -610,18 +618,31 @@ export default function Login() {
 
         {/* Terms Button */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.45 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
           className="mt-3 mb-8"
         >
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setShowTerms(true)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-secondary/40 border border-border/30"
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-[hsl(var(--amber))]/20 relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg, hsl(var(--amber) / 0.08), hsl(var(--orange) / 0.06))" }}
           >
-            <span className="text-sm font-bold text-foreground">📜 শর্তাবলী ও নীতিমালা</span>
-            <ArrowRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-[hsl(var(--amber))]/10 to-transparent"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 4, repeat: Infinity, repeatDelay: 3 }}
+            />
+            <span className="text-sm font-black bg-gradient-to-r from-[hsl(var(--amber))] to-[hsl(var(--orange))] bg-clip-text text-transparent relative z-10">📜 শর্তাবলী ও নীতিমালা</span>
+            <motion.div
+              animate={{ x: [0, 4, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              <ArrowRight className="w-4 h-4 text-[hsl(var(--amber))]" />
+            </motion.div>
+          </motion.button>
         </motion.div>
 
         {/* Footer */}
