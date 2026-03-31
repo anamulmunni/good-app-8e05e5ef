@@ -280,6 +280,10 @@ export default function AdminPanel() {
     mutationFn: adminCancelRequestsByRequester,
     onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি active request cancel হয়েছে` }); },
   });
+  const cancelTransferBatchMutation = useMutation({
+    mutationFn: adminCancelTransferBatch,
+    onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি request ফিরে গেছে submitter এর কাছে` }); },
+  });
 
   const filteredUsers = users?.filter(u => searchQuery ? u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) : true);
 
