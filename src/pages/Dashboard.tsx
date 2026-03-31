@@ -1046,18 +1046,22 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground text-center py-3">কোনো request আসেনি</p>
                     ) : (
                       <>
-                        {/* Rate Info Box */}
-                        <motion.div
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-gradient-to-r from-[hsl(var(--amber))]/15 to-[hsl(var(--orange))]/10 border border-[hsl(var(--amber))]/30 rounded-xl p-3"
-                        >
-                          <p className="text-xs font-bold text-[hsl(var(--amber))]">💰 বর্তমান রেট: <span className="text-base">{currentRate} TK</span>/ভেরিফাই</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">এই রেটে Admin প্যানেলে সাবমিট হবে</p>
-                        </motion.div>
+                        {/* Below-min verified warning */}
+                        {belowMinIncoming.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 text-center"
+                          >
+                            <p className="text-xs font-bold text-destructive">
+                              ⚠️ {belowMinIncoming.length} টি request এ verified count {minRequestVerified} এর কম আছে।
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1">ওইগুলো Cancel করুন তারপর list submit দিতে পারবেন।</p>
+                          </motion.div>
+                        )}
 
                         {/* Minimum target warning */}
-                        {minRequestTarget > 0 && !canSubmitList && (
+                        {minRequestTarget > 0 && incomingRequests.length < minRequestTarget && (
                           <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1066,7 +1070,6 @@ export default function Dashboard() {
                             <p className="text-xs font-bold text-destructive">
                               সর্বনিম্ন {minRequestTarget} টি request দরকার। আপনার আছে {incomingRequests.length} টি।
                             </p>
-                            <p className="text-[10px] text-muted-foreground mt-1">কম হলে বাড়তি request Cancel করে নতুন request আনুন।</p>
                           </motion.div>
                         )}
 
