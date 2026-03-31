@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   getAllUsers, getAllTransactions, getPublicSettings, getPoolStats,
   getSubmittedNumbers, getResetHistory, getPaymentUsers,
-  toggleBlockUser, updateUserBalance, resetUserKeyCount,
+  toggleBlockUser, updateUserBalance, resetUserKeyCount, updateUserKeyCount,
   updateUserVerifiedBadge,
   updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
