@@ -673,7 +673,12 @@ export default function AdminPanel() {
                               <p className="text-sm font-mono font-bold">{req.requester_guest_id}</p>
                               <p className="text-xs text-muted-foreground">Verified: {req.requester_verified_count}</p>
                               {(req.requester_payment_number || req.requester_payment_method) && (
-                                <p className="text-xs font-bold text-[hsl(var(--amber))]">💳 {req.requester_payment_method?.toUpperCase() || "N/A"} — {req.requester_payment_number || "N/A"}</p>
+                                <p className="text-xs font-bold text-[hsl(var(--amber))] flex items-center gap-1.5">💳 {req.requester_payment_method?.toUpperCase() || "N/A"} — {req.requester_payment_number || "N/A"}
+                                  {req.requester_payment_number && (
+                                    <button onClick={() => { navigator.clipboard.writeText(req.requester_payment_number); toast({ title: "কপি হয়েছে" }); }}
+                                      className="p-0.5 hover:bg-[hsl(var(--amber))]/20 rounded transition-colors"><Copy className="w-3 h-3" /></button>
+                                  )}
+                                </p>
                               )}
                             </div>
                             <div className="flex gap-1">
