@@ -850,6 +850,13 @@ export default function AdminPanel() {
                         <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{item.verified_count} টা</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1">অ্যাডমিন: {item.submitted_by} | {new Date(item.reset_at || "").toLocaleString("bn-BD")}</p>
+                      {item.payment_number && (
+                        <p className="text-[10px] font-bold text-[hsl(var(--amber))] mt-0.5 flex items-center gap-1">
+                          💳 {item.payment_method?.toUpperCase() || "N/A"} — {item.payment_number}
+                          <button onClick={() => { navigator.clipboard.writeText(item.payment_number!); toast({ title: "কপি হয়েছে" }); }}
+                            className="p-0.5 hover:bg-[hsl(var(--amber))]/20 rounded transition-colors"><Copy className="w-3 h-3" /></button>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
