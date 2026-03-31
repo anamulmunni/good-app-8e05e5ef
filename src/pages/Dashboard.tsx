@@ -1039,7 +1039,7 @@ export default function Dashboard() {
                               key={item.id}
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              className="bg-secondary/30 border border-border/50 rounded-xl p-3.5 space-y-2"
+                              className={`rounded-xl p-3.5 space-y-2 ${(item.requester_verified_count || 0) < minRequestVerified ? "bg-destructive/10 border-2 border-destructive/40" : "bg-secondary/30 border border-border/50"}`}
                             >
                               <div className="flex items-center justify-between">
                                 <p className="text-sm font-bold font-mono">{item.requester_guest_id}</p>
