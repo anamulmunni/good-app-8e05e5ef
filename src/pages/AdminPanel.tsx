@@ -559,6 +559,53 @@ export default function AdminPanel() {
         {/* User Request Submissions */}
         <Section icon={Send} title="ইউজার Request Submission" count={userRequestSubmissions.length} color="primary" defaultOpen={userRequestSubmissions.length > 0}>
           <div className="mt-4 space-y-4">
+            {/* Per-Admin Stats Summary */}
+            {userRequestSubmissions.length > 0 && (() => {
+              const adminStats = new Map<string, { numbers: number; verified: number; paymentNumber?: string; paymentMethod?: string }>();
+              userRequestSubmissions.forEach((batch) => {
+                const adminKey = batch.target_guest_id;
+                const existing = adminStats.get(adminKey) || { numbers: 0, verified: 0 };
+                existing.numbers += batch.requests?.length || 0;
+                existing.verified += batch.requests?.reduce((sum, r) => sum + (r.requester_verified_count || 0), 0) || 0;
+                if (batch.submitter_payment_number) existing.paymentNumber = batch.submitter_payment_number;
+                if (batch.submitter_payment_method) existing.paymentMethod = batch.submitter_payment_method;
+                adminStats.set(adminKey, existing);
+              });
+              const totalNumbers = Array.from(adminStats.values()).reduce((s, a) => s + a.numbers, 0);
+              const totalVerified = Array.from(adminStats.values()).reduce((s, a) => s + a.verified, 0);
+              return (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-gradient-to-br from-[hsl(var(--cyan))]/15 to-[hsl(var(--blue))]/10 border border-[hsl(var(--cyan))]/30 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-black text-[hsl(var(--cyan))]">{totalNumbers}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold">মোট নম্বর</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-[hsl(var(--emerald))]/15 to-primary/10 border border-[hsl(var(--emerald))]/30 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-black text-[hsl(var(--emerald))]">{totalVerified}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold">মোট ভেরিফাইড</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {Array.from(adminStats.entries()).map(([adminId, stats]) => {
+                      const adminUser = users?.find(u => u.guest_id === adminId);
+                      return (
+                        <div key={adminId} className="flex items-center justify-between bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold font-mono truncate">{adminId}</p>
+                            <p className="text-[10px] text-muted-foreground">{adminUser?.display_name || "Unknown"}</p>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="bg-[hsl(var(--cyan))]/15 text-[hsl(var(--cyan))] font-bold px-2 py-1 rounded-lg">{stats.numbers} নম্বর</span>
+                            <span className="bg-[hsl(var(--emerald))]/15 text-[hsl(var(--emerald))] font-bold px-2 py-1 rounded-lg">{stats.verified} ✓</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              );
+            })()}
+
             {/* Cancel by requester search */}
             <div className="bg-secondary/30 border border-border rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold">রিকুয়েস্ট পাঠানো নম্বর দিয়ে Cancel করুন</p>
