@@ -190,6 +190,27 @@ export async function adminDismissTransferRequest(requestId: number): Promise<bo
   return Boolean(data);
 }
 
+// Cancel a submitted batch - returns requests back to pending for submitter
+export async function adminCancelTransferBatch(batchId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_cancel_transfer_batch", {
+    p_batch_id: batchId,
+  } as any);
+
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+// Submitter cancels an incoming pending request
+export async function cancelIncomingRequest(requestId: number, targetGuestId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("cancel_incoming_request", {
+    p_request_id: requestId,
+    p_target_guest_id: targetGuestId,
+  } as any);
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
 // Get all requests (pending + submitted + others) for a user (as requester) for history
 export async function getUserRequestHistory(requesterGuestId: string): Promise<UserTransferRequest[]> {
   const { data, error } = await supabase
