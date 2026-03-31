@@ -654,10 +654,21 @@ export default function AdminPanel() {
                   <div key={batch.id} className="glass-card border border-border rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between bg-primary/10 rounded-lg px-3 py-2">
                       <p className="text-sm font-bold text-primary">📋 {batch.request_count} টি নম্বর • মোট {totalBatchVerified} ভেরিফাইড</p>
-                      <button onClick={() => resetTransferBatchMutation.mutate(batch.id)} disabled={resetTransferBatchMutation.isPending} className="p-2 rounded-lg bg-primary/20 hover:bg-primary/40 transition" title="Reset Batch">
-                        <RefreshCcw className="w-4 h-4 text-primary" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button onClick={() => { if (confirm("এই ব্যাচ Cancel করলে request গুলো submitter এর কাছে ফিরে যাবে। নিশ্চিত?")) cancelTransferBatchMutation.mutate(batch.id); }} disabled={cancelTransferBatchMutation.isPending} className="p-2 rounded-lg bg-[hsl(var(--amber))]/20 hover:bg-[hsl(var(--amber))]/40 transition" title="Cancel Batch (ফিরে যাবে)">
+                          <XCircle className="w-4 h-4 text-[hsl(var(--amber))]" />
+                        </button>
+                        <button onClick={() => resetTransferBatchMutation.mutate(batch.id)} disabled={resetTransferBatchMutation.isPending} className="p-2 rounded-lg bg-primary/20 hover:bg-primary/40 transition" title="Reset Batch">
+                          <RefreshCcw className="w-4 h-4 text-primary" />
+                        </button>
+                      </div>
                     </div>
+                    {/* Rate info */}
+                    {(batch as any).submitter_rate > 0 && (
+                      <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-lg px-3 py-1.5">
+                        <p className="text-xs font-bold text-[hsl(var(--amber))]">💰 রেট: {(batch as any).submitter_rate} TK/ভেরিফাই</p>
+                      </div>
+                    )}
                     <div className="bg-[hsl(var(--emerald))]/10 border border-[hsl(var(--emerald))]/20 rounded-lg px-3 py-2">
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mb-1">🧑 যে সাবমিট করেছে:</p>
                       <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || "Unknown"})</span></p>
