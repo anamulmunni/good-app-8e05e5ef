@@ -727,7 +727,7 @@ export default function Dashboard() {
                       className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center"
                     >
                       {/* Confetti burst */}
-                      {[...Array(30)].map((_, i) => (
+                      {[...Array(10)].map((_, i) => (
                         <motion.div
                           key={`confetti-${i}`}
                           className="absolute rounded-full"
