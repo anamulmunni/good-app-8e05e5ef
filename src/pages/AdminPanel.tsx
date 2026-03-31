@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   getAllUsers, getAllTransactions, getPublicSettings, getPoolStats,
   getSubmittedNumbers, getResetHistory, getPaymentUsers,
-  toggleBlockUser, updateUserBalance, resetUserKeyCount,
+  toggleBlockUser, updateUserBalance, resetUserKeyCount, updateUserKeyCount,
   updateUserVerifiedBadge,
   updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
@@ -19,7 +19,7 @@ import {
   adminDismissTransferRequest,
   adminCancelTransferBatch,
 } from "@/lib/user-requests";
-import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff, ToggleLeft, ToggleRight, Wallet, Settings, FileText, CreditCard, Clock, Youtube } from "lucide-react";
+import { ShieldCheck, UserX, UserCheck, CheckCircle, XCircle, Loader2, Coins, Key, Search, RefreshCcw, Copy, Users, ChevronDown, ChevronUp, Trash2, Bell, Send, History, Lock, Eye, EyeOff, ToggleLeft, ToggleRight, Wallet, Settings, FileText, CreditCard, Clock, Youtube, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -94,6 +94,8 @@ export default function AdminPanel() {
   const [withdrawLockUntilSetting, setWithdrawLockUntilSetting] = useState("");
   const [requestLockUntilSetting, setRequestLockUntilSetting] = useState("");
   const [resetHistorySearch, setResetHistorySearch] = useState("");
+  const [editingKeyCountUserId, setEditingKeyCountUserId] = useState<number | null>(null);
+  const [newKeyCountValue, setNewKeyCountValue] = useState("");
   const [youtubeApiKeyInput, setYoutubeApiKeyInput] = useState("");
   const [minRequestTargetSetting, setMinRequestTargetSetting] = useState("0");
   const [savedYoutubeKeys, setSavedYoutubeKeys] = useState<string[]>([]);
@@ -199,6 +201,16 @@ export default function AdminPanel() {
       }
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-users"] }); queryClient.invalidateQueries({ queryKey: ["admin-reset-history"] }); toast({ title: "কাউন্ট রিসেট হয়েছে" }); },
+  });
+
+  const updateKeyCountMutation = useMutation({
+    mutationFn: ({ id, keyCount }: { id: number; keyCount: number }) => updateUserKeyCount(id, keyCount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      setEditingKeyCountUserId(null);
+      setNewKeyCountValue("");
+      toast({ title: "Verified count আপডেট হয়েছে ✓" });
+    },
   });
 
   const verifiedBadgeMutation = useMutation({
@@ -1176,6 +1188,13 @@ export default function AdminPanel() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
+                        onClick={() => { setEditingKeyCountUserId(u.id); setNewKeyCountValue(String(u.key_count || 0)); }}
+                        className="p-1.5 hover:bg-secondary rounded-lg text-muted-foreground hover:text-[hsl(var(--amber))] transition-colors"
+                        title="Verified count এডিট করুন"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => verifiedBadgeMutation.mutate({ id: u.id, isVerifiedBadge: !(u as any).is_verified_badge })}
                         className={`p-1.5 rounded-lg transition-colors ${(u as any).is_verified_badge ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}
                         title="Verified badge"
@@ -1191,6 +1210,19 @@ export default function AdminPanel() {
                       </button>
                     </div>
                   </div>
+                  {editingKeyCountUserId === u.id && (
+                    <div className="flex items-center gap-2">
+                      <input type="number" value={newKeyCountValue} onChange={(e) => setNewKeyCountValue(e.target.value)}
+                        placeholder="Verified count দিন..." className="input-field text-sm flex-1" min="0" />
+                      <button
+                        disabled={updateKeyCountMutation.isPending || newKeyCountValue === ""}
+                        onClick={() => updateKeyCountMutation.mutate({ id: u.id, keyCount: parseInt(newKeyCountValue) || 0 })}
+                        className="px-3 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-xs">
+                        {updateKeyCountMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "সেভ"}
+                      </button>
+                      <button onClick={() => { setEditingKeyCountUserId(null); setNewKeyCountValue(""); }} className="p-1.5 text-muted-foreground hover:text-destructive"><XCircle className="w-3.5 h-3.5" /></button>
+                    </div>
+                  )}
                   {editingPasswordUserId === u.id ? (
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">

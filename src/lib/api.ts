@@ -317,6 +317,11 @@ export async function resetUserKeyCount(userId: number) {
   await supabase.from("users").update({ key_count: 0 }).eq("id", userId);
 }
 
+export async function updateUserKeyCount(userId: number, keyCount: number) {
+  const { error } = await supabase.from("users").update({ key_count: keyCount }).eq("id", userId);
+  if (error) throw error;
+}
+
 export async function getAllTransactions(): Promise<Transaction[]> {
   const { data } = await supabase.from("transactions").select("*").order("created_at", { ascending: false });
   return data || [];
