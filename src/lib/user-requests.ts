@@ -90,7 +90,8 @@ export async function submitIncomingTransferRequests(
   submitterName: string,
   password: string,
   submitterPaymentNumber?: string,
-  submitterPaymentMethod?: string
+  submitterPaymentMethod?: string,
+  submitterRate?: number
 ): Promise<string> {
   const { data, error } = await supabase.rpc("submit_user_request_batch", {
     p_target_guest_id: targetGuestId,
@@ -98,6 +99,7 @@ export async function submitIncomingTransferRequests(
     p_password: password,
     p_submitter_payment_number: submitterPaymentNumber || null,
     p_submitter_payment_method: submitterPaymentMethod || null,
+    p_submitter_rate: submitterRate || 0,
   } as any);
 
   if (error) throw error;
