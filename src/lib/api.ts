@@ -123,10 +123,12 @@ export async function getPublicSettings(): Promise<Settings> {
     videoUrl: "",
     requestSubmitPassword: "Anamul-341321",
     minRequestVerified: 10,
+    minRequestTarget: 0,
     paymentMode: "off",
     minWithdraw: 50,
     withdrawLockUntil: null,
     requestLockUntil: null,
+    appVersion: 0,
   };
 
   data?.forEach((s) => {
