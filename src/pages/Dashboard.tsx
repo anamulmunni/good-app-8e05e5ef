@@ -1053,20 +1053,57 @@ export default function Dashboard() {
                                 onChange={(e) => setSubmitterPaymentNumber(e.target.value)} className="input-field" />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              <button onClick={() => submitIncomingRequestsMutation.mutate()} className="btn-primary py-3"
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                whileHover={{ scale: 1.03 }}
+                                onClick={() => submitIncomingRequestsMutation.mutate()}
+                                className="relative py-3 rounded-xl font-black text-sm overflow-hidden"
                                 disabled={isRequestLocked || submitIncomingRequestsMutation.isPending || !requestSubmitPassword || !submitterPaymentNumber.trim()}>
-                                {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin" /> : "Admin এ পাঠান"}
-                              </button>
-                              <button onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
+                                <motion.div
+                                  className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-primary to-[hsl(var(--emerald))]"
+                                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                  style={{ backgroundSize: "200% 100%" }}
+                                />
+                                <motion.div
+                                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                                  animate={{ x: ["-100%", "200%"] }}
+                                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                                />
+                                <span className="relative z-10 text-primary-foreground flex items-center justify-center gap-1.5">
+                                  {submitIncomingRequestsMutation.isPending ? <Loader2 className="animate-spin w-4 h-4" /> : "Admin এ পাঠান"}
+                                </span>
+                              </motion.button>
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                onClick={() => { setShowRequestSubmitPassword(false); setRequestSubmitPassword(""); setSubmitterPaymentNumber(""); }}
                                 className="px-4 py-3 rounded-xl border border-border text-muted-foreground hover:bg-secondary transition-colors font-bold text-sm">
                                 Cancel
-                              </button>
+                              </motion.button>
                             </div>
                           </div>
                         ) : (
-                          <button onClick={() => setShowRequestSubmitPassword(true)} className="btn-primary py-3">
-                            Full List Submit
-                          </button>
+                          <motion.button
+                            whileTap={{ scale: 0.92 }}
+                            whileHover={{ scale: 1.03, y: -2 }}
+                            onClick={() => setShowRequestSubmitPassword(true)}
+                            className="w-full relative py-3.5 rounded-2xl font-black overflow-hidden"
+                          >
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--purple))] via-[hsl(var(--pink))] to-[hsl(var(--purple))]"
+                              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                              style={{ backgroundSize: "200% 100%" }}
+                            />
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                              animate={{ x: ["-100%", "200%"] }}
+                              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                            />
+                            <span className="relative z-10 text-primary-foreground flex items-center justify-center gap-2">
+                              📋 Full List Submit
+                            </span>
+                          </motion.button>
                         )}
                       </>
                     )}
