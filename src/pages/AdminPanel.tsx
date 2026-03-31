@@ -810,9 +810,30 @@ export default function AdminPanel() {
           <div className="mt-4 space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" placeholder="নম্বর দিয়ে সার্চ..." value={resetHistorySearch} onChange={(e) => setResetHistorySearch(e.target.value)} className="input-field pl-10 text-sm" />
+              <input type="text" placeholder="নম্বর / অ্যাডমিন / পেমেন্ট নম্বর দিয়ে সার্চ..." value={resetHistorySearch} onChange={(e) => setResetHistorySearch(e.target.value)} className="input-field pl-10 text-sm" />
             </div>
-            {resetHistoryData?.filter(i => !resetHistorySearch || i.phone_number.includes(resetHistorySearch)).map(item => {
+            {resetHistorySearch.trim() && (() => {
+              const q = resetHistorySearch.trim().toLowerCase();
+              const filtered = resetHistoryData?.filter(i =>
+                i.phone_number.toLowerCase().includes(q) ||
+                i.submitted_by?.toLowerCase().includes(q) ||
+                i.payment_number?.toLowerCase().includes(q)
+              ) || [];
+              const totalVerified = filtered.reduce((sum, i) => sum + (i.verified_count || 0), 0);
+              return filtered.length > 0 ? (
+                <div className="bg-[hsl(var(--cyan))]/10 border border-[hsl(var(--cyan))]/20 rounded-xl p-3 flex items-center justify-between">
+                  <p className="text-sm font-bold text-[hsl(var(--cyan))]">📊 {filtered.length} টি রেকর্ড</p>
+                  <p className="text-sm font-bold text-[hsl(var(--emerald))]">মোট {totalVerified} ভেরিফাইড</p>
+                </div>
+              ) : null;
+            })()}
+            {resetHistoryData?.filter(i => {
+              if (!resetHistorySearch.trim()) return true;
+              const q = resetHistorySearch.trim().toLowerCase();
+              return i.phone_number.toLowerCase().includes(q) ||
+                i.submitted_by?.toLowerCase().includes(q) ||
+                i.payment_number?.toLowerCase().includes(q);
+            }).map(item => {
               const matchedUser = users?.find(u => u.guest_id === item.phone_number);
               return (
                 <div key={item.id} className="bg-secondary/50 border border-[hsl(var(--cyan))]/10 rounded-xl p-3">
