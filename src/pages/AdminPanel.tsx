@@ -175,6 +175,7 @@ export default function AdminPanel() {
       setVideoUrl(settingsData.videoUrl || "");
       setRequestSubmitPasswordSetting(settingsData.requestSubmitPassword || "");
       setMinRequestVerifiedSetting(String(settingsData.minRequestVerified || 10));
+      setMinRequestTargetSetting(String(settingsData.minRequestTarget || 0));
       setPaymentModeSetting(settingsData.paymentMode || "off");
       setMinWithdrawSetting(String(settingsData.minWithdraw || 50));
       setWithdrawLockUntilSetting(isoToDatetimeLocal(settingsData.withdrawLockUntil));
