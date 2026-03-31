@@ -228,10 +228,12 @@ export default function Dashboard() {
   const targetAmount = publicSettings?.bonusTarget || 10;
   const customNoticeText = publicSettings?.customNotice;
   const minRequestVerified = publicSettings?.minRequestVerified || 10;
+  const minRequestTarget = publicSettings?.minRequestTarget || 0;
   const paymentMode = publicSettings?.paymentMode === "on";
   const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
+  const canSubmitList = minRequestTarget <= 0 || incomingRequests.length >= minRequestTarget;
   const requestLockRemainingMs = !paymentMode ? getRemainingMilliseconds(publicSettings?.requestLockUntil, nowMs) : 0;
   const isRequestLocked = requestLockRemainingMs > 0;
   const requestCountdownText = formatCountdown(requestLockRemainingMs);
