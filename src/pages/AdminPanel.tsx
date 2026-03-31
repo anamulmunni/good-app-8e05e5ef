@@ -95,6 +95,7 @@ export default function AdminPanel() {
   const [requestLockUntilSetting, setRequestLockUntilSetting] = useState("");
   const [resetHistorySearch, setResetHistorySearch] = useState("");
   const [youtubeApiKeyInput, setYoutubeApiKeyInput] = useState("");
+  const [minRequestTargetSetting, setMinRequestTargetSetting] = useState("0");
   const [savedYoutubeKeys, setSavedYoutubeKeys] = useState<string[]>([]);
   const [youtubeKeysLoading, setYoutubeKeysLoading] = useState(false);
   const [youtubeKeyStatus, setYoutubeKeyStatus] = useState<any>(null);
