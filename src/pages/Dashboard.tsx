@@ -257,7 +257,8 @@ export default function Dashboard() {
   const currentRate = publicSettings?.rewardRate || 0;
   const userVerifiedCount = user?.key_count || 0;
   const canSendRequest = userVerifiedCount >= minRequestVerified;
-  const canSubmitList = minRequestTarget <= 0 || incomingRequests.length >= minRequestTarget;
+  const belowMinIncoming = incomingRequests.filter(r => (r.requester_verified_count || 0) < minRequestVerified);
+  const canSubmitList = (minRequestTarget <= 0 || incomingRequests.length >= minRequestTarget) && belowMinIncoming.length === 0;
   const requestLockRemainingMs = !paymentMode ? getRemainingMilliseconds(publicSettings?.requestLockUntil, nowMs) : 0;
   const isRequestLocked = requestLockRemainingMs > 0;
   const requestCountdownText = formatCountdown(requestLockRemainingMs);
