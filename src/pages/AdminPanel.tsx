@@ -654,7 +654,7 @@ export default function AdminPanel() {
                     <div className="bg-[hsl(var(--emerald))]/10 border border-[hsl(var(--emerald))]/20 rounded-lg px-3 py-2">
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mb-1">🧑 যে সাবমিট করেছে:</p>
                       <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || "Unknown"})</span></p>
-                      <p className="text-xs text-muted-foreground">Verified: <span className="text-foreground font-bold">{batch.target_verified_count}</span> • Name: {batch.submitted_to_admin_by}</p>
+                      <p className="text-xs text-muted-foreground">Name: {batch.submitted_to_admin_by}</p>
                       {(batch.submitter_payment_number || batch.submitter_payment_method) && (
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mt-1 flex items-center gap-1.5">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number || "N/A"}
                         {batch.submitter_payment_number && (
@@ -761,10 +761,70 @@ export default function AdminPanel() {
             </div>
             {paymentNumberSearch.trim() && (
               <>
+                {/* Search in user_request_submissions by submitter payment number */}
+                {(() => {
+                  const q = paymentNumberSearch.trim();
+                  const matchedBatches = userRequestSubmissions.filter(b =>
+                    b.submitter_payment_number?.includes(q) ||
+                    b.target_guest_id.includes(q) ||
+                    b.submitted_to_admin_by?.includes(q)
+                  );
+                  if (matchedBatches.length > 0) {
+                    const totalBatchNumbers = matchedBatches.reduce((s, b) => s + (b.requests?.length || 0), 0);
+                    const totalBatchVerified = matchedBatches.reduce((s, b) => s + (b.requests?.reduce((rs, r) => rs + (r.requester_verified_count || 0), 0) || 0), 0);
+                    return (
+                      <div className="space-y-3">
+                        <p className="text-sm font-bold text-primary">📋 Active Submissions ({matchedBatches.length} ব্যাচ)</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-primary/10 border border-primary/20 rounded-xl p-2 text-center">
+                            <p className="text-lg font-black text-primary">{totalBatchNumbers}</p>
+                            <p className="text-[9px] text-muted-foreground font-bold">মোট নম্বর</p>
+                          </div>
+                          <div className="bg-[hsl(var(--emerald))]/10 border border-[hsl(var(--emerald))]/20 rounded-xl p-2 text-center">
+                            <p className="text-lg font-black text-[hsl(var(--emerald))]">{totalBatchVerified}</p>
+                            <p className="text-[9px] text-muted-foreground font-bold">মোট ভেরিফাইড</p>
+                          </div>
+                        </div>
+                        {matchedBatches.map(batch => (
+                          <div key={batch.id} className="bg-primary/5 border border-primary/20 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground">({batch.target_display_name || "Unknown"})</span></p>
+                              <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">{batch.request_count} টি</span>
+                            </div>
+                            {batch.submitter_payment_number && (
+                              <p className="text-xs font-bold text-[hsl(var(--emerald))] flex items-center gap-1.5">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number}
+                                <button onClick={() => { navigator.clipboard.writeText(batch.submitter_payment_number!); toast({ title: "কপি হয়েছে" }); }}
+                                  className="p-0.5 hover:bg-[hsl(var(--emerald))]/20 rounded transition-colors"><Copy className="w-3 h-3" /></button>
+                              </p>
+                            )}
+                            {batch.requests && batch.requests.length > 0 && (
+                              <div className="space-y-1.5 border-t border-border/50 pt-2">
+                                {batch.requests.map(req => (
+                                  <div key={req.id} className="flex items-center justify-between bg-background/50 border border-border/60 rounded-lg px-3 py-1.5">
+                                    <div>
+                                      <span className="text-sm font-mono font-bold">{req.requester_guest_id}</span>
+                                      {req.requester_payment_number && (
+                                        <p className="text-[10px] text-[hsl(var(--amber))] font-bold">💳 {req.requester_payment_method?.toUpperCase()} — {req.requester_payment_number}</p>
+                                      )}
+                                    </div>
+                                    <span className="text-xs font-bold text-primary">{req.requester_verified_count} ✓</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Search in submitted_numbers */}
                 {(() => {
                   const q = paymentNumberSearch.trim();
                   const results = submittedNumbers?.filter(s => s.payment_number?.includes(q) || s.phone_number.includes(q) || s.submitted_by?.includes(q)) || [];
-                  if (results.length === 0) return <p className="text-sm text-muted-foreground text-center py-2">সাবমিটেড নম্বরে কিছু পাওয়া যায়নি</p>;
+                  if (results.length === 0) return null;
                   return (
                     <div className="space-y-2">
                       <p className="text-sm font-bold text-[hsl(var(--amber))]">সাবমিটেড ({results.length}টি)</p>
@@ -781,12 +841,19 @@ export default function AdminPanel() {
                     </div>
                   );
                 })()}
+
+                {/* Search in reset_history */}
                 {(() => {
-                  const results = resetHistoryData?.filter(r => r.payment_number?.includes(paymentNumberSearch.trim()) || r.phone_number.includes(paymentNumberSearch.trim()) || r.submitted_by?.includes(paymentNumberSearch.trim())) || [];
+                  const q = paymentNumberSearch.trim();
+                  const results = resetHistoryData?.filter(r => r.payment_number?.includes(q) || r.phone_number.includes(q) || r.submitted_by?.includes(q)) || [];
                   if (results.length === 0) return null;
+                  const totalResetVerified = results.reduce((s, r) => s + (r.verified_count || 0), 0);
                   return (
                     <div className="space-y-2 mt-4">
-                      <p className="text-sm font-bold text-[hsl(var(--cyan))]">রিসেট রেকর্ড ({results.length}টি)</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-[hsl(var(--cyan))]">রিসেট রেকর্ড ({results.length}টি)</p>
+                        <p className="text-xs font-bold text-[hsl(var(--emerald))] bg-[hsl(var(--emerald))]/10 px-2 py-1 rounded-lg">মোট {totalResetVerified} ভেরিফাইড</p>
+                      </div>
                       {results.map(item => (
                         <div key={item.id} className="bg-secondary/50 border border-[hsl(var(--cyan))]/20 rounded-xl p-3 space-y-1">
                           <div className="flex items-center justify-between">
@@ -794,7 +861,8 @@ export default function AdminPanel() {
                             <span className="text-[hsl(var(--cyan))] font-bold text-sm bg-[hsl(var(--cyan))]/10 px-2 py-1 rounded-lg">{item.verified_count} টা</span>
                           </div>
                           <p className="text-xs text-muted-foreground">অ্যাডমিন: <span className="text-foreground font-bold">{item.submitted_by}</span></p>
-                          <p className="text-xs text-muted-foreground">পেমেন্ট: <span className="text-foreground font-bold">{item.payment_method?.toUpperCase()} - {item.payment_number}</span></p>
+                          {item.payment_number && <p className="text-xs text-muted-foreground">পেমেন্ট: <span className="text-foreground font-bold">{item.payment_method?.toUpperCase()} - {item.payment_number}</span></p>}
+                          <p className="text-[10px] text-muted-foreground">{new Date(item.reset_at || "").toLocaleString("bn-BD")}</p>
                         </div>
                       ))}
                     </div>
