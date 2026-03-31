@@ -116,12 +116,19 @@ export default function Dashboard() {
   const submitIncomingRequestsMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
+      // Re-fetch latest settings to prevent stale submissions
+      const freshSettings = await getPublicSettings();
+      const minTarget = freshSettings.minRequestTarget || 0;
+      if (minTarget > 0 && incomingRequests.length < minTarget) {
+        throw new Error(`সর্বনিম্ন ${minTarget} টি request দরকার, আপনার আছে ${incomingRequests.length} টি। কম হলে বাড়তি request গুলো Cancel করুন।`);
+      }
       return submitIncomingTransferRequests(
         user.guest_id,
         user.display_name || user.guest_id,
         requestSubmitPassword,
         submitterPaymentNumber.trim() || undefined,
-        submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined
+        submitterPaymentNumber.trim() ? submitterPaymentMethod : undefined,
+        freshSettings.rewardRate || 0
       );
     },
     onSuccess: () => {
@@ -135,6 +142,20 @@ export default function Dashboard() {
     },
     onError: (error: Error) => {
       toast({ title: "সাবমিট ব্যর্থ হয়েছে", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelIncomingRequestMutation = useMutation({
+    mutationFn: async (requestId: number) => {
+      if (!user) throw new Error("ইউজার পাওয়া যায়নি");
+      return cancelIncomingRequest(requestId, user.guest_id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incoming-user-transfer-requests", user?.guest_id] });
+      toast({ title: "Request cancel হয়েছে" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Cancel ব্যর্থ", description: error.message, variant: "destructive" });
     },
   });
 
