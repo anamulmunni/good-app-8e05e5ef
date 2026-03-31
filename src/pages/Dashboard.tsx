@@ -193,6 +193,17 @@ export default function Dashboard() {
     }
   }, [user?.key_count]);
 
+  // Auto-refresh: track appVersion changes and reload page
+  useEffect(() => {
+    if (publicSettings?.appVersion != null) {
+      if (loadedAppVersion === null) {
+        setLoadedAppVersion(publicSettings.appVersion);
+      } else if (publicSettings.appVersion !== loadedAppVersion) {
+        window.location.reload();
+      }
+    }
+  }, [publicSettings?.appVersion, loadedAppVersion]);
+
   useEffect(() => {
     if (!user?.id) return;
 
