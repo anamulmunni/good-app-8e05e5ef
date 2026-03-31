@@ -211,7 +211,7 @@ export default function AdminPanel() {
   });
 
   const rateMutation = useMutation({
-    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string; requestSubmitPassword?: string; minRequestVerified?: number; minWithdraw?: number; withdrawLockUntil?: string; requestLockUntil?: string }) => {
+    mutationFn: async (data: { rate?: number; status?: string; bonusStatus?: string; bonusTarget?: number; customNotice?: string; videoUrl?: string; requestSubmitPassword?: string; minRequestVerified?: number; minRequestTarget?: number; minWithdraw?: number; withdrawLockUntil?: string; requestLockUntil?: string }) => {
       if (data.rate !== undefined && Number.isFinite(data.rate)) await updateSetting("rewardRate", String(data.rate));
       if (data.status !== undefined) await updateSetting("buyStatus", data.status);
       if (data.bonusStatus !== undefined) await updateSetting("bonusStatus", data.bonusStatus);
@@ -220,6 +220,7 @@ export default function AdminPanel() {
       if (data.videoUrl !== undefined) await updateSetting("videoUrl", data.videoUrl);
       if (data.requestSubmitPassword !== undefined) await updateSetting("requestSubmitPassword", data.requestSubmitPassword);
       if (data.minRequestVerified !== undefined && Number.isFinite(data.minRequestVerified)) await updateSetting("minRequestVerified", String(data.minRequestVerified));
+      if (data.minRequestTarget !== undefined && Number.isFinite(data.minRequestTarget)) await updateSetting("minRequestTarget", String(data.minRequestTarget));
       if (data.minWithdraw !== undefined && Number.isFinite(data.minWithdraw)) await updateSetting("minWithdraw", String(data.minWithdraw));
       if (data.withdrawLockUntil !== undefined) await updateSetting("withdrawLockUntil", data.withdrawLockUntil);
       if (data.requestLockUntil !== undefined) await updateSetting("requestLockUntil", data.requestLockUntil);
