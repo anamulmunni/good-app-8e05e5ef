@@ -956,11 +956,25 @@ export default function Dashboard() {
                           onChange={(e) => setRequestPaymentNumber(e.target.value)} className="input-field" />
                       </div>
                       <motion.button
-                        whileTap={{ scale: 0.95 }}
+                        whileTap={{ scale: 0.92 }}
+                        whileHover={{ scale: 1.03, y: -2 }}
                         onClick={() => createUserRequestMutation.mutate()}
-                        className="btn-primary py-3.5 font-black relative overflow-hidden"
+                        className="w-full relative py-3.5 rounded-2xl font-black overflow-hidden"
                         disabled={isRequestLocked || createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
-                        {createUserRequestMutation.isPending ? <Loader2 className="animate-spin" /> : <><Send className="w-4 h-4" /> Request পাঠান</>}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-primary via-[hsl(var(--cyan))] to-primary"
+                          animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                          style={{ backgroundSize: "200% 100%" }}
+                        />
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                          animate={{ x: ["-100%", "200%"] }}
+                          transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                        />
+                        <span className="relative z-10 flex items-center justify-center gap-2 text-primary-foreground">
+                          {createUserRequestMutation.isPending ? <Loader2 className="animate-spin w-5 h-5" /> : <><Send className="w-4 h-4" /> Request পাঠান</>}
+                        </span>
                       </motion.button>
                     </div>
                   )}
