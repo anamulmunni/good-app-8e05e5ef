@@ -67,10 +67,12 @@ export type Settings = {
   videoUrl: string;
   requestSubmitPassword: string;
   minRequestVerified: number;
+  minRequestTarget: number;
   paymentMode: string;
   minWithdraw: number;
   withdrawLockUntil: string | null;
   requestLockUntil: string | null;
+  appVersion: number;
 };
 
 // Auth / User APIs
