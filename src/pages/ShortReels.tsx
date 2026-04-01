@@ -337,13 +337,14 @@ export default function ShortReels() {
             </div>
           )}
 
-          {/* Preloaded iframes — current is visible, others hidden off-screen */}
+          {/* Preloaded iframes — current visible, others off-screen */}
           {preloadReels.map((reel) => {
             const isCurrent = reel.videoId === currentReel?.videoId;
-            const src = `https://www.youtube.com/embed/${reel.videoId}?autoplay=${isCurrent ? "1" : "0"}&mute=0&controls=1&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=0`;
+            const src = `https://www.youtube.com/embed/${reel.videoId}?autoplay=${isCurrent ? "1" : "0"}&mute=0&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=1&origin=${window.location.origin}`;
             return (
               <iframe
                 key={reel.videoId}
+                ref={isCurrent ? currentIframeRef : undefined}
                 src={src}
                 className="absolute w-full h-full z-[3]"
                 style={{
@@ -359,6 +360,22 @@ export default function ShortReels() {
               />
             );
           })}
+
+          {/* Pause indicator */}
+          <AnimatePresence>
+            {isPaused && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                className="absolute inset-0 z-[11] flex items-center justify-center pointer-events-none"
+              >
+                <div className="w-20 h-20 rounded-full bg-black/50 flex items-center justify-center">
+                  <Pause className="w-10 h-10 text-white fill-white" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* YouTube logo cover */}
           <div
