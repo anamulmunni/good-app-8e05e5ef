@@ -1444,13 +1444,20 @@ export default function Feed() {
                   className="w-full bg-transparent text-gray-900 dark:text-foreground text-base resize-none border-none outline-none placeholder:text-gray-400 min-h-[120px]" autoFocus />
               </div>
 
-              {postImagePreview && (
-                <div className="px-4 mt-2 relative">
-                  <img src={postImagePreview} className="w-full rounded-lg max-h-60 object-cover" />
-                  <button onClick={() => { setPostImageFile(null); setPostImagePreview(null); }}
-                    className="absolute top-2 right-6 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center">
-                    <X className="w-4 h-4 text-white" />
-                  </button>
+              {postImagePreviews.length > 0 && (
+                <div className="px-4 mt-2 grid gap-2" style={{ gridTemplateColumns: postImagePreviews.length === 1 ? '1fr' : 'repeat(2, 1fr)' }}>
+                  {postImagePreviews.map((preview, idx) => (
+                    <div key={idx} className="relative">
+                      <img src={preview} className="w-full rounded-lg max-h-60 object-cover" />
+                      <button onClick={() => {
+                        setPostImageFiles(prev => prev.filter((_, i) => i !== idx));
+                        setPostImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                      }}
+                        className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center">
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
