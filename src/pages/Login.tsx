@@ -288,22 +288,6 @@ export default function Login() {
           ))}
         </motion.div>
 
-        {/* ⚠️ Single Account Notice */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.25 }}
-          className="mb-3 rounded-2xl border border-amber-500/30 px-4 py-3"
-          style={{ background: "linear-gradient(135deg, hsl(45 90% 50% / 0.08), hsl(30 90% 45% / 0.05))" }}
-        >
-          <div className="flex items-start gap-2.5">
-            <span className="text-lg mt-0.5">⚠️</span>
-            <div className="text-[11.5px] leading-relaxed text-amber-200/90 font-medium">
-              <p className="font-bold text-amber-300 text-xs mb-1">গুরুত্বপূর্ণ নোটিশ:</p>
-              <p>একজন ইউজার শুধুমাত্র <span className="text-amber-300 font-bold">একটি অ্যাকাউন্ট</span> ব্যবহার করতে পারবে। একটি অ্যাকাউন্ট দিয়েই আনলিমিটেড ভেরিফাইড করতে পারবেন। একাধিক অ্যাকাউন্ট তৈরি করলে আগের সকল অ্যাকাউন্ট <span className="text-red-400 font-bold">স্থায়ীভাবে ব্যান</span> হয়ে যাবে।</p>
-            </div>
-          </div>
-        </motion.div>
 
         {/* Form Card */}
         <motion.div
