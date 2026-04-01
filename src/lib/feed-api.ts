@@ -718,11 +718,11 @@ export async function hasUserPosted(userId: number): Promise<boolean> {
   return (count || 0) > 0;
 }
 
-// Get feed posts with user info
-export async function getFeedPosts(limit = 1000, searchQuery?: string): Promise<Post[]> {
+// Get feed posts with user info - paginated for performance
+export async function getFeedPosts(limit = 50, searchQuery?: string, offset = 0): Promise<Post[]> {
   let query = (supabase.from("posts").select("*") as any)
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   const { data: posts } = await query;
   if (!posts || posts.length === 0) return [];
