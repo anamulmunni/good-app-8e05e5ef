@@ -104,7 +104,7 @@ export default function AdminPanel() {
   const [youtubeKeyStatus, setYoutubeKeyStatus] = useState<any>(null);
   const [youtubeKeysLoaded, setYoutubeKeysLoaded] = useState(false);
   const [showFullYoutubeKeys, setShowFullYoutubeKeys] = useState(false);
-  const [bulkKeyImport, setBulkKeyImport] = useState("");
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
