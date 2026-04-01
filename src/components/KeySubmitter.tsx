@@ -133,9 +133,10 @@ export function KeySubmitter() {
     }
   }, []);
 
-  // Auto-submit after verification
+  // Auto-submit after verification (ref-guarded to prevent duplicate calls)
   const autoSubmit = useCallback(async (key: GeneratedKey) => {
-    if (!user || isAutoSubmitting) return;
+    if (!user || isAutoSubmittingRef.current) return;
+    isAutoSubmittingRef.current = true;
     setIsAutoSubmitting(true);
     try {
       const result = await submitKey(user.id, key.privateKey);
@@ -176,8 +177,9 @@ export function KeySubmitter() {
       setHasLeftApp(false);
     } finally {
       setIsAutoSubmitting(false);
+      isAutoSubmittingRef.current = false;
     }
-  }, [user, isAutoSubmitting, refreshUser, queryClient, toast]);
+  }, [user, refreshUser, queryClient, toast]);
 
   // Auto-polling when activeKey is set
   useEffect(() => {
@@ -193,9 +195,10 @@ export function KeySubmitter() {
     setCheckCount(0);
 
     const poll = async () => {
+      if (isAutoSubmittingRef.current) return; // Already submitting, skip
       setCheckCount(prev => prev + 1);
       const whitelisted = await checkWhitelistDirectly(activeKey.address);
-      if (whitelisted) {
+      if (whitelisted && !isAutoSubmittingRef.current) {
         if (pollingRef.current) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
