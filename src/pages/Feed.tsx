@@ -236,6 +236,7 @@ export default function Feed() {
     onSuccess: () => {
       setPostContent(""); setPostImageFiles([]); setPostImagePreviews([]);
       setPostVideoFile(null); setPostVideoPreview(null); setShowCreatePost(false);
+      setPage(0); setAllPosts([]); setHasMore(true);
       queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
       toast({ title: "পোস্ট প্রকাশিত! 🎉" });
     },
