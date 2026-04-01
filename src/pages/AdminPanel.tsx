@@ -164,6 +164,7 @@ export default function AdminPanel() {
   const { data: resetHistoryData } = useQuery({ queryKey: ["admin-reset-history"], queryFn: getResetHistory, enabled: isLoggedIn });
   const { data: receivedList } = useQuery({ queryKey: ["admin-payments-received"], queryFn: () => getPaymentUsers("received"), enabled: isLoggedIn });
   const { data: notReceivedList } = useQuery({ queryKey: ["admin-payments-not-received"], queryFn: () => getPaymentUsers("not_received"), enabled: isLoggedIn });
+  const { data: duplicateAttempts = [] } = useQuery({ queryKey: ["admin-duplicate-attempts"], queryFn: getDuplicateKeyAttempts, enabled: isLoggedIn });
 
   const withdrawals = allTx?.filter(t => t.type === "withdrawal") || [];
   const pendingWithdrawals = withdrawals.filter(w => w.status === "pending");
