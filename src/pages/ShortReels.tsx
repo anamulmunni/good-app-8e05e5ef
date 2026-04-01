@@ -345,7 +345,7 @@ export default function ShortReels() {
 
           {reelQueue.map((item, index) => {
             const offset = index - currentIndex;
-            if (Math.abs(offset) > 1) return null;
+            if (Math.abs(offset) > 2) return null;
 
             const isActive = index === currentIndex;
             const loaded = iframeLoaded.has(item.videoId);
