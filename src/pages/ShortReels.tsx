@@ -33,15 +33,6 @@ const CATEGORY_QUERY: Record<string, string> = {
 const SEEN_REELS_KEY = "goodapp-short-reels-seen-v2";
 const MAX_SEEN_REELS = 500;
 
-function shuffle<T>(items: T[]): T[] {
-  const arr = [...items];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 function buildSessionSeed() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -66,6 +57,30 @@ function saveSeenReel(videoId: string) {
   } catch {}
 }
 
+// ─── YouTube IFrame API loader ───
+let ytApiReady = false;
+let ytApiPromise: Promise<void> | null = null;
+
+function loadYTApi(): Promise<void> {
+  if (ytApiReady) return Promise.resolve();
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise<void>((resolve) => {
+    if ((window as any).YT?.Player) {
+      ytApiReady = true;
+      resolve();
+      return;
+    }
+    (window as any).onYouTubeIframeAPIReady = () => {
+      ytApiReady = true;
+      resolve();
+    };
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+  });
+  return ytApiPromise;
+}
+
 export default function ShortReels() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
@@ -77,18 +92,67 @@ export default function ShortReels() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [showPauseIcon, setShowPauseIcon] = useState(false);
-  const [iframeLoaded, setIframeLoaded] = useState<Set<string>>(new Set());
+  const [playerReady, setPlayerReady] = useState(false);
 
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const touchStartTime = useRef(0);
   const swipeLocked = useRef(false);
-  const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
   const pauseIconTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // YT Player refs — we use only ONE player to avoid heavy multi-iframe
+  const playerRef = useRef<any>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const currentVideoIdRef = useRef<string>("");
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
+
+  // ─── Initialize YT Player once ───
+  useEffect(() => {
+    let cancelled = false;
+    loadYTApi().then(() => {
+      if (cancelled || playerRef.current) return;
+      const YT = (window as any).YT;
+      playerRef.current = new YT.Player("yt-reels-player", {
+        width: "100%",
+        height: "100%",
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          rel: 0,
+          showinfo: 0,
+          iv_load_policy: 3,
+          fs: 0,
+          disablekb: 1,
+          loop: 1,
+          mute: 0,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: () => {
+            if (!cancelled) setPlayerReady(true);
+          },
+          onStateChange: (event: any) => {
+            // Auto-next when video ends
+            if (event.data === YT.PlayerState.ENDED) {
+              setCurrentIndex((prev) => prev + 1);
+            }
+          },
+          onError: () => {
+            // Skip broken videos
+            setCurrentIndex((prev) => prev + 1);
+          },
+        },
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const baseFnUrl = useMemo(() => {
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -129,8 +193,8 @@ export default function ShortReels() {
     setReelQueue([]);
     setCurrentIndex(0);
     setPaused(false);
-    setIframeLoaded(new Set());
     swipeLocked.current = false;
+    currentVideoIdRef.current = "";
   }, []);
 
   useEffect(() => {
@@ -147,50 +211,58 @@ export default function ShortReels() {
 
   const currentReel = reelQueue[currentIndex];
 
-  // When active reel changes: pause old, play new
-  const prevIndexRef = useRef(-1);
+  // ─── Load video into player when index changes ───
   useEffect(() => {
-    if (!currentReel?.videoId) return;
+    if (!currentReel?.videoId || !playerReady || !playerRef.current) return;
+
     saveSeenReel(currentReel.videoId);
     setPaused(false);
 
-    // Pause previously active reel
-    const prevIndex = prevIndexRef.current;
-    if (prevIndex >= 0 && prevIndex !== currentIndex && reelQueue[prevIndex]) {
-      sendYtCommand(reelQueue[prevIndex].videoId, "pauseVideo");
+    const player = playerRef.current;
+    if (currentVideoIdRef.current === currentReel.videoId) {
+      // Same video, just play
+      try { player.playVideo(); } catch {}
+      return;
     }
-    // Play current reel
-    sendYtCommand(currentReel.videoId, "playVideo");
-    prevIndexRef.current = currentIndex;
-  }, [currentReel?.videoId, currentIndex]);
 
+    currentVideoIdRef.current = currentReel.videoId;
+    try {
+      // loadVideoById is instant — no iframe reload!
+      player.loadVideoById({
+        videoId: currentReel.videoId,
+        startSeconds: 0,
+      });
+    } catch {
+      // Player not ready yet, retry
+      setTimeout(() => {
+        try {
+          player.loadVideoById({ videoId: currentReel.videoId, startSeconds: 0 });
+        } catch {}
+      }, 500);
+    }
+  }, [currentReel?.videoId, currentIndex, playerReady]);
+
+  // ─── Prefetch more when near end ───
   useEffect(() => {
     if (!user || isFetching || reelQueue.length === 0) return;
     if (currentIndex < reelQueue.length - 3) return;
     setFetchBatch((prev) => prev + 1);
   }, [currentIndex, isFetching, reelQueue.length, user]);
 
-  // Send play/pause command to YouTube iframe via postMessage
-  const sendYtCommand = useCallback((videoId: string, command: "playVideo" | "pauseVideo") => {
-    const iframe = iframeRefs.current[videoId];
-    if (!iframe?.contentWindow) return;
-    iframe.contentWindow.postMessage(
-      JSON.stringify({ event: "command", func: command, args: "" }),
-      "*"
-    );
-  }, []);
-
   const togglePause = useCallback(() => {
-    if (!currentReel) return;
+    if (!currentReel || !playerRef.current) return;
     const next = !paused;
     setPaused(next);
-    sendYtCommand(currentReel.videoId, next ? "pauseVideo" : "playVideo");
 
-    // Show pause/play icon briefly
+    try {
+      if (next) playerRef.current.pauseVideo();
+      else playerRef.current.playVideo();
+    } catch {}
+
     setShowPauseIcon(true);
     clearTimeout(pauseIconTimer.current);
     pauseIconTimer.current = setTimeout(() => setShowPauseIcon(false), 800);
-  }, [paused, currentReel, sendYtCommand]);
+  }, [paused, currentReel]);
 
   const moveToNext = useCallback(() => {
     setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
@@ -208,73 +280,37 @@ export default function ShortReels() {
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (swipeLocked.current) return;
-
     const deltaY = touchStartY.current - e.changedTouches[0].clientY;
     const deltaX = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
     const elapsed = Date.now() - touchStartTime.current;
 
-    // Tap detection: short duration, small movement → pause/resume
     if (Math.abs(deltaY) < 20 && deltaX < 20 && elapsed < 300) {
       togglePause();
       return;
     }
-
     if (deltaX > Math.abs(deltaY)) return;
     if (Math.abs(deltaY) < 45) return;
 
     swipeLocked.current = true;
     if (deltaY > 0) moveToNext();
     else moveToPrev();
-
-    window.setTimeout(() => {
-      swipeLocked.current = false;
-    }, 320);
+    setTimeout(() => { swipeLocked.current = false; }, 320);
   }, [moveToNext, moveToPrev, togglePause]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (swipeLocked.current) return;
     if (Math.abs(e.deltaY) < 28) return;
-
     swipeLocked.current = true;
     if (e.deltaY > 0) moveToNext();
     else moveToPrev();
-
-    window.setTimeout(() => {
-      swipeLocked.current = false;
-    }, 320);
+    setTimeout(() => { swipeLocked.current = false; }, 320);
   }, [moveToNext, moveToPrev]);
 
-  const buildEmbedUrl = useCallback((videoId: string) => {
-    const params = new URLSearchParams({
-      autoplay: "1",
-      mute: "0",
-      loop: "1",
-      playlist: videoId,
-      controls: "0",
-      modestbranding: "1",
-      playsinline: "1",
-      rel: "0",
-      showinfo: "0",
-      iv_load_policy: "3",
-      fs: "0",
-      disablekb: "1",
-      enablejsapi: "1",
-    });
-    if (typeof window !== "undefined") {
-      params.set("origin", window.location.origin);
-    }
-    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
-  }, []);
-
-  const handleIframeLoad = useCallback((videoId: string) => {
-    setIframeLoaded((prev) => {
-      const next = new Set(prev);
-      next.add(videoId);
-      return next;
-    });
-  }, []);
-
   if (isLoading || !user) return null;
+
+  const showLoading = candidatesLoading && reelQueue.length === 0;
+  const showEmpty = !candidatesLoading && reelQueue.length === 0;
+  const isVideoLoading = !playerReady || !currentReel || currentVideoIdRef.current !== currentReel?.videoId;
 
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
@@ -305,17 +341,17 @@ export default function ShortReels() {
         </div>
       </div>
 
-      {candidatesLoading && reelQueue.length === 0 ? (
+      {showLoading ? (
         <div className="h-full flex items-center justify-center">
           <Loader2 className="w-10 h-10 animate-spin text-white" />
         </div>
-      ) : reelQueue.length === 0 ? (
+      ) : showEmpty ? (
         <div className="h-full flex items-center justify-center text-white/60 text-sm">
           কোনো ভিডিও পাওয়া যায়নি
         </div>
       ) : (
         <div className="h-full w-full relative overflow-hidden" onWheel={handleWheel}>
-          {/* Touch overlay for swipe + tap */}
+          {/* Touch overlay */}
           <div
             className="absolute left-0 right-0 bottom-0 z-10"
             style={{ top: "92px", touchAction: "none" }}
@@ -323,7 +359,7 @@ export default function ShortReels() {
             onTouchEnd={handleTouchEnd}
           />
 
-          {/* Pause/Play icon overlay */}
+          {/* Pause/Play icon */}
           <AnimatePresence>
             {showPauseIcon && (
               <motion.div
@@ -343,87 +379,68 @@ export default function ShortReels() {
             )}
           </AnimatePresence>
 
-          {reelQueue.map((item, index) => {
-            const offset = index - currentIndex;
-            if (Math.abs(offset) > 2) return null;
-
-            const isActive = index === currentIndex;
-            const loaded = iframeLoaded.has(item.videoId);
-
-            return (
-              <div
-                key={`${item.videoId}-${index}`}
-                className="absolute inset-0 w-full h-full transition-transform duration-300 ease-out"
-                style={{ transform: `translateY(${offset * 100}%)` }}
-              >
-                {/* Thumbnail shown while iframe loads */}
-                {!loaded && (
-                  <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center bg-black">
-                    <img
-                      src={`https://i.ytimg.com/vi/${item.videoId}/hq720.jpg`}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
-                      }}
-                    />
-                    {/* good-app branding overlay on thumbnail */}
-                    <div className="absolute top-[38%] left-0 right-0 flex flex-col items-center justify-center pointer-events-none">
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.7 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5, ease: "easeOut" }}
-                        className="flex flex-col items-center gap-2"
-                      >
-                        <motion.span
-                          className="text-[32px] font-black tracking-wider drop-shadow-2xl"
-                          animate={{ opacity: [0.7, 1, 0.7] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                          style={{
-                            background: "linear-gradient(135deg, #22c55e 0%, #4ade80 30%, #86efac 50%, #4ade80 70%, #22c55e 100%)",
-                            backgroundSize: "200% 200%",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            animation: "shimmer-text 3s ease-in-out infinite",
-                          }}
-                        >
-                          good-<span style={{
-                            background: "linear-gradient(135deg, #f97316 0%, #fb923c 50%, #f97316 100%)",
-                            backgroundSize: "200% 200%",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            animation: "shimmer-text 3s ease-in-out infinite 0.5s",
-                          }}>app</span>
-                        </motion.span>
-                        <Loader2 className="w-7 h-7 animate-spin text-white/70" />
-                      </motion.div>
-                    </div>
-                  </div>
-                )}
-
-                <iframe
-                  ref={(el) => { iframeRefs.current[item.videoId] = el; }}
-                  src={buildEmbedUrl(item.videoId)}
-                  className="w-full h-full border-0"
-                  allow="autoplay; encrypted-media; accelerometer; gyroscope"
-                  allowFullScreen={false}
-                  loading={Math.abs(offset) <= 1 ? "eager" : "lazy"}
-                  style={{ pointerEvents: "none" }}
-                  onLoad={() => handleIframeLoad(item.videoId)}
-                />
-
-                {/* Bottom info gradient */}
-                <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent px-4 pb-5 pt-10 pointer-events-none">
-                  <p className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
-                    {item.title}
-                  </p>
-                  <p className="text-white/70 text-xs mt-1">
-                    {item.author}
-                  </p>
-                </div>
+          {/* Thumbnail overlay while loading */}
+          {currentReel && isVideoLoading && (
+            <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center bg-black">
+              <img
+                src={`https://i.ytimg.com/vi/${currentReel.videoId}/hq720.jpg`}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://i.ytimg.com/vi/${currentReel.videoId}/hqdefault.jpg`;
+                }}
+              />
+              <div className="absolute top-[38%] left-0 right-0 flex flex-col items-center justify-center pointer-events-none">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="flex flex-col items-center gap-2"
+                >
+                  <motion.span
+                    className="text-[32px] font-black tracking-wider drop-shadow-2xl"
+                    animate={{ opacity: [0.7, 1, 0.7] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    style={{
+                      background: "linear-gradient(135deg, #22c55e 0%, #4ade80 30%, #86efac 50%, #4ade80 70%, #22c55e 100%)",
+                      backgroundSize: "200% 200%",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    good-<span style={{
+                      background: "linear-gradient(135deg, #f97316 0%, #fb923c 50%, #f97316 100%)",
+                      backgroundSize: "200% 200%",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}>app</span>
+                  </motion.span>
+                  <Loader2 className="w-7 h-7 animate-spin text-white/70" />
+                </motion.div>
               </div>
-            );
-          })}
+            </div>
+          )}
+
+          {/* Single YT Player — no multiple iframes! */}
+          <div
+            ref={playerContainerRef}
+            className="absolute inset-0 w-full h-full"
+            style={{ pointerEvents: "none" }}
+          >
+            <div id="yt-reels-player" className="w-full h-full" />
+          </div>
+
+          {/* Bottom info */}
+          {currentReel && (
+            <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent px-4 pb-5 pt-10 pointer-events-none">
+              <p className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
+                {currentReel.title}
+              </p>
+              <p className="text-white/70 text-xs mt-1">
+                {currentReel.author}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
