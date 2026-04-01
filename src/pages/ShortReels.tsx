@@ -186,24 +186,62 @@ export default function ShortReels() {
     if (swipeLocked.current) return;
     const deltaY = touchStartY.current - e.changedTouches[0].clientY;
     const deltaX = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
+    const elapsed = Date.now() - touchStartTime.current;
+
+    // Tap detection — small movement & short duration
+    if (Math.abs(deltaY) < 20 && deltaX < 20 && elapsed < 300) {
+      // Toggle play/pause via postMessage
+      if (currentIframeRef.current?.contentWindow) {
+        const cmd = isPaused ? "playVideo" : "pauseVideo";
+        currentIframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: "command", func: cmd, args: "" }), "*"
+        );
+        setIsPaused((p) => !p);
+      }
+      return;
+    }
 
     if (deltaX > Math.abs(deltaY)) return;
     if (Math.abs(deltaY) < 50) return;
 
     swipeLocked.current = true;
+    setIsPaused(false);
     if (deltaY > 0) moveToNext();
     else moveToPrev();
     setTimeout(() => { swipeLocked.current = false; }, 350);
-  }, [moveToNext, moveToPrev]);
+  }, [moveToNext, moveToPrev, isPaused]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (swipeLocked.current) return;
     if (Math.abs(e.deltaY) < 28) return;
     swipeLocked.current = true;
+    setIsPaused(false);
     if (e.deltaY > 0) moveToNext();
     else moveToPrev();
     setTimeout(() => { swipeLocked.current = false; }, 350);
   }, [moveToNext, moveToPrev]);
+
+  // Listen for YouTube postMessage events (video ended → auto next)
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (typeof e.data !== "string") return;
+      try {
+        const data = JSON.parse(e.data);
+        // YouTube sends info.playerState: 0 = ended
+        if (data?.event === "onStateChange" && data?.info === 0) {
+          setIsPaused(false);
+          moveToNext();
+        }
+      } catch {}
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [moveToNext]);
+
+  // Reset pause state on reel change
+  useEffect(() => {
+    setIsPaused(false);
+  }, [currentIndex]);
 
   if (isLoading || !user) return null;
 
