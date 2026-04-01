@@ -392,7 +392,7 @@ export default function ShortReels() {
 
                 <iframe
                   ref={(el) => { iframeRefs.current[item.videoId] = el; }}
-                  src={buildEmbedUrl(item.videoId, isActive && !paused)}
+                  src={buildEmbedUrl(item.videoId)}
                   className="w-full h-full border-0"
                   allow="autoplay; encrypted-media; accelerometer; gyroscope"
                   allowFullScreen={false}
