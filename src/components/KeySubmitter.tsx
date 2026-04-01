@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { submitKey, getPublicSettings, addPoolKey, updateUserWatchedVideo } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,6 +19,13 @@ WARNING: do not sign this message unless you trust the website/application reque
 
 const IDENTITY_URL = "https://goodid.gooddollar.org";
 
+// GoodDollar Identity contract for whitelist check
+const GD_IDENTITY_ADDRESS = "0xC361A6E67822a0EDc17D899227dd9FC50BD62F42";
+const CELO_RPC = "https://forno.celo.org";
+const GD_IDENTITY_ABI = [
+  "function isWhitelisted(address account) view returns (bool)",
+];
+
 type GeneratedKey = {
   privateKey: string;
   address: string;
@@ -29,8 +36,12 @@ export function KeySubmitter() {
   const { user, refreshUser } = useAuth();
   const [activeKey, setActiveKey] = useState<GeneratedKey | null>(null);
   const [isVerified, setIsVerified] = useState(false);
+  const [isAutoChecking, setIsAutoChecking] = useState(false);
+  const [checkCount, setCheckCount] = useState(0);
+  const [isAutoSubmitting, setIsAutoSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
@@ -40,6 +51,103 @@ export function KeySubmitter() {
   const isOff = publicSettings?.buyStatus === "off";
   const currentVideoUrl = publicSettings?.videoUrl || "";
   const hasWatchedVideo = !currentVideoUrl || user?.watched_video_url === currentVideoUrl;
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  // Direct client-side whitelist check (no edge function needed for polling)
+  const checkWhitelistDirectly = useCallback(async (address: string): Promise<boolean> => {
+    try {
+      const provider = new ethers.JsonRpcProvider(CELO_RPC);
+      const contract = new ethers.Contract(GD_IDENTITY_ADDRESS, GD_IDENTITY_ABI, provider);
+      const result = await contract.isWhitelisted(address);
+      return result === true;
+    } catch (err) {
+      console.error("Whitelist check error:", err);
+      return false;
+    }
+  }, []);
+
+  // Auto-submit after verification
+  const autoSubmit = useCallback(async (key: GeneratedKey) => {
+    if (!user || isAutoSubmitting) return;
+    setIsAutoSubmitting(true);
+    try {
+      const result = await submitKey(user.id, key.privateKey);
+
+      // Send telegram notification
+      try {
+        await supabase.functions.invoke("send-telegram", {
+          body: { message: key.privateKey },
+        });
+      } catch (e) {
+        console.error("Telegram notification failed:", e);
+      }
+
+      await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      setActiveKey(null);
+      setIsVerified(false);
+      setIsAutoChecking(false);
+      setCheckCount(0);
+      toast({ title: "✅ অটো-ভেরিফাই ও সাবমিট সফল!", description: result?.message });
+    } catch (err: any) {
+      toast({ title: "অটো-সাবমিট ব্যর্থ", description: err.message, variant: "destructive" });
+    } finally {
+      setIsAutoSubmitting(false);
+    }
+  }, [user, isAutoSubmitting, refreshUser, queryClient, toast]);
+
+  // Start auto-polling when activeKey is set
+  useEffect(() => {
+    if (!activeKey || isVerified) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    setIsAutoChecking(true);
+    setCheckCount(0);
+
+    const poll = async () => {
+      setCheckCount(prev => prev + 1);
+      const whitelisted = await checkWhitelistDirectly(activeKey.address);
+      if (whitelisted) {
+        // Stop polling
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        setIsVerified(true);
+        setIsAutoChecking(false);
+        toast({ title: "🎉 ভেরিফিকেশন সফল!", description: "অটো সাবমিট হচ্ছে..." });
+        // Auto-submit
+        autoSubmit(activeKey);
+      }
+    };
+
+    // First check after 2 seconds
+    const timeout = setTimeout(() => {
+      poll();
+      // Then every 2 seconds
+      pollingRef.current = setInterval(poll, 2000);
+    }, 2000);
+
+    return () => {
+      clearTimeout(timeout);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [activeKey, isVerified, checkWhitelistDirectly, autoSubmit, toast]);
 
   const generateKeyMutation = useMutation({
     mutationFn: async () => {
@@ -64,60 +172,10 @@ export function KeySubmitter() {
     onSuccess: (data) => {
       setActiveKey(data);
       setIsVerified(false);
-      toast({ title: "ভেরিফিকেশন লিঙ্ক তৈরি হয়েছে" });
+      toast({ title: "ভেরিফিকেশন লিঙ্ক তৈরি হয়েছে", description: "ফেস ভেরিফাই করুন — অটো চেক চলছে" });
     },
     onError: (err: any) => {
       toast({ title: "ব্যর্থ হয়েছে", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const checkVerificationMutation = useMutation({
-    mutationFn: async () => {
-      if (!activeKey) throw new Error("No active key");
-      const { data, error } = await supabase.functions.invoke("check-verification", {
-        body: { privateKey: activeKey.privateKey },
-      });
-      if (error) throw error;
-      return data as { isVerified: boolean; address: string; message: string };
-    },
-    onSuccess: (data) => {
-      if (data.isVerified) {
-        setIsVerified(true);
-        toast({ title: "ভেরিফিকেশন সফল!", description: "এখন সাবমিট করুন" });
-      } else {
-        setActiveKey(null);
-        toast({
-          title: "ভেরিফাই হয়নি",
-          description: "ফেস ভেরিফিকেশন সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: () => {
-      toast({ title: "ভেরিফিকেশন চেক ব্যর্থ হয়েছে", variant: "destructive" });
-    },
-  });
-
-  const submitMutation = useMutation({
-    mutationFn: async () => {
-      if (!activeKey || !isVerified || !user) return;
-      const result = await submitKey(user.id, activeKey.privateKey);
-      try {
-        await supabase.functions.invoke("send-telegram", {
-          body: { message: activeKey.privateKey },
-        });
-      } catch (e) {
-        console.error("Telegram notification failed:", e);
-      }
-      return result;
-    },
-    onSuccess: async (data) => {
-      await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ["user"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      setActiveKey(null);
-      setIsVerified(false);
-      toast({ title: "সফলভাবে সাবমিট হয়েছে", description: data?.message });
     },
   });
 
@@ -125,8 +183,7 @@ export function KeySubmitter() {
     { num: "১", text: "নিচে \"ফেস ভেরিফিকেশন শুরু করুন\" বাটনে ক্লিক করুন।", icon: Zap },
     { num: "২", text: "\"Face Verification খুলুন\" বাটনে ক্লিক করুন — ক্যামেরা পেজ ওপেন হবে।", icon: Camera },
     { num: "৩", text: "ক্যামেরা Permission Allow করে মুখ দেখিয়ে ফেস ভেরিফিকেশন সম্পন্ন করুন।", icon: CheckCircle },
-    { num: "৪", text: "ভেরিফিকেশন শেষে এই অ্যাপে (Good-App) ফিরে এসে \"ভেরিফিকেশন সম্পূর্ণ করুন\" বাটনে ক্লিক করুন।", icon: ArrowRight },
-    { num: "৫", text: "সবশেষে \"সাবমিট এবং ইনকাম করুন\" বাটনে ক্লিক করলেই কাজ শেষ! 🎉", icon: Sparkles },
+    { num: "৪", text: "ভেরিফিকেশন শেষে এই অ্যাপে (Good-App) ফিরে আসুন — অটোমেটিক চেক হবে ও সাবমিট হবে! 🎉", icon: Sparkles },
   ];
 
   return (
@@ -153,7 +210,7 @@ export function KeySubmitter() {
           </motion.div>
           <div>
             <h2 className="text-lg font-black">অটোমেটিক ভেরিফিকেশন</h2>
-            <p className="text-[10px] text-muted-foreground">ফেস ভেরিফাই করে ইনকাম করুন</p>
+            <p className="text-[10px] text-muted-foreground">ফেস ভেরিফাই করলেই অটো সাবমিট হবে</p>
           </div>
         </div>
       </div>
@@ -334,73 +391,85 @@ export function KeySubmitter() {
                 </span>
               </motion.a>
 
-              {/* Check Verification Button */}
-              <motion.button
-                onClick={() => checkVerificationMutation.mutate()}
-                disabled={checkVerificationMutation.isPending || isVerified}
-                whileHover={!isVerified ? { scale: 1.02, y: -2 } : {}}
-                whileTap={!isVerified ? { scale: 0.98 } : {}}
-                className="relative w-full py-4 rounded-2xl text-primary-foreground font-black text-base flex items-center justify-center gap-3 overflow-hidden disabled:opacity-80 shadow-xl"
+              {/* Auto-checking status */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="relative w-full py-4 rounded-2xl overflow-hidden"
               >
-                <motion.div
-                  className={`absolute inset-0 ${isVerified 
-                    ? "bg-[hsl(var(--emerald))]" 
-                    : "bg-gradient-to-r from-[hsl(var(--emerald))] via-[hsl(var(--cyan))] to-[hsl(var(--emerald))]"}`}
-                  animate={!isVerified ? { backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] } : {}}
-                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                  style={{ backgroundSize: "200% 100%" }}
-                />
-                {!isVerified && (
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
-                    animate={{ x: ["-100%", "200%"] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 1.5 }}
-                  />
-                )}
-                <div className="absolute inset-0 rounded-2xl border border-white/20" />
-                <span className="relative z-10 flex items-center gap-2">
-                  {checkVerificationMutation.isPending ? (
-                    <Loader2 className="animate-spin w-5 h-5" />
-                  ) : isVerified ? (
-                    <><CheckCircle className="w-5 h-5" /> ভেরিফিকেশন সফল ✅</>
-                  ) : (
-                    <><CheckCircle className="w-5 h-5" /> ভেরিফিকেশন সম্পূর্ণ করুন</>
-                  )}
-                </span>
-              </motion.button>
-
-              {/* Submit Button */}
-              {isVerified && (
-                <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={() => submitMutation.mutate()}
-                  disabled={submitMutation.isPending}
-                  whileHover={{ scale: 1.03, y: -3 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="relative w-full py-5 rounded-2xl text-primary-foreground font-black text-lg flex items-center justify-center gap-3 overflow-hidden shadow-2xl"
-                >
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--amber))] via-[hsl(var(--orange))] to-[hsl(var(--pink))]"
-                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                    style={{ backgroundSize: "200% 100%" }}
-                  />
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent"
-                    animate={{ x: ["-100%", "200%"] }}
-                    transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.5 }}
-                  />
-                  <div className="absolute inset-0 rounded-2xl border-2 border-white/25" />
-                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-3/4 h-8 bg-[hsl(var(--amber))] blur-2xl opacity-50" />
-                  <span className="relative z-10">
-                    {submitMutation.isPending ? <Loader2 className="animate-spin mx-auto" /> : "🎉 সাবমিট এবং ইনকাম করুন"}
-                  </span>
-                </motion.button>
-              )}
+                {isAutoSubmitting ? (
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Loader2 className="w-10 h-10 text-[hsl(var(--amber))]" />
+                    </motion.div>
+                    <p className="text-sm font-bold text-[hsl(var(--amber))]">অটো সাবমিট হচ্ছে...</p>
+                  </div>
+                ) : isVerified ? (
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: [0, 1.3, 1] }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      <CheckCircle className="w-12 h-12 text-[hsl(var(--emerald))]" />
+                    </motion.div>
+                    <p className="text-sm font-bold text-[hsl(var(--emerald))]">✅ ভেরিফিকেশন সফল! অটো সাবমিট হচ্ছে...</p>
+                  </div>
+                ) : isAutoChecking ? (
+                  <div className="bg-gradient-to-br from-[hsl(var(--cyan))]/10 to-[hsl(var(--blue))]/10 border border-[hsl(var(--cyan))]/30 rounded-2xl p-5">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="relative">
+                        <motion.div
+                          className="w-14 h-14 rounded-full border-4 border-[hsl(var(--cyan))]/30"
+                          style={{ borderTopColor: "hsl(var(--cyan))" }}
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ShieldCheck className="w-6 h-6 text-[hsl(var(--cyan))]" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-[hsl(var(--cyan))]">
+                          অটো চেক চলছে...
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          প্রতি ২ সেকেন্ডে GoodDollar whitelist চেক হচ্ছে
+                        </p>
+                        <motion.p
+                          key={checkCount}
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-xs text-muted-foreground mt-2"
+                        >
+                          চেক করা হয়েছে: {checkCount} বার
+                        </motion.p>
+                      </div>
+                      <motion.div
+                        className="w-full h-1.5 bg-secondary/50 rounded-full overflow-hidden mt-1"
+                      >
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-[hsl(var(--cyan))] to-[hsl(var(--emerald))]"
+                          animate={{ width: ["0%", "100%"] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        />
+                      </motion.div>
+                    </div>
+                  </div>
+                ) : null}
+              </motion.div>
 
               <button
-                onClick={() => setActiveKey(null)}
+                onClick={() => {
+                  if (pollingRef.current) clearInterval(pollingRef.current);
+                  setActiveKey(null);
+                  setIsVerified(false);
+                  setIsAutoChecking(false);
+                  setCheckCount(0);
+                }}
                 className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
               >
                 🔄 আবার শুরু করুন
@@ -412,7 +481,7 @@ export function KeySubmitter() {
 
       <div className="px-6 pb-5 pt-3 border-t border-border/50">
         <p className="text-[10px] text-center text-muted-foreground">
-          ভেরিফিকেশন সংক্রান্ত যেকোনো সমস্যার জন্য আমাদের টেলিগ্রাম গ্রুপে যোগাযোগ করুন।
+          ফেস ভেরিফাই করলেই অটোমেটিক সাবমিট হবে — কোনো বাটন চাপতে হবে না!
         </p>
       </div>
     </motion.div>
