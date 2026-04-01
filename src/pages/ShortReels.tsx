@@ -260,8 +260,8 @@ export default function ShortReels() {
             onTouchEnd={handleTouchEnd}
           />
 
-          {/* Loading overlay */}
-          {currentReel && !iframeLoaded && (
+          {/* Loading overlay — only if current reel not yet loaded */}
+          {currentReel && !loadedIds.has(currentReel.videoId) && (
             <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center bg-black">
               <img
                 src={`https://i.ytimg.com/vi/${currentReel.videoId}/hq720.jpg`}
@@ -302,21 +302,28 @@ export default function ShortReels() {
             </div>
           )}
 
-          {/* YouTube Embed iframe — simple & reliable */}
-          {currentReel && (
-            <iframe
-              key={currentReel.videoId}
-              src={embedUrl}
-              className="absolute inset-0 w-full h-full z-[3]"
-              style={{ border: "none" }}
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen={false}
-              onLoad={() => {
-                // Give a moment for the video to start rendering
-                setTimeout(() => setIframeLoaded(true), 1500);
-              }}
-            />
-          )}
+          {/* Preloaded iframes — current is visible, others hidden off-screen */}
+          {preloadReels.map((reel) => {
+            const isCurrent = reel.videoId === currentReel?.videoId;
+            const src = `https://www.youtube.com/embed/${reel.videoId}?autoplay=${isCurrent ? "1" : "0"}&mute=0&controls=1&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=0`;
+            return (
+              <iframe
+                key={reel.videoId}
+                src={src}
+                className="absolute w-full h-full z-[3]"
+                style={{
+                  border: "none",
+                  top: isCurrent ? 0 : "200vh",
+                  left: 0,
+                }}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen={false}
+                onLoad={() => {
+                  setTimeout(() => markLoaded(reel.videoId), 800);
+                }}
+              />
+            );
+          })}
 
           {/* YouTube logo cover */}
           <div
