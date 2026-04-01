@@ -115,7 +115,7 @@ export default function ShortReels() {
     setFetchBatch(0);
     setReelQueue([]);
     setCurrentIndex(0);
-    setIframeLoaded(false);
+    setLoadedIds(new Set());
     swipeLocked.current = false;
   }, []);
 
@@ -132,12 +132,29 @@ export default function ShortReels() {
   }, [candidates]);
 
   const currentReel = reelQueue[currentIndex];
+  // Preload window: current + next 3
+  const PRELOAD_COUNT = 3;
+  const preloadReels = useMemo(() => {
+    const items: ReelItem[] = [];
+    for (let i = currentIndex; i <= Math.min(currentIndex + PRELOAD_COUNT, reelQueue.length - 1); i++) {
+      if (reelQueue[i]) items.push(reelQueue[i]);
+    }
+    return items;
+  }, [currentIndex, reelQueue]);
+
+  const markLoaded = useCallback((videoId: string) => {
+    setLoadedIds((prev) => {
+      if (prev.has(videoId)) return prev;
+      const next = new Set(prev);
+      next.add(videoId);
+      return next;
+    });
+  }, []);
 
   // Mark as seen
   useEffect(() => {
     if (currentReel?.videoId) {
       saveSeenReel(currentReel.videoId);
-      setIframeLoaded(false);
     }
   }, [currentReel?.videoId]);
 
