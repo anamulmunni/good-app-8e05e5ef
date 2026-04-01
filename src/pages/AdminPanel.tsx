@@ -1124,7 +1124,50 @@ export default function AdminPanel() {
           <ChevronDown className="w-5 h-5 -rotate-90 text-muted-foreground" />
         </a>
 
-        {/* Pool List */}
+        {/* Duplicate Key Detection */}
+        {duplicateAttempts.length > 0 && (
+          <Section icon={AlertCircle} title="ডুপ্লিকেট কী সনাক্ত" count={duplicateAttempts.length} color="pink" defaultOpen={true}>
+            <div className="mt-4 space-y-3">
+              <p className="text-xs text-destructive font-bold">⚠️ এই ইউজাররা ডুপ্লিকেট কী সাবমিট করার চেষ্টা করেছে (সিস্টেম ব্লক করেছে):</p>
+              {(() => {
+                // Group by user
+                const byUser = new Map<string, { guest_id: string; display_name: string | null; user_id: number; attempts: { details: string; created_at: string | null }[] }>();
+                duplicateAttempts.forEach(a => {
+                  const key = a.guest_id;
+                  if (!byUser.has(key)) byUser.set(key, { guest_id: a.guest_id, display_name: a.display_name, user_id: a.user_id, attempts: [] });
+                  byUser.get(key)!.attempts.push({ details: a.details, created_at: a.created_at });
+                });
+                return Array.from(byUser.values()).map(u => (
+                  <div key={u.guest_id} className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-bold">{u.display_name || u.guest_id}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{u.guest_id}</p>
+                      </div>
+                      <span className="bg-destructive/20 text-destructive text-xs font-bold px-2 py-1 rounded-lg">
+                        {u.attempts.length} বার চেষ্টা
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {u.attempts.map((a, i) => (
+                        <div key={i} className="bg-background/50 rounded-lg p-2 flex items-start justify-between gap-2">
+                          <p className="text-[10px] font-mono text-foreground/70 break-all flex-1">
+                            {a.details?.replace("Duplicate Key: ", "")}
+                          </p>
+                          <p className="text-[9px] text-muted-foreground shrink-0">
+                            {a.created_at ? new Date(a.created_at).toLocaleString("bn-BD") : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </Section>
+        )}
+
+
         <Section icon={Key} title="পুল কি লিস্ট" count={pool?.length} color="primary">
           <div className="mt-4">
             {poolPassword !== POOL_SECRET ? (
