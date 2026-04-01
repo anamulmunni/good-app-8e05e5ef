@@ -1203,6 +1203,11 @@ export default function AdminPanel() {
                     <div key={item.id} className="flex items-center justify-between p-2.5 bg-secondary/50 rounded-xl border border-border">
                       <div className="flex-1 truncate mr-3">
                         <div className="flex items-center gap-1.5">
+                          {item.is_used ? (
+                            <span className="text-[9px] bg-[hsl(var(--emerald))]/20 text-[hsl(var(--emerald))] px-1.5 py-0.5 rounded font-bold shrink-0">USED</span>
+                          ) : (
+                            <span className="text-[9px] bg-[hsl(var(--amber))]/20 text-[hsl(var(--amber))] px-1.5 py-0.5 rounded font-bold shrink-0">READY</span>
+                          )}
                           <p className="text-xs font-mono truncate">{item.private_key}</p>
                           <button onClick={() => { navigator.clipboard.writeText(item.private_key); toast({ title: "কপি হয়েছে" }); }}
                             className="text-muted-foreground hover:text-foreground shrink-0"><Copy className="w-3 h-3" /></button>
