@@ -271,8 +271,22 @@ export async function requestWithdraw(userId: number, method: string, number: st
 
 // Pool
 export async function getPoolStats(): Promise<PoolItem[]> {
-  const { data } = await supabase.from("verification_pool").select("*").order("created_at", { ascending: false });
-  return data || [];
+  // Fetch all keys (bypass 1000 row default limit)
+  let allData: PoolItem[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data } = await supabase
+      .from("verification_pool")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return allData;
 }
 
 export async function addPoolKey(privateKey: string, verifyUrl: string, addedBy: string) {
