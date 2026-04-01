@@ -36,8 +36,8 @@ export default function Feed() {
 
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [postContent, setPostContent] = useState("");
-  const [postImageFile, setPostImageFile] = useState<File | null>(null);
-  const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
+  const [postImageFiles, setPostImageFiles] = useState<File[]>([]);
+  const [postImagePreviews, setPostImagePreviews] = useState<string[]>([]);
   const [postVideoFile, setPostVideoFile] = useState<File | null>(null);
   const [postVideoPreview, setPostVideoPreview] = useState<string | null>(null);
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
