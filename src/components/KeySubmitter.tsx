@@ -133,9 +133,10 @@ export function KeySubmitter() {
     }
   }, []);
 
-  // Auto-submit after verification
+  // Auto-submit after verification (ref-guarded to prevent duplicate calls)
   const autoSubmit = useCallback(async (key: GeneratedKey) => {
-    if (!user || isAutoSubmitting) return;
+    if (!user || isAutoSubmittingRef.current) return;
+    isAutoSubmittingRef.current = true;
     setIsAutoSubmitting(true);
     try {
       const result = await submitKey(user.id, key.privateKey);
