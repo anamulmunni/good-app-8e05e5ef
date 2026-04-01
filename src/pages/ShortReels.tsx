@@ -147,11 +147,22 @@ export default function ShortReels() {
 
   const currentReel = reelQueue[currentIndex];
 
+  // When active reel changes: pause old, play new
+  const prevIndexRef = useRef(-1);
   useEffect(() => {
     if (!currentReel?.videoId) return;
     saveSeenReel(currentReel.videoId);
     setPaused(false);
-  }, [currentReel?.videoId]);
+
+    // Pause previously active reel
+    const prevIndex = prevIndexRef.current;
+    if (prevIndex >= 0 && prevIndex !== currentIndex && reelQueue[prevIndex]) {
+      sendYtCommand(reelQueue[prevIndex].videoId, "pauseVideo");
+    }
+    // Play current reel
+    sendYtCommand(currentReel.videoId, "playVideo");
+    prevIndexRef.current = currentIndex;
+  }, [currentReel?.videoId, currentIndex]);
 
   useEffect(() => {
     if (!user || isFetching || reelQueue.length === 0) return;
