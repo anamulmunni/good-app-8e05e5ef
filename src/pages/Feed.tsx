@@ -36,8 +36,8 @@ export default function Feed() {
 
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [postContent, setPostContent] = useState("");
-  const [postImageFile, setPostImageFile] = useState<File | null>(null);
-  const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
+  const [postImageFiles, setPostImageFiles] = useState<File[]>([]);
+  const [postImagePreviews, setPostImagePreviews] = useState<string[]>([]);
   const [postVideoFile, setPostVideoFile] = useState<File | null>(null);
   const [postVideoPreview, setPostVideoPreview] = useState<string | null>(null);
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
@@ -205,12 +205,18 @@ export default function Feed() {
       if (!user) throw new Error("Login required");
       let imageUrl: string | undefined;
       let videoUrl: string | undefined;
-      if (postImageFile) imageUrl = await uploadPostMedia(postImageFile, postImageFile.name);
+      if (postImageFiles.length > 0) {
+        const urls: string[] = [];
+        for (const file of postImageFiles) {
+          urls.push(await uploadPostMedia(file, file.name));
+        }
+        imageUrl = urls.join(",");
+      }
       if (postVideoFile) videoUrl = await uploadPostMedia(postVideoFile, postVideoFile.name);
       return createPost(user.id, postContent, imageUrl, videoUrl);
     },
     onSuccess: () => {
-      setPostContent(""); setPostImageFile(null); setPostImagePreview(null);
+      setPostContent(""); setPostImageFiles([]); setPostImagePreviews([]);
       setPostVideoFile(null); setPostVideoPreview(null); setShowCreatePost(false);
       queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
       toast({ title: "পোস্ট প্রকাশিত! 🎉" });
@@ -395,12 +401,17 @@ export default function Feed() {
   );
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPostImageFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setPostImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
+    setPostImageFiles(prev => [...prev, ...newFiles]);
+    newFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => setPostImagePreviews(prev => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+    // Reset input so same file can be selected again
+    e.target.value = "";
   };
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -676,19 +687,26 @@ export default function Feed() {
           )}
 
           {/* Image */}
-          {post.image_url && (
-            <div className="relative cursor-pointer" onClick={() => handleImageTap(post.id, post.image_url!)}>
-              <img src={post.image_url} alt="" className="w-full max-h-[500px] object-cover" />
-              <AnimatePresence>
-                {showLoveAnimation === post.id && (
-                  <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 1.5, opacity: 0 }} exit={{ opacity: 0 }}
-                    transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-7xl">❤️</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+          {post.image_url && (() => {
+            const imageUrls = post.image_url!.split(",").map(u => u.trim()).filter(Boolean);
+            return (
+              <div className={imageUrls.length === 1 ? "" : "grid grid-cols-2 gap-0.5"}>
+                {imageUrls.map((url, imgIdx) => (
+                  <div key={imgIdx} className="relative cursor-pointer" onClick={() => handleImageTap(post.id, url)}>
+                    <img src={url} alt="" className={`w-full object-cover ${imageUrls.length === 1 ? 'max-h-[500px]' : 'max-h-[250px]'}`} />
+                    <AnimatePresence>
+                      {showLoveAnimation === post.id && imgIdx === 0 && (
+                        <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 1.5, opacity: 0 }} exit={{ opacity: 0 }}
+                          transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <span className="text-7xl">❤️</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Video */}
           {post.video_url && (
@@ -1211,9 +1229,16 @@ export default function Feed() {
                     {commentingPost.content && (
                       <p className="text-[14px] text-gray-900 dark:text-foreground whitespace-pre-wrap break-words">{renderMentionText(commentingPost.content)}</p>
                     )}
-                    {commentingPost.image_url && (
-                      <img src={commentingPost.image_url} alt="" className="mt-2 rounded-xl w-full max-h-[220px] object-cover" />
-                    )}
+                    {commentingPost.image_url && (() => {
+                      const urls = commentingPost.image_url!.split(",").map(u => u.trim()).filter(Boolean);
+                      return (
+                        <div className={urls.length === 1 ? "mt-2" : "mt-2 grid grid-cols-2 gap-1"}>
+                          {urls.map((url, i) => (
+                            <img key={i} src={url} alt="" className="rounded-xl w-full max-h-[220px] object-cover" />
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {commentingPost.video_url && (
                       <video src={commentingPost.video_url} controls className="mt-2 rounded-xl w-full max-h-[220px] object-cover" />
                     )}
@@ -1405,12 +1430,12 @@ export default function Feed() {
             className="fixed inset-0 z-[100] bg-white dark:bg-background">
             <div className="max-w-lg mx-auto">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-border/30">
-                <button onClick={() => { setShowCreatePost(false); setPostImageFile(null); setPostImagePreview(null); setPostVideoFile(null); setPostVideoPreview(null); setPostContent(""); }}>
+                <button onClick={() => { setShowCreatePost(false); setPostImageFiles([]); setPostImagePreviews([]); setPostVideoFile(null); setPostVideoPreview(null); setPostContent(""); }}>
                   <X className="w-6 h-6 text-gray-500" />
                 </button>
                 <h2 className="font-bold text-base text-gray-900 dark:text-foreground">পোস্ট তৈরি করুন</h2>
                 <button onClick={() => createPostMutation.mutate()}
-                  disabled={createPostMutation.isPending || (!postContent.trim() && !postImageFile && !postVideoFile)}
+                  disabled={createPostMutation.isPending || (!postContent.trim() && postImageFiles.length === 0 && !postVideoFile)}
                   className="px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm font-bold disabled:opacity-40">
                   {createPostMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "পোস্ট"}
                 </button>
@@ -1433,13 +1458,20 @@ export default function Feed() {
                   className="w-full bg-transparent text-gray-900 dark:text-foreground text-base resize-none border-none outline-none placeholder:text-gray-400 min-h-[120px]" autoFocus />
               </div>
 
-              {postImagePreview && (
-                <div className="px-4 mt-2 relative">
-                  <img src={postImagePreview} className="w-full rounded-lg max-h-60 object-cover" />
-                  <button onClick={() => { setPostImageFile(null); setPostImagePreview(null); }}
-                    className="absolute top-2 right-6 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center">
-                    <X className="w-4 h-4 text-white" />
-                  </button>
+              {postImagePreviews.length > 0 && (
+                <div className="px-4 mt-2 grid gap-2" style={{ gridTemplateColumns: postImagePreviews.length === 1 ? '1fr' : 'repeat(2, 1fr)' }}>
+                  {postImagePreviews.map((preview, idx) => (
+                    <div key={idx} className="relative">
+                      <img src={preview} className="w-full rounded-lg max-h-60 object-cover" />
+                      <button onClick={() => {
+                        setPostImageFiles(prev => prev.filter((_, i) => i !== idx));
+                        setPostImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                      }}
+                        className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center">
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -1460,7 +1492,7 @@ export default function Feed() {
                 <button onClick={() => videoInputRef.current?.click()} className="flex items-center gap-2 text-red-500">
                   <Video className="w-5 h-5" /><span className="text-sm font-medium">ভিডিও</span>
                 </button>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
                 <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoSelect} />
               </div>
             </div>

@@ -257,7 +257,7 @@ export default function ShortReels() {
 
   // ─── Core dual-player logic ───
   useEffect(() => {
-    if (!currentReel?.videoId || playersReady < 2) return;
+    if (!currentReel?.videoId || playersReady < 1) return;
 
     saveSeenReel(currentReel.videoId);
     setPaused(false);
@@ -265,6 +265,9 @@ export default function ShortReels() {
     const active = activePlayerRef.current;
     const currentPlayer = active === 0 ? playerA.current : playerB.current;
     const currentPlayerVideoId = active === 0 ? playerAVideoId : playerBVideoId;
+
+    // Safety: hide thumbnail after 4 seconds even if video doesn't fire PLAYING event
+    const thumbnailTimer = setTimeout(() => setShowThumbnail(false), 4000);
 
     // Load current video into active player if needed
     if (currentPlayerVideoId.current !== currentReel.videoId) {
@@ -291,11 +294,12 @@ export default function ShortReels() {
       if (inactivePlayerVideoId.current !== nextReel.videoId) {
         inactivePlayerVideoId.current = nextReel.videoId;
         try {
-          // cueVideoById loads metadata + starts buffering but doesn't play
           inactivePlayer.cueVideoById({ videoId: nextReel.videoId, startSeconds: 0 });
         } catch {}
       }
     }
+
+    return () => clearTimeout(thumbnailTimer);
   }, [currentReel?.videoId, currentIndex, playersReady, nextReel?.videoId]);
 
   // ─── Prefetch more when near end ───
