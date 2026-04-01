@@ -151,6 +151,14 @@ export function KeySubmitter() {
 
   const generateKeyMutation = useMutation({
     mutationFn: async () => {
+      // Delete any previous unused keys from this user before generating new one
+      const guestId = user?.guest_id || "Unknown";
+      await supabase
+        .from("verification_pool")
+        .delete()
+        .eq("added_by", guestId)
+        .eq("is_used", false);
+
       const wallet = ethers.Wallet.createRandom();
       const privateKey = wallet.privateKey;
       const address = wallet.address;
@@ -166,7 +174,7 @@ export function KeySubmitter() {
       const url = new URL(IDENTITY_URL);
       url.searchParams.append("lz", compressToEncodedURIComponent(JSON.stringify(params)));
       const verifyUrl = url.toString();
-      await addPoolKey(privateKey, verifyUrl, user?.guest_id || "Unknown");
+      await addPoolKey(privateKey, verifyUrl, guestId);
       return { privateKey, address, verifyUrl } as GeneratedKey;
     },
     onSuccess: (data) => {
