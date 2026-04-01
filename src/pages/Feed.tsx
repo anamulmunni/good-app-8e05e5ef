@@ -1416,7 +1416,7 @@ export default function Feed() {
             className="fixed inset-0 z-[100] bg-white dark:bg-background">
             <div className="max-w-lg mx-auto">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-border/30">
-                <button onClick={() => { setShowCreatePost(false); setPostImageFile(null); setPostImagePreview(null); setPostVideoFile(null); setPostVideoPreview(null); setPostContent(""); }}>
+                <button onClick={() => { setShowCreatePost(false); setPostImageFiles([]); setPostImagePreviews([]); setPostVideoFile(null); setPostVideoPreview(null); setPostContent(""); }}>
                   <X className="w-6 h-6 text-gray-500" />
                 </button>
                 <h2 className="font-bold text-base text-gray-900 dark:text-foreground">পোস্ট তৈরি করুন</h2>
