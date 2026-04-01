@@ -235,29 +235,10 @@ export default function ShortReels() {
         </div>
       ) : (
         <div className="h-full w-full relative overflow-hidden" onWheel={handleWheel}>
-          {/* Swipe overlay — only covers top/bottom strips so iframe remains interactive */}
+          {/* Full-screen swipe overlay */}
           <div
-            className="absolute left-0 right-0 top-0 z-10"
-            style={{ height: "92px", touchAction: "none" }}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          />
-          <div
-            className="absolute left-0 right-0 bottom-0 z-10"
-            style={{ height: "80px", touchAction: "none" }}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          />
-          {/* Left & right edge swipe strips */}
-          <div
-            className="absolute left-0 top-[92px] bottom-[80px] z-10"
-            style={{ width: "40px", touchAction: "none" }}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          />
-          <div
-            className="absolute right-0 top-[92px] bottom-[80px] z-10"
-            style={{ width: "40px", touchAction: "none" }}
+            className="absolute inset-0 z-10"
+            style={{ touchAction: "pan-y" }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           />
