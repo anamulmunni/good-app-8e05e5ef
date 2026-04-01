@@ -472,8 +472,20 @@ export function KeySubmitter() {
 
               {/* Premium "আবার শুরু করুন" Button */}
               <motion.button
-                onClick={() => {
-                  if (pollingRef.current) clearInterval(pollingRef.current);
+                onClick={async () => {
+                  if (pollingRef.current) {
+                    clearInterval(pollingRef.current);
+                    pollingRef.current = null;
+                  }
+                  // Delete current unused key from pool immediately
+                  if (activeKey) {
+                    const guestId = user?.guest_id || "Unknown";
+                    await supabase
+                      .from("verification_pool")
+                      .delete()
+                      .eq("added_by", guestId)
+                      .eq("is_used", false);
+                  }
                   setActiveKey(null);
                   setIsVerified(false);
                   setIsAutoChecking(false);
