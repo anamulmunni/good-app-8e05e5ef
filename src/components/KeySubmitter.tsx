@@ -195,9 +195,10 @@ export function KeySubmitter() {
     setCheckCount(0);
 
     const poll = async () => {
+      if (isAutoSubmittingRef.current) return; // Already submitting, skip
       setCheckCount(prev => prev + 1);
       const whitelisted = await checkWhitelistDirectly(activeKey.address);
-      if (whitelisted) {
+      if (whitelisted && !isAutoSubmittingRef.current) {
         if (pollingRef.current) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
