@@ -451,6 +451,13 @@ export async function getDuplicateKeyAttempts(): Promise<{
     created_at: a.created_at,
   }));
 }
+
+// Recalculate all users' balance based on key_count * rate (uses DB function for speed)
+export async function recalculateAllBalances(rate: number) {
+  const { error } = await supabase.rpc("recalculate_all_balances", { p_rate: rate });
+  if (error) throw error;
+}
+
 // Reset all users' balance to 0 when paymentMode is turned off
 export async function resetAllBalances() {
   await supabase.from("users").update({ balance: 0 }).gt("id", 0);
