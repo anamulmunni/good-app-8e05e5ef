@@ -192,27 +192,14 @@ export default function Feed() {
 
   useEffect(() => {
     const channel = supabase.channel("feed-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, () => {
+        setNewPostsAvailable(true);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, () => {
         queryClient.invalidateQueries({ queryKey: ["stories"] });
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
-        queryClient.invalidateQueries({ queryKey: ["unread-count"] });
-        const incoming = payload?.new;
-        if (incoming && incoming.sender_id !== user?.id) {
-          playUiSound("message");
-        }
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["friend-request-count"] });
-        queryClient.invalidateQueries({ queryKey: ["friend-requests"] });
-        queryClient.invalidateQueries({ queryKey: ["suggested-people"] });
-      })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, () => {
         queryClient.invalidateQueries({ queryKey: ["notif-count"] });
-        queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
