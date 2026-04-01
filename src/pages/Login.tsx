@@ -196,7 +196,7 @@ export default function Login() {
 
       {/* Floating particles - faster */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
           <motion.div
             key={i}
             animate={{

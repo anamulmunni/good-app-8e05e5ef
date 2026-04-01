@@ -190,7 +190,7 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 5000);
     return () => window.clearInterval(intervalId);
   }, []);
 
