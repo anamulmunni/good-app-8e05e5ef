@@ -147,11 +147,22 @@ export default function ShortReels() {
 
   const currentReel = reelQueue[currentIndex];
 
+  // When active reel changes: pause old, play new
+  const prevIndexRef = useRef(-1);
   useEffect(() => {
     if (!currentReel?.videoId) return;
     saveSeenReel(currentReel.videoId);
     setPaused(false);
-  }, [currentReel?.videoId]);
+
+    // Pause previously active reel
+    const prevIndex = prevIndexRef.current;
+    if (prevIndex >= 0 && prevIndex !== currentIndex && reelQueue[prevIndex]) {
+      sendYtCommand(reelQueue[prevIndex].videoId, "pauseVideo");
+    }
+    // Play current reel
+    sendYtCommand(currentReel.videoId, "playVideo");
+    prevIndexRef.current = currentIndex;
+  }, [currentReel?.videoId, currentIndex]);
 
   useEffect(() => {
     if (!user || isFetching || reelQueue.length === 0) return;
@@ -233,9 +244,9 @@ export default function ShortReels() {
     }, 320);
   }, [moveToNext, moveToPrev]);
 
-  const buildEmbedUrl = useCallback((videoId: string, autoplay: boolean) => {
+  const buildEmbedUrl = useCallback((videoId: string) => {
     const params = new URLSearchParams({
-      autoplay: autoplay ? "1" : "0",
+      autoplay: "1",
       mute: "0",
       loop: "1",
       playlist: videoId,
@@ -334,7 +345,7 @@ export default function ShortReels() {
 
           {reelQueue.map((item, index) => {
             const offset = index - currentIndex;
-            if (Math.abs(offset) > 1) return null;
+            if (Math.abs(offset) > 2) return null;
 
             const isActive = index === currentIndex;
             const loaded = iframeLoaded.has(item.videoId);
@@ -392,7 +403,7 @@ export default function ShortReels() {
 
                 <iframe
                   ref={(el) => { iframeRefs.current[item.videoId] = el; }}
-                  src={buildEmbedUrl(item.videoId, isActive && !paused)}
+                  src={buildEmbedUrl(item.videoId)}
                   className="w-full h-full border-0"
                   allow="autoplay; encrypted-media; accelerometer; gyroscope"
                   allowFullScreen={false}
