@@ -401,12 +401,17 @@ export default function Feed() {
   );
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPostImageFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setPostImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
+    setPostImageFiles(prev => [...prev, ...newFiles]);
+    newFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => setPostImagePreviews(prev => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+    // Reset input so same file can be selected again
+    e.target.value = "";
   };
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
