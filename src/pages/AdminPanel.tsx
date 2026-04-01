@@ -1141,20 +1141,24 @@ export default function AdminPanel() {
                   <div key={u.guest_id} className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-bold">{u.display_name || u.guest_id}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{u.guest_id}</p>
+                        <p className="text-sm font-bold">{u.display_name || "Unknown"}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-mono text-foreground/80">{u.guest_id}</p>
+                          <button onClick={() => { navigator.clipboard.writeText(u.guest_id); toast({ title: "কপি হয়েছে" }); }}
+                            className="text-muted-foreground hover:text-foreground"><Copy className="w-3 h-3" /></button>
+                        </div>
                       </div>
-                      <span className="bg-destructive/20 text-destructive text-xs font-bold px-2 py-1 rounded-lg">
-                        {u.attempts.length} বার চেষ্টা
+                      <span className="bg-destructive/20 text-destructive text-xs font-bold px-2.5 py-1.5 rounded-lg">
+                        {u.attempts.length} বার
                       </span>
                     </div>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
                       {u.attempts.map((a, i) => (
-                        <div key={i} className="bg-background/50 rounded-lg p-2 flex items-start justify-between gap-2">
-                          <p className="text-[10px] font-mono text-foreground/70 break-all flex-1">
+                        <div key={i} className="bg-background/50 rounded-lg p-2 space-y-1">
+                          <p className="text-[10px] font-mono text-foreground/70 break-all">
                             {a.details?.replace("Duplicate Key: ", "")}
                           </p>
-                          <p className="text-[9px] text-muted-foreground shrink-0">
+                          <p className="text-[9px] text-muted-foreground">
                             {a.created_at ? new Date(a.created_at).toLocaleString("bn-BD") : ""}
                           </p>
                         </div>
