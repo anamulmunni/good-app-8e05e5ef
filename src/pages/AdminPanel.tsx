@@ -104,7 +104,7 @@ export default function AdminPanel() {
   const [youtubeKeyStatus, setYoutubeKeyStatus] = useState<any>(null);
   const [youtubeKeysLoaded, setYoutubeKeysLoaded] = useState(false);
   const [showFullYoutubeKeys, setShowFullYoutubeKeys] = useState(false);
-  const [bulkKeyImport, setBulkKeyImport] = useState("");
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1177,41 +1177,7 @@ export default function AdminPanel() {
         </Section>
 
 
-        {/* Bulk Key Import */}
-        <Section icon={Key} title="কী ইম্পোর্ট (টেলিগ্রাম থেকে)" color="amber">
-          <div className="mt-4 space-y-3">
-            <p className="text-xs text-muted-foreground">টেলিগ্রাম থেকে key গুলো কপি করে এখানে পেস্ট করুন (প্রতি লাইনে একটি key)।</p>
-            <textarea
-              value={bulkKeyImport}
-              onChange={(e) => setBulkKeyImport(e.target.value)}
-              placeholder="0x1234abcd...&#10;0x5678efgh...&#10;..."
-              className="input-field text-xs font-mono h-32 w-full"
-            />
-            <button
-              onClick={async () => {
-                const keys = bulkKeyImport.split(/[\n\r]+/).map(k => k.trim()).filter(k => k.startsWith("0x") && k.length > 20);
-                if (keys.length === 0) { toast({ title: "কোনো ভ্যালিড key পাওয়া যায়নি", variant: "destructive" }); return; }
-                let inserted = 0;
-                let skipped = 0;
-                for (const key of keys) {
-                  const { error } = await supabase.from("verification_pool").insert({
-                    private_key: key,
-                    verify_url: "imported",
-                    added_by: "telegram-import",
-                    is_used: false,
-                  });
-                  if (error) { skipped++; } else { inserted++; }
-                }
-                queryClient.invalidateQueries({ queryKey: ["admin-pool"] });
-                setBulkKeyImport("");
-                toast({ title: `${inserted} টি key ইম্পোর্ট হয়েছে${skipped > 0 ? `, ${skipped} টি ডুপ্লিকেট/স্কিপ` : ""}` });
-              }}
-              className="btn-primary bg-[hsl(var(--amber))] text-xs py-2.5"
-            >
-              <Key className="w-3.5 h-3.5" /> ইম্পোর্ট করুন ({bulkKeyImport.split(/[\n\r]+/).filter(k => k.trim().startsWith("0x") && k.trim().length > 20).length} টি key)
-            </button>
-          </div>
-        </Section>
+
 
         <Section icon={Key} title="পুল কি লিস্ট" count={pool?.length} color="primary">
           <div className="mt-4">
@@ -1237,6 +1203,11 @@ export default function AdminPanel() {
                     <div key={item.id} className="flex items-center justify-between p-2.5 bg-secondary/50 rounded-xl border border-border">
                       <div className="flex-1 truncate mr-3">
                         <div className="flex items-center gap-1.5">
+                          {item.is_used ? (
+                            <span className="text-[9px] bg-[hsl(var(--emerald))]/20 text-[hsl(var(--emerald))] px-1.5 py-0.5 rounded font-bold shrink-0">USED</span>
+                          ) : (
+                            <span className="text-[9px] bg-[hsl(var(--amber))]/20 text-[hsl(var(--amber))] px-1.5 py-0.5 rounded font-bold shrink-0">READY</span>
+                          )}
                           <p className="text-xs font-mono truncate">{item.private_key}</p>
                           <button onClick={() => { navigator.clipboard.writeText(item.private_key); toast({ title: "কপি হয়েছে" }); }}
                             className="text-muted-foreground hover:text-foreground shrink-0"><Copy className="w-3 h-3" /></button>
