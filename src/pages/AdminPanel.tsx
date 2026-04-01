@@ -6,7 +6,7 @@ import {
   getSubmittedNumbers, getResetHistory, getPaymentUsers,
   toggleBlockUser, updateUserBalance, resetUserKeyCount, updateUserKeyCount,
   updateUserVerifiedBadge,
-  updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
+  updateTransactionStatus, updateSetting, deletePoolKey, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
   addResetHistory, recalculateAllBalances, resetAllBalances,
   getDuplicateKeyAttempts,
