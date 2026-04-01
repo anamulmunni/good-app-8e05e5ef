@@ -126,24 +126,31 @@ export default function Login() {
           return;
         }
 
-        // Check if this device already has a DIFFERENT account — if so, block ALL previous ones
+        // User is NOT blocked in DB — if admin unblocked them, reset device tracking
+        // so old localStorage entries don't re-trigger a ban
         const deviceAccounts = getDeviceAccounts();
         const otherAccounts = deviceAccounts.filter(id => id !== normalizedPhone);
+        
         if (otherAccounts.length > 0) {
-          // Block all previous accounts from this device
-          for (const oldGuestId of otherAccounts) {
-            await supabase.from("users").update({ is_blocked: true }).eq("guest_id", oldGuestId);
+          // Check if any of the other accounts on this device are DIFFERENT real users
+          // If admin has unblocked this user, we trust the DB and reset device list
+          if (userData) {
+            // User exists and is not blocked — admin cleared them, reset device tracking
+            localStorage.setItem(DEVICE_ACCOUNTS_KEY, JSON.stringify([normalizedPhone]));
+          } else {
+            // New user trying to login on a device with existing accounts — block all
+            for (const oldGuestId of otherAccounts) {
+              await supabase.from("users").update({ is_blocked: true }).eq("guest_id", oldGuestId);
+            }
+            await supabase.from("users").update({ is_blocked: true }).eq("guest_id", normalizedPhone);
+            addDeviceAccount(normalizedPhone);
+            toast({
+              title: "🚫 সকল অ্যাকাউন্ট ব্লক করা হয়েছে",
+              description: "এই ডিভাইসে একাধিক অ্যাকাউন্ট ব্যবহার করা হয়েছে। নিয়ম অনুযায়ী আগের অ্যাকাউন্টসহ এই অ্যাকাউন্টও ব্লক করা হয়েছে। একটি ডিভাইসে শুধুমাত্র একটি অ্যাকাউন্ট অনুমোদিত। অ্যাডমিনের সাথে যোগাযোগ করুন।",
+              variant: "destructive",
+            });
+            return;
           }
-          // Also block the current account trying to login (the NEW one too gets banned)
-          await supabase.from("users").update({ is_blocked: true }).eq("guest_id", normalizedPhone);
-          // Update localStorage to include this account
-          addDeviceAccount(normalizedPhone);
-          toast({
-            title: "🚫 সকল অ্যাকাউন্ট ব্লক করা হয়েছে",
-            description: "এই ডিভাইসে একাধিক অ্যাকাউন্ট ব্যবহার করা হয়েছে। নিয়ম অনুযায়ী আগের অ্যাকাউন্টসহ এই অ্যাকাউন্টও ব্লক করা হয়েছে। একটি ডিভাইসে শুধুমাত্র একটি অ্যাকাউন্ট অনুমোদিত। অ্যাডমিনের সাথে যোগাযোগ করুন।",
-            variant: "destructive",
-          });
-          return;
         }
 
         const fakeEmail = `${normalizedPhone}@goodapp.local`;
