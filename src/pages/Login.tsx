@@ -120,7 +120,27 @@ export default function Login() {
         if (userData?.is_blocked) {
           toast({
             title: "🚫 অ্যাকাউন্ট ব্লক করা হয়েছে",
-            description: "আপনার অ্যাকাউন্টটি ব্লক করা হয়েছে। কারণ: এই ডিভাইস থেকে একাধিক অ্যাকাউন্ট তৈরি করা হয়েছে অথবা নিয়ম লঙ্ঘন করা হয়েছে। একটি ডিভাইসে শুধুমাত্র একটি অ্যাকাউন্ট অনুমোদিত। সমস্যা সমাধানের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।",
+            description: "আপনার অ্যাকাউন্টটি ব্লক করা হয়েছে। কারণ: এই ডিভাইস থেকে একাধিক অ্যাকাউন্ট তৈরি বা ব্যবহার করা হয়েছে অথবা নিয়ম লঙ্ঘন করা হয়েছে। একটি ডিভাইসে শুধুমাত্র একটি অ্যাকাউন্ট অনুমোদিত। সমস্যা সমাধানের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Check if this device already has a DIFFERENT account — if so, block ALL previous ones
+        const deviceAccounts = getDeviceAccounts();
+        const otherAccounts = deviceAccounts.filter(id => id !== normalizedPhone);
+        if (otherAccounts.length > 0) {
+          // Block all previous accounts from this device
+          for (const oldGuestId of otherAccounts) {
+            await supabase.from("users").update({ is_blocked: true }).eq("guest_id", oldGuestId);
+          }
+          // Also block the current account trying to login (the NEW one too gets banned)
+          await supabase.from("users").update({ is_blocked: true }).eq("guest_id", normalizedPhone);
+          // Update localStorage to include this account
+          addDeviceAccount(normalizedPhone);
+          toast({
+            title: "🚫 সকল অ্যাকাউন্ট ব্লক করা হয়েছে",
+            description: "এই ডিভাইসে একাধিক অ্যাকাউন্ট ব্যবহার করা হয়েছে। নিয়ম অনুযায়ী আগের অ্যাকাউন্টসহ এই অ্যাকাউন্টও ব্লক করা হয়েছে। একটি ডিভাইসে শুধুমাত্র একটি অ্যাকাউন্ট অনুমোদিত। অ্যাডমিনের সাথে যোগাযোগ করুন।",
             variant: "destructive",
           });
           return;
@@ -136,6 +156,9 @@ export default function Login() {
           }
         }
         if (error) throw error;
+        
+        // Track this account on this device after successful login
+        addDeviceAccount(normalizedPhone);
         navigate("/dashboard");
       } catch (err: unknown) {
         const msg = String((err as any)?.message || "").toLowerCase();
