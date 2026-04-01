@@ -905,7 +905,7 @@ export default function AdminPanel() {
         </Section>
 
         {/* Reset History */}
-        <Section icon={History} title="রিসেট হিস্ট্রি" count={resetHistoryData?.length} color="cyan">
+        <Section icon={History} title="পেমেন্ট হিস্ট্রি (পেইড)" count={resetHistoryData?.length} color="emerald">
           <div className="mt-4 space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
