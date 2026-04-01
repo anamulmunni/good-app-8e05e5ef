@@ -189,10 +189,13 @@ export default function Dashboard() {
     },
   });
 
+  // Only tick every second when countdown is active, otherwise every 30s
   useEffect(() => {
-    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    const needsFastTick = isRequestLocked;
+    const interval = needsFastTick ? 1000 : 30000;
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), interval);
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [isRequestLocked]);
 
   // Celebration when key_count increases
   useEffect(() => {
