@@ -257,7 +257,7 @@ export default function ShortReels() {
 
   // ─── Core dual-player logic ───
   useEffect(() => {
-    if (!currentReel?.videoId || playersReady < 2) return;
+    if (!currentReel?.videoId || playersReady < 1) return;
 
     saveSeenReel(currentReel.videoId);
     setPaused(false);
