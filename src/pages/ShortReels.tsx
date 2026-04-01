@@ -81,6 +81,20 @@ function loadYTApi(): Promise<void> {
   return ytApiPromise;
 }
 
+const PLAYER_VARS = {
+  autoplay: 0,
+  controls: 0,
+  modestbranding: 1,
+  playsinline: 1,
+  rel: 0,
+  showinfo: 0,
+  iv_load_policy: 3,
+  fs: 0,
+  disablekb: 1,
+  mute: 0,
+  enablejsapi: 1,
+};
+
 export default function ShortReels() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
@@ -92,7 +106,7 @@ export default function ShortReels() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [showPauseIcon, setShowPauseIcon] = useState(false);
-  const [playerReady, setPlayerReady] = useState(false);
+  const [playersReady, setPlayersReady] = useState(0); // count of ready players
 
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
@@ -100,58 +114,79 @@ export default function ShortReels() {
   const swipeLocked = useRef(false);
   const pauseIconTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // YT Player refs — we use only ONE player to avoid heavy multi-iframe
-  const playerRef = useRef<any>(null);
-  const playerContainerRef = useRef<HTMLDivElement>(null);
-  const currentVideoIdRef = useRef<string>("");
+  // Dual player system: A and B alternate
+  const playerA = useRef<any>(null);
+  const playerB = useRef<any>(null);
+  const playerAVideoId = useRef<string>("");
+  const playerBVideoId = useRef<string>("");
+  // 0 = playerA is active, 1 = playerB is active
+  const [activePlayer, setActivePlayer] = useState<0 | 1>(0);
+  const activePlayerRef = useRef<0 | 1>(0);
+  const firstVideoLoaded = useRef(false);
+  const [showThumbnail, setShowThumbnail] = useState(true);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
 
-  // ─── Initialize YT Player once ───
+  // ─── Initialize TWO YT Players ───
   useEffect(() => {
     let cancelled = false;
     loadYTApi().then(() => {
-      if (cancelled || playerRef.current) return;
+      if (cancelled) return;
       const YT = (window as any).YT;
-      playerRef.current = new YT.Player("yt-reels-player", {
-        width: "100%",
-        height: "100%",
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          rel: 0,
-          showinfo: 0,
-          iv_load_policy: 3,
-          fs: 0,
-          disablekb: 1,
-          loop: 1,
-          mute: 0,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: () => {
-            if (!cancelled) setPlayerReady(true);
+
+      if (!playerA.current) {
+        playerA.current = new YT.Player("yt-player-a", {
+          width: "100%",
+          height: "100%",
+          playerVars: { ...PLAYER_VARS, origin: window.location.origin },
+          events: {
+            onReady: () => {
+              if (!cancelled) setPlayersReady((p) => p + 1);
+            },
+            onStateChange: (event: any) => {
+              if (event.data === YT.PlayerState.PLAYING && activePlayerRef.current === 0) {
+                setShowThumbnail(false);
+                firstVideoLoaded.current = true;
+              }
+              if (event.data === YT.PlayerState.ENDED && activePlayerRef.current === 0) {
+                setCurrentIndex((prev) => prev + 1);
+              }
+            },
+            onError: () => {
+              if (activePlayerRef.current === 0) setCurrentIndex((prev) => prev + 1);
+            },
           },
-          onStateChange: (event: any) => {
-            // Auto-next when video ends
-            if (event.data === YT.PlayerState.ENDED) {
-              setCurrentIndex((prev) => prev + 1);
-            }
+        });
+      }
+
+      if (!playerB.current) {
+        playerB.current = new YT.Player("yt-player-b", {
+          width: "100%",
+          height: "100%",
+          playerVars: { ...PLAYER_VARS, origin: window.location.origin },
+          events: {
+            onReady: () => {
+              if (!cancelled) setPlayersReady((p) => p + 1);
+            },
+            onStateChange: (event: any) => {
+              if (event.data === YT.PlayerState.PLAYING && activePlayerRef.current === 1) {
+                setShowThumbnail(false);
+                firstVideoLoaded.current = true;
+              }
+              if (event.data === YT.PlayerState.ENDED && activePlayerRef.current === 1) {
+                setCurrentIndex((prev) => prev + 1);
+              }
+            },
+            onError: () => {
+              if (activePlayerRef.current === 1) setCurrentIndex((prev) => prev + 1);
+            },
           },
-          onError: () => {
-            // Skip broken videos
-            setCurrentIndex((prev) => prev + 1);
-          },
-        },
-      });
+        });
+      }
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const baseFnUrl = useMemo(() => {
@@ -193,8 +228,16 @@ export default function ShortReels() {
     setReelQueue([]);
     setCurrentIndex(0);
     setPaused(false);
+    setActivePlayer(0);
+    activePlayerRef.current = 0;
+    setShowThumbnail(true);
+    firstVideoLoaded.current = false;
+    playerAVideoId.current = "";
+    playerBVideoId.current = "";
     swipeLocked.current = false;
-    currentVideoIdRef.current = "";
+    // Stop both players
+    try { playerA.current?.stopVideo(); } catch {}
+    try { playerB.current?.stopVideo(); } catch {}
   }, []);
 
   useEffect(() => {
@@ -210,37 +253,50 @@ export default function ShortReels() {
   }, [candidates]);
 
   const currentReel = reelQueue[currentIndex];
+  const nextReel = reelQueue[currentIndex + 1];
 
-  // ─── Load video into player when index changes ───
+  // ─── Core dual-player logic ───
   useEffect(() => {
-    if (!currentReel?.videoId || !playerReady || !playerRef.current) return;
+    if (!currentReel?.videoId || playersReady < 2) return;
 
     saveSeenReel(currentReel.videoId);
     setPaused(false);
 
-    const player = playerRef.current;
-    if (currentVideoIdRef.current === currentReel.videoId) {
-      // Same video, just play
-      try { player.playVideo(); } catch {}
-      return;
+    const active = activePlayerRef.current;
+    const currentPlayer = active === 0 ? playerA.current : playerB.current;
+    const currentPlayerVideoId = active === 0 ? playerAVideoId : playerBVideoId;
+
+    // Load current video into active player if needed
+    if (currentPlayerVideoId.current !== currentReel.videoId) {
+      currentPlayerVideoId.current = currentReel.videoId;
+      setShowThumbnail(true);
+      try {
+        currentPlayer.loadVideoById({ videoId: currentReel.videoId, startSeconds: 0 });
+      } catch {
+        setTimeout(() => {
+          try { currentPlayer.loadVideoById({ videoId: currentReel.videoId, startSeconds: 0 }); } catch {}
+        }, 300);
+      }
+    } else {
+      // Already loaded — just play
+      try { currentPlayer.playVideo(); } catch {}
+      setShowThumbnail(false);
     }
 
-    currentVideoIdRef.current = currentReel.videoId;
-    try {
-      // loadVideoById is instant — no iframe reload!
-      player.loadVideoById({
-        videoId: currentReel.videoId,
-        startSeconds: 0,
-      });
-    } catch {
-      // Player not ready yet, retry
-      setTimeout(() => {
+    // Pre-buffer next video into inactive player
+    if (nextReel?.videoId) {
+      const inactivePlayer = active === 0 ? playerB.current : playerA.current;
+      const inactivePlayerVideoId = active === 0 ? playerBVideoId : playerAVideoId;
+
+      if (inactivePlayerVideoId.current !== nextReel.videoId) {
+        inactivePlayerVideoId.current = nextReel.videoId;
         try {
-          player.loadVideoById({ videoId: currentReel.videoId, startSeconds: 0 });
+          // cueVideoById loads metadata + starts buffering but doesn't play
+          inactivePlayer.cueVideoById({ videoId: nextReel.videoId, startSeconds: 0 });
         } catch {}
-      }, 500);
+      }
     }
-  }, [currentReel?.videoId, currentIndex, playerReady]);
+  }, [currentReel?.videoId, currentIndex, playersReady, nextReel?.videoId]);
 
   // ─── Prefetch more when near end ───
   useEffect(() => {
@@ -250,13 +306,15 @@ export default function ShortReels() {
   }, [currentIndex, isFetching, reelQueue.length, user]);
 
   const togglePause = useCallback(() => {
-    if (!currentReel || !playerRef.current) return;
+    if (!currentReel) return;
+    const currentPlayer = activePlayerRef.current === 0 ? playerA.current : playerB.current;
+    if (!currentPlayer) return;
+
     const next = !paused;
     setPaused(next);
-
     try {
-      if (next) playerRef.current.pauseVideo();
-      else playerRef.current.playVideo();
+      if (next) currentPlayer.pauseVideo();
+      else currentPlayer.playVideo();
     } catch {}
 
     setShowPauseIcon(true);
@@ -265,11 +323,43 @@ export default function ShortReels() {
   }, [paused, currentReel]);
 
   const moveToNext = useCallback(() => {
-    setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
+    if (reelQueue.length === 0) return;
+    setCurrentIndex((prev) => {
+      const next = Math.min(prev + 1, reelQueue.length - 1);
+      if (next !== prev) {
+        // Swap active player — the inactive one already has the next video pre-buffered!
+        const oldActive = activePlayerRef.current;
+        const newActive: 0 | 1 = oldActive === 0 ? 1 : 0;
+        activePlayerRef.current = newActive;
+        setActivePlayer(newActive);
+
+        // Pause old player
+        const oldPlayer = oldActive === 0 ? playerA.current : playerB.current;
+        try { oldPlayer?.pauseVideo(); } catch {}
+
+        // Play new player (already buffered!)
+        const newPlayer = newActive === 0 ? playerA.current : playerB.current;
+        try { newPlayer?.playVideo(); } catch {}
+      }
+      return next;
+    });
   }, [reelQueue.length]);
 
   const moveToPrev = useCallback(() => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    setCurrentIndex((prev) => {
+      const next = Math.max(prev - 1, 0);
+      if (next !== prev) {
+        // For going back, swap and load
+        const oldActive = activePlayerRef.current;
+        const newActive: 0 | 1 = oldActive === 0 ? 1 : 0;
+        activePlayerRef.current = newActive;
+        setActivePlayer(newActive);
+
+        const oldPlayer = oldActive === 0 ? playerA.current : playerB.current;
+        try { oldPlayer?.pauseVideo(); } catch {}
+      }
+      return next;
+    });
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -310,7 +400,6 @@ export default function ShortReels() {
 
   const showLoading = candidatesLoading && reelQueue.length === 0;
   const showEmpty = !candidatesLoading && reelQueue.length === 0;
-  const isVideoLoading = !playerReady || !currentReel || currentVideoIdRef.current !== currentReel?.videoId;
 
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
@@ -379,8 +468,8 @@ export default function ShortReels() {
             )}
           </AnimatePresence>
 
-          {/* Thumbnail overlay while loading */}
-          {currentReel && isVideoLoading && (
+          {/* Thumbnail overlay while first video loads */}
+          {currentReel && showThumbnail && (
             <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center bg-black">
               <img
                 src={`https://i.ytimg.com/vi/${currentReel.videoId}/hq720.jpg`}
@@ -421,13 +510,26 @@ export default function ShortReels() {
             </div>
           )}
 
-          {/* Single YT Player — no multiple iframes! */}
+          {/* Dual YT Players — swap visibility for instant switching */}
           <div
-            ref={playerContainerRef}
             className="absolute inset-0 w-full h-full"
-            style={{ pointerEvents: "none" }}
+            style={{
+              pointerEvents: "none",
+              opacity: activePlayer === 0 ? 1 : 0,
+              zIndex: activePlayer === 0 ? 2 : 1,
+            }}
           >
-            <div id="yt-reels-player" className="w-full h-full" />
+            <div id="yt-player-a" className="w-full h-full" />
+          </div>
+          <div
+            className="absolute inset-0 w-full h-full"
+            style={{
+              pointerEvents: "none",
+              opacity: activePlayer === 1 ? 1 : 0,
+              zIndex: activePlayer === 1 ? 2 : 1,
+            }}
+          >
+            <div id="yt-player-b" className="w-full h-full" />
           </div>
 
           {/* Bottom info */}
