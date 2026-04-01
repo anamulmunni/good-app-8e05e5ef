@@ -1229,9 +1229,16 @@ export default function Feed() {
                     {commentingPost.content && (
                       <p className="text-[14px] text-gray-900 dark:text-foreground whitespace-pre-wrap break-words">{renderMentionText(commentingPost.content)}</p>
                     )}
-                    {commentingPost.image_url && (
-                      <img src={commentingPost.image_url} alt="" className="mt-2 rounded-xl w-full max-h-[220px] object-cover" />
-                    )}
+                    {commentingPost.image_url && (() => {
+                      const urls = commentingPost.image_url!.split(",").map(u => u.trim()).filter(Boolean);
+                      return (
+                        <div className={urls.length === 1 ? "mt-2" : "mt-2 grid grid-cols-2 gap-1"}>
+                          {urls.map((url, i) => (
+                            <img key={i} src={url} alt="" className="rounded-xl w-full max-h-[220px] object-cover" />
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {commentingPost.video_url && (
                       <video src={commentingPost.video_url} controls className="mt-2 rounded-xl w-full max-h-[220px] object-cover" />
                     )}
