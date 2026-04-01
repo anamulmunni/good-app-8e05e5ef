@@ -1182,9 +1182,9 @@ export default function AdminPanel() {
 
 
         {/* Bulk Key Import */}
-        <Section icon={Key} title="কী ব্যাক ইম্পোর্ট (টেলিগ্রাম থেকে)" color="amber">
+        <Section icon={Key} title="কী ইম্পোর্ট (টেলিগ্রাম থেকে)" color="amber">
           <div className="mt-4 space-y-3">
-            <p className="text-xs text-muted-foreground">টেলিগ্রাম থেকে key গুলো কপি করে এখানে পেস্ট করুন (প্রতি লাইনে একটি key)। এগুলো used হিসেবে pool-এ ঢুকবে।</p>
+            <p className="text-xs text-muted-foreground">টেলিগ্রাম থেকে key গুলো কপি করে এখানে পেস্ট করুন (প্রতি লাইনে একটি key)।</p>
             <textarea
               value={bulkKeyImport}
               onChange={(e) => setBulkKeyImport(e.target.value)}
@@ -1202,7 +1202,7 @@ export default function AdminPanel() {
                     private_key: key,
                     verify_url: "imported",
                     added_by: "telegram-import",
-                    is_used: true,
+                    is_used: false,
                   });
                   if (error) { skipped++; } else { inserted++; }
                 }
