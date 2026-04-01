@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Pause, Play } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 type ReelItem = {
