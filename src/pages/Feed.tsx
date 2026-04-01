@@ -61,9 +61,11 @@ export default function Feed() {
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(0);
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [hasMore, setHasMore] = useState(true);
   const [newPostsAvailable, setNewPostsAvailable] = useState(false);
-  const POSTS_PER_PAGE = 50;
+  const POSTS_PER_PAGE = 20;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -76,28 +78,42 @@ export default function Feed() {
     if (!isLoading && !user) navigate("/");
   }, [user, isLoading, navigate]);
 
-  // Capped fetch to reduce backend pressure and keep feed stable
-  const { data: allPosts = [], isLoading: postsLoading } = useQuery({
-    queryKey: ["feed-posts", searchQuery],
-    queryFn: () => getFeedPosts(1000, searchQuery),
+  // Initial + paginated fetch
+  const { isLoading: postsLoading } = useQuery({
+    queryKey: ["feed-posts", searchQuery, page],
+    queryFn: async () => {
+      const newPosts = await getFeedPosts(POSTS_PER_PAGE, searchQuery, page * POSTS_PER_PAGE);
+      if (newPosts.length < POSTS_PER_PAGE) setHasMore(false);
+      else setHasMore(true);
+      if (page === 0) {
+        setAllPosts(newPosts);
+      } else {
+        setAllPosts(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const unique = newPosts.filter(p => !existingIds.has(p.id));
+          return [...prev, ...unique];
+        });
+      }
+      return newPosts;
+    },
     enabled: !!user,
     staleTime: 20000,
   });
 
-  // Paginated display
-  const visibleNonVideoPosts = allPosts.filter((p) => !hiddenPosts.has(p.id) && !p.video_url);
-  const posts = visibleNonVideoPosts.slice(0, page * POSTS_PER_PAGE);
-  const hasMore = posts.length < visibleNonVideoPosts.length;
+  // Reset page when search changes
+  useEffect(() => { setPage(0); setAllPosts([]); setHasMore(true); }, [searchQuery]);
+
+  const posts = allPosts.filter(p => !hiddenPosts.has(p.id) && !p.video_url);
 
   // Infinite scroll observer
   useEffect(() => {
-    if (!sentinelRef.current || !hasMore) return;
+    if (!sentinelRef.current || !hasMore || postsLoading) return;
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) setPage(p => p + 1);
     }, { threshold: 0.1 });
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, posts.length]);
+  }, [hasMore, postsLoading, posts.length]);
 
   const { data: stories = [] } = useQuery({
     queryKey: ["stories"],
@@ -166,35 +182,24 @@ export default function Feed() {
     enabled: searchQuery.length >= 2,
   });
 
+  // Only load reactions for currently visible posts (not all 1000)
   useEffect(() => {
-    if (user && allPosts.length > 0) {
-      getUserReactions(user.id, allPosts.map(p => p.id)).then(setUserReactions);
+    if (user && posts.length > 0) {
+      const visibleIds = posts.map(p => p.id);
+      getUserReactions(user.id, visibleIds).then(setUserReactions);
     }
-  }, [user, allPosts]);
+  }, [user, posts.length]);
 
   useEffect(() => {
     const channel = supabase.channel("feed-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, () => {
+        setNewPostsAvailable(true);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, () => {
         queryClient.invalidateQueries({ queryKey: ["stories"] });
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
-        queryClient.invalidateQueries({ queryKey: ["unread-count"] });
-        const incoming = payload?.new;
-        if (incoming && incoming.sender_id !== user?.id) {
-          playUiSound("message");
-        }
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["friend-request-count"] });
-        queryClient.invalidateQueries({ queryKey: ["friend-requests"] });
-        queryClient.invalidateQueries({ queryKey: ["suggested-people"] });
-      })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, () => {
         queryClient.invalidateQueries({ queryKey: ["notif-count"] });
-        queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -218,6 +223,7 @@ export default function Feed() {
     onSuccess: () => {
       setPostContent(""); setPostImageFiles([]); setPostImagePreviews([]);
       setPostVideoFile(null); setPostVideoPreview(null); setShowCreatePost(false);
+      setPage(0); setAllPosts([]); setHasMore(true);
       queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
       toast({ title: "পোস্ট প্রকাশিত! 🎉" });
     },
