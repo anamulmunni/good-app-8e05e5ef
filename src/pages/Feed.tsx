@@ -1478,7 +1478,7 @@ export default function Feed() {
                 <button onClick={() => videoInputRef.current?.click()} className="flex items-center gap-2 text-red-500">
                   <Video className="w-5 h-5" /><span className="text-sm font-medium">ভিডিও</span>
                 </button>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
                 <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoSelect} />
               </div>
             </div>
