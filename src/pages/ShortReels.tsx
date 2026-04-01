@@ -57,44 +57,6 @@ function saveSeenReel(videoId: string) {
   } catch {}
 }
 
-// ─── YouTube IFrame API loader ───
-let ytApiReady = false;
-let ytApiPromise: Promise<void> | null = null;
-
-function loadYTApi(): Promise<void> {
-  if (ytApiReady) return Promise.resolve();
-  if (ytApiPromise) return ytApiPromise;
-  ytApiPromise = new Promise<void>((resolve) => {
-    if ((window as any).YT?.Player) {
-      ytApiReady = true;
-      resolve();
-      return;
-    }
-    (window as any).onYouTubeIframeAPIReady = () => {
-      ytApiReady = true;
-      resolve();
-    };
-    const tag = document.createElement("script");
-    tag.src = "https://www.youtube.com/iframe_api";
-    document.head.appendChild(tag);
-  });
-  return ytApiPromise;
-}
-
-const PLAYER_VARS = {
-  autoplay: 0,
-  controls: 0,
-  modestbranding: 1,
-  playsinline: 1,
-  rel: 0,
-  showinfo: 0,
-  iv_load_policy: 3,
-  fs: 0,
-  disablekb: 1,
-  mute: 0,
-  enablejsapi: 1,
-};
-
 export default function ShortReels() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
@@ -104,90 +66,16 @@ export default function ShortReels() {
   const [fetchBatch, setFetchBatch] = useState(0);
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [showPauseIcon, setShowPauseIcon] = useState(false);
-  const [playersReady, setPlayersReady] = useState(0); // count of ready players
 
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const touchStartTime = useRef(0);
   const swipeLocked = useRef(false);
-  const pauseIconTimer = useRef<ReturnType<typeof setTimeout>>();
-
-  // Dual player system: A and B alternate
-  const playerA = useRef<any>(null);
-  const playerB = useRef<any>(null);
-  const playerAVideoId = useRef<string>("");
-  const playerBVideoId = useRef<string>("");
-  // 0 = playerA is active, 1 = playerB is active
-  const [activePlayer, setActivePlayer] = useState<0 | 1>(0);
-  const activePlayerRef = useRef<0 | 1>(0);
-  const firstVideoLoaded = useRef(false);
-  const [showThumbnail, setShowThumbnail] = useState(true);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
   }, [isLoading, user, navigate]);
-
-  // ─── Initialize TWO YT Players ───
-  useEffect(() => {
-    let cancelled = false;
-    loadYTApi().then(() => {
-      if (cancelled) return;
-      const YT = (window as any).YT;
-
-      if (!playerA.current) {
-        playerA.current = new YT.Player("yt-player-a", {
-          width: "100%",
-          height: "100%",
-          playerVars: { ...PLAYER_VARS, origin: window.location.origin },
-          events: {
-            onReady: () => {
-              if (!cancelled) setPlayersReady((p) => p + 1);
-            },
-            onStateChange: (event: any) => {
-              if (event.data === YT.PlayerState.PLAYING && activePlayerRef.current === 0) {
-                setShowThumbnail(false);
-                firstVideoLoaded.current = true;
-              }
-              if (event.data === YT.PlayerState.ENDED && activePlayerRef.current === 0) {
-                setCurrentIndex((prev) => prev + 1);
-              }
-            },
-            onError: () => {
-              if (activePlayerRef.current === 0) setCurrentIndex((prev) => prev + 1);
-            },
-          },
-        });
-      }
-
-      if (!playerB.current) {
-        playerB.current = new YT.Player("yt-player-b", {
-          width: "100%",
-          height: "100%",
-          playerVars: { ...PLAYER_VARS, origin: window.location.origin },
-          events: {
-            onReady: () => {
-              if (!cancelled) setPlayersReady((p) => p + 1);
-            },
-            onStateChange: (event: any) => {
-              if (event.data === YT.PlayerState.PLAYING && activePlayerRef.current === 1) {
-                setShowThumbnail(false);
-                firstVideoLoaded.current = true;
-              }
-              if (event.data === YT.PlayerState.ENDED && activePlayerRef.current === 1) {
-                setCurrentIndex((prev) => prev + 1);
-              }
-            },
-            onError: () => {
-              if (activePlayerRef.current === 1) setCurrentIndex((prev) => prev + 1);
-            },
-          },
-        });
-      }
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   const baseFnUrl = useMemo(() => {
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -227,17 +115,8 @@ export default function ShortReels() {
     setFetchBatch(0);
     setReelQueue([]);
     setCurrentIndex(0);
-    setPaused(false);
-    setActivePlayer(0);
-    activePlayerRef.current = 0;
-    setShowThumbnail(true);
-    firstVideoLoaded.current = false;
-    playerAVideoId.current = "";
-    playerBVideoId.current = "";
+    setIframeLoaded(false);
     swipeLocked.current = false;
-    // Stop both players
-    try { playerA.current?.stopVideo(); } catch {}
-    try { playerB.current?.stopVideo(); } catch {}
   }, []);
 
   useEffect(() => {
@@ -253,117 +132,29 @@ export default function ShortReels() {
   }, [candidates]);
 
   const currentReel = reelQueue[currentIndex];
-  const nextReel = reelQueue[currentIndex + 1];
 
-  // ─── Core dual-player logic ───
+  // Mark as seen
   useEffect(() => {
-    if (!currentReel?.videoId || playersReady < 1) return;
-
-    saveSeenReel(currentReel.videoId);
-    setPaused(false);
-
-    const active = activePlayerRef.current;
-    const currentPlayer = active === 0 ? playerA.current : playerB.current;
-    const currentPlayerVideoId = active === 0 ? playerAVideoId : playerBVideoId;
-
-    // Safety: hide thumbnail after 4 seconds even if video doesn't fire PLAYING event
-    const thumbnailTimer = setTimeout(() => setShowThumbnail(false), 4000);
-
-    // Load current video into active player if needed
-    if (currentPlayerVideoId.current !== currentReel.videoId) {
-      currentPlayerVideoId.current = currentReel.videoId;
-      setShowThumbnail(true);
-      try {
-        currentPlayer.loadVideoById({ videoId: currentReel.videoId, startSeconds: 0 });
-      } catch {
-        setTimeout(() => {
-          try { currentPlayer.loadVideoById({ videoId: currentReel.videoId, startSeconds: 0 }); } catch {}
-        }, 300);
-      }
-    } else {
-      // Already loaded — just play
-      try { currentPlayer.playVideo(); } catch {}
-      setShowThumbnail(false);
+    if (currentReel?.videoId) {
+      saveSeenReel(currentReel.videoId);
+      setIframeLoaded(false);
     }
+  }, [currentReel?.videoId]);
 
-    // Pre-buffer next video into inactive player
-    if (nextReel?.videoId) {
-      const inactivePlayer = active === 0 ? playerB.current : playerA.current;
-      const inactivePlayerVideoId = active === 0 ? playerBVideoId : playerAVideoId;
-
-      if (inactivePlayerVideoId.current !== nextReel.videoId) {
-        inactivePlayerVideoId.current = nextReel.videoId;
-        try {
-          inactivePlayer.cueVideoById({ videoId: nextReel.videoId, startSeconds: 0 });
-        } catch {}
-      }
-    }
-
-    return () => clearTimeout(thumbnailTimer);
-  }, [currentReel?.videoId, currentIndex, playersReady, nextReel?.videoId]);
-
-  // ─── Prefetch more when near end ───
+  // Prefetch more when near end
   useEffect(() => {
     if (!user || isFetching || reelQueue.length === 0) return;
     if (currentIndex < reelQueue.length - 3) return;
     setFetchBatch((prev) => prev + 1);
   }, [currentIndex, isFetching, reelQueue.length, user]);
 
-  const togglePause = useCallback(() => {
-    if (!currentReel) return;
-    const currentPlayer = activePlayerRef.current === 0 ? playerA.current : playerB.current;
-    if (!currentPlayer) return;
-
-    const next = !paused;
-    setPaused(next);
-    try {
-      if (next) currentPlayer.pauseVideo();
-      else currentPlayer.playVideo();
-    } catch {}
-
-    setShowPauseIcon(true);
-    clearTimeout(pauseIconTimer.current);
-    pauseIconTimer.current = setTimeout(() => setShowPauseIcon(false), 800);
-  }, [paused, currentReel]);
-
   const moveToNext = useCallback(() => {
     if (reelQueue.length === 0) return;
-    setCurrentIndex((prev) => {
-      const next = Math.min(prev + 1, reelQueue.length - 1);
-      if (next !== prev) {
-        // Swap active player — the inactive one already has the next video pre-buffered!
-        const oldActive = activePlayerRef.current;
-        const newActive: 0 | 1 = oldActive === 0 ? 1 : 0;
-        activePlayerRef.current = newActive;
-        setActivePlayer(newActive);
-
-        // Pause old player
-        const oldPlayer = oldActive === 0 ? playerA.current : playerB.current;
-        try { oldPlayer?.pauseVideo(); } catch {}
-
-        // Play new player (already buffered!)
-        const newPlayer = newActive === 0 ? playerA.current : playerB.current;
-        try { newPlayer?.playVideo(); } catch {}
-      }
-      return next;
-    });
+    setCurrentIndex((prev) => Math.min(prev + 1, reelQueue.length - 1));
   }, [reelQueue.length]);
 
   const moveToPrev = useCallback(() => {
-    setCurrentIndex((prev) => {
-      const next = Math.max(prev - 1, 0);
-      if (next !== prev) {
-        // For going back, swap and load
-        const oldActive = activePlayerRef.current;
-        const newActive: 0 | 1 = oldActive === 0 ? 1 : 0;
-        activePlayerRef.current = newActive;
-        setActivePlayer(newActive);
-
-        const oldPlayer = oldActive === 0 ? playerA.current : playerB.current;
-        try { oldPlayer?.pauseVideo(); } catch {}
-      }
-      return next;
-    });
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -376,20 +167,15 @@ export default function ShortReels() {
     if (swipeLocked.current) return;
     const deltaY = touchStartY.current - e.changedTouches[0].clientY;
     const deltaX = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
-    const elapsed = Date.now() - touchStartTime.current;
 
-    if (Math.abs(deltaY) < 20 && deltaX < 20 && elapsed < 300) {
-      togglePause();
-      return;
-    }
     if (deltaX > Math.abs(deltaY)) return;
-    if (Math.abs(deltaY) < 45) return;
+    if (Math.abs(deltaY) < 50) return;
 
     swipeLocked.current = true;
     if (deltaY > 0) moveToNext();
     else moveToPrev();
-    setTimeout(() => { swipeLocked.current = false; }, 320);
-  }, [moveToNext, moveToPrev, togglePause]);
+    setTimeout(() => { swipeLocked.current = false; }, 350);
+  }, [moveToNext, moveToPrev]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (swipeLocked.current) return;
@@ -397,13 +183,18 @@ export default function ShortReels() {
     swipeLocked.current = true;
     if (e.deltaY > 0) moveToNext();
     else moveToPrev();
-    setTimeout(() => { swipeLocked.current = false; }, 320);
+    setTimeout(() => { swipeLocked.current = false; }, 350);
   }, [moveToNext, moveToPrev]);
 
   if (isLoading || !user) return null;
 
   const showLoading = candidatesLoading && reelQueue.length === 0;
   const showEmpty = !candidatesLoading && reelQueue.length === 0;
+
+  // Build YouTube embed URL — autoplay, no controls, loop
+  const embedUrl = currentReel
+    ? `https://www.youtube.com/embed/${currentReel.videoId}?autoplay=1&mute=0&controls=1&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=0`
+    : "";
 
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
@@ -444,36 +235,35 @@ export default function ShortReels() {
         </div>
       ) : (
         <div className="h-full w-full relative overflow-hidden" onWheel={handleWheel}>
-          {/* Touch overlay */}
+          {/* Swipe overlay — only covers top/bottom strips so iframe remains interactive */}
+          <div
+            className="absolute left-0 right-0 top-0 z-10"
+            style={{ height: "92px", touchAction: "none" }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          />
           <div
             className="absolute left-0 right-0 bottom-0 z-10"
-            style={{ top: "92px", touchAction: "none" }}
+            style={{ height: "80px", touchAction: "none" }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          />
+          {/* Left & right edge swipe strips */}
+          <div
+            className="absolute left-0 top-[92px] bottom-[80px] z-10"
+            style={{ width: "40px", touchAction: "none" }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          />
+          <div
+            className="absolute right-0 top-[92px] bottom-[80px] z-10"
+            style={{ width: "40px", touchAction: "none" }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           />
 
-          {/* Pause/Play icon */}
-          <AnimatePresence>
-            {showPauseIcon && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.5 }}
-                className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-              >
-                <div className="w-20 h-20 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm">
-                  {paused ? (
-                    <Play className="w-10 h-10 text-white ml-1" fill="white" />
-                  ) : (
-                    <Pause className="w-10 h-10 text-white" fill="white" />
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Thumbnail overlay while first video loads */}
-          {currentReel && showThumbnail && (
+          {/* Loading overlay */}
+          {currentReel && !iframeLoaded && (
             <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center bg-black">
               <img
                 src={`https://i.ytimg.com/vi/${currentReel.videoId}/hq720.jpg`}
@@ -514,26 +304,47 @@ export default function ShortReels() {
             </div>
           )}
 
-          {/* Dual YT Players — swap visibility for instant switching */}
+          {/* YouTube Embed iframe — simple & reliable */}
+          {currentReel && (
+            <iframe
+              key={currentReel.videoId}
+              src={embedUrl}
+              className="absolute inset-0 w-full h-full z-[3]"
+              style={{ border: "none" }}
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen={false}
+              onLoad={() => {
+                // Give a moment for the video to start rendering
+                setTimeout(() => setIframeLoaded(true), 1500);
+              }}
+            />
+          )}
+
+          {/* YouTube logo cover */}
           <div
-            className="absolute inset-0 w-full h-full"
+            className="absolute z-20 pointer-events-none"
             style={{
-              pointerEvents: "none",
-              opacity: activePlayer === 0 ? 1 : 0,
-              zIndex: activePlayer === 0 ? 2 : 1,
+              bottom: "68px",
+              right: "8px",
+              width: "200px",
+              height: "36px",
+              background: "linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 100%)",
+              borderRadius: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            <div id="yt-player-a" className="w-full h-full" />
-          </div>
-          <div
-            className="absolute inset-0 w-full h-full"
-            style={{
-              pointerEvents: "none",
-              opacity: activePlayer === 1 ? 1 : 0,
-              zIndex: activePlayer === 1 ? 2 : 1,
-            }}
-          >
-            <div id="yt-player-b" className="w-full h-full" />
+            <span
+              className="font-black text-[20px] tracking-wide"
+              style={{
+                background: "linear-gradient(135deg, #22c55e, #4ade80, #f97316)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              good-app
+            </span>
           </div>
 
           {/* Bottom info */}
