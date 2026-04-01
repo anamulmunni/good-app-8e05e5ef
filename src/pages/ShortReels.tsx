@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Pause, Play } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 type ReelItem = {
@@ -66,12 +66,12 @@ export default function ShortReels() {
   const [fetchBatch, setFetchBatch] = useState(0);
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
 
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const touchStartTime = useRef(0);
   const swipeLocked = useRef(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -115,7 +115,7 @@ export default function ShortReels() {
     setFetchBatch(0);
     setReelQueue([]);
     setCurrentIndex(0);
-    setIframeLoaded(false);
+    setLoadedIds(new Set());
     swipeLocked.current = false;
   }, []);
 
@@ -132,12 +132,29 @@ export default function ShortReels() {
   }, [candidates]);
 
   const currentReel = reelQueue[currentIndex];
+  // Preload window: current + next 3
+  const PRELOAD_COUNT = 3;
+  const preloadReels = useMemo(() => {
+    const items: ReelItem[] = [];
+    for (let i = currentIndex; i <= Math.min(currentIndex + PRELOAD_COUNT, reelQueue.length - 1); i++) {
+      if (reelQueue[i]) items.push(reelQueue[i]);
+    }
+    return items;
+  }, [currentIndex, reelQueue]);
+
+  const markLoaded = useCallback((videoId: string) => {
+    setLoadedIds((prev) => {
+      if (prev.has(videoId)) return prev;
+      const next = new Set(prev);
+      next.add(videoId);
+      return next;
+    });
+  }, []);
 
   // Mark as seen
   useEffect(() => {
     if (currentReel?.videoId) {
       saveSeenReel(currentReel.videoId);
-      setIframeLoaded(false);
     }
   }, [currentReel?.videoId]);
 
@@ -191,11 +208,6 @@ export default function ShortReels() {
   const showLoading = candidatesLoading && reelQueue.length === 0;
   const showEmpty = !candidatesLoading && reelQueue.length === 0;
 
-  // Build YouTube embed URL — autoplay, no controls, loop
-  const embedUrl = currentReel
-    ? `https://www.youtube.com/embed/${currentReel.videoId}?autoplay=1&mute=0&controls=1&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=0`
-    : "";
-
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
       {/* Header */}
@@ -243,8 +255,8 @@ export default function ShortReels() {
             onTouchEnd={handleTouchEnd}
           />
 
-          {/* Loading overlay */}
-          {currentReel && !iframeLoaded && (
+          {/* Loading overlay — only if current reel not yet loaded */}
+          {currentReel && !loadedIds.has(currentReel.videoId) && (
             <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center bg-black">
               <img
                 src={`https://i.ytimg.com/vi/${currentReel.videoId}/hq720.jpg`}
@@ -285,21 +297,28 @@ export default function ShortReels() {
             </div>
           )}
 
-          {/* YouTube Embed iframe — simple & reliable */}
-          {currentReel && (
-            <iframe
-              key={currentReel.videoId}
-              src={embedUrl}
-              className="absolute inset-0 w-full h-full z-[3]"
-              style={{ border: "none" }}
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen={false}
-              onLoad={() => {
-                // Give a moment for the video to start rendering
-                setTimeout(() => setIframeLoaded(true), 1500);
-              }}
-            />
-          )}
+          {/* Preloaded iframes — current is visible, others hidden off-screen */}
+          {preloadReels.map((reel) => {
+            const isCurrent = reel.videoId === currentReel?.videoId;
+            const src = `https://www.youtube.com/embed/${reel.videoId}?autoplay=${isCurrent ? "1" : "0"}&mute=0&controls=1&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=0`;
+            return (
+              <iframe
+                key={reel.videoId}
+                src={src}
+                className="absolute w-full h-full z-[3]"
+                style={{
+                  border: "none",
+                  top: isCurrent ? 0 : "200vh",
+                  left: 0,
+                }}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen={false}
+                onLoad={() => {
+                  setTimeout(() => markLoaded(reel.videoId), 800);
+                }}
+              />
+            );
+          })}
 
           {/* YouTube logo cover */}
           <div
