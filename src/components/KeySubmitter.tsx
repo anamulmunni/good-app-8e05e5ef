@@ -177,8 +177,9 @@ export function KeySubmitter() {
       setHasLeftApp(false);
     } finally {
       setIsAutoSubmitting(false);
+      isAutoSubmittingRef.current = false;
     }
-  }, [user, isAutoSubmitting, refreshUser, queryClient, toast]);
+  }, [user, refreshUser, queryClient, toast]);
 
   // Auto-polling when activeKey is set
   useEffect(() => {
