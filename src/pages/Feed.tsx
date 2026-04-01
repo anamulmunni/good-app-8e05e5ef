@@ -687,19 +687,26 @@ export default function Feed() {
           )}
 
           {/* Image */}
-          {post.image_url && (
-            <div className="relative cursor-pointer" onClick={() => handleImageTap(post.id, post.image_url!)}>
-              <img src={post.image_url} alt="" className="w-full max-h-[500px] object-cover" />
-              <AnimatePresence>
-                {showLoveAnimation === post.id && (
-                  <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 1.5, opacity: 0 }} exit={{ opacity: 0 }}
-                    transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-7xl">❤️</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+          {post.image_url && (() => {
+            const imageUrls = post.image_url!.split(",").map(u => u.trim()).filter(Boolean);
+            return (
+              <div className={imageUrls.length === 1 ? "" : "grid grid-cols-2 gap-0.5"}>
+                {imageUrls.map((url, imgIdx) => (
+                  <div key={imgIdx} className="relative cursor-pointer" onClick={() => handleImageTap(post.id, url)}>
+                    <img src={url} alt="" className={`w-full object-cover ${imageUrls.length === 1 ? 'max-h-[500px]' : 'max-h-[250px]'}`} />
+                    <AnimatePresence>
+                      {showLoveAnimation === post.id && imgIdx === 0 && (
+                        <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 1.5, opacity: 0 }} exit={{ opacity: 0 }}
+                          transition={{ duration: 0.8 }} className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <span className="text-7xl">❤️</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Video */}
           {post.video_url && (
