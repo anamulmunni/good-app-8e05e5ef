@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Pause } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 type ReelItem = {
@@ -67,11 +67,13 @@ export default function ShortReels() {
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
+  const [isPaused, setIsPaused] = useState(false);
 
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const touchStartTime = useRef(0);
   const swipeLocked = useRef(false);
+  const currentIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
@@ -184,24 +186,62 @@ export default function ShortReels() {
     if (swipeLocked.current) return;
     const deltaY = touchStartY.current - e.changedTouches[0].clientY;
     const deltaX = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
+    const elapsed = Date.now() - touchStartTime.current;
+
+    // Tap detection — small movement & short duration
+    if (Math.abs(deltaY) < 20 && deltaX < 20 && elapsed < 300) {
+      // Toggle play/pause via postMessage
+      if (currentIframeRef.current?.contentWindow) {
+        const cmd = isPaused ? "playVideo" : "pauseVideo";
+        currentIframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: "command", func: cmd, args: "" }), "*"
+        );
+        setIsPaused((p) => !p);
+      }
+      return;
+    }
 
     if (deltaX > Math.abs(deltaY)) return;
     if (Math.abs(deltaY) < 50) return;
 
     swipeLocked.current = true;
+    setIsPaused(false);
     if (deltaY > 0) moveToNext();
     else moveToPrev();
     setTimeout(() => { swipeLocked.current = false; }, 350);
-  }, [moveToNext, moveToPrev]);
+  }, [moveToNext, moveToPrev, isPaused]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (swipeLocked.current) return;
     if (Math.abs(e.deltaY) < 28) return;
     swipeLocked.current = true;
+    setIsPaused(false);
     if (e.deltaY > 0) moveToNext();
     else moveToPrev();
     setTimeout(() => { swipeLocked.current = false; }, 350);
   }, [moveToNext, moveToPrev]);
+
+  // Listen for YouTube postMessage events (video ended → auto next)
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (typeof e.data !== "string") return;
+      try {
+        const data = JSON.parse(e.data);
+        // YouTube sends info.playerState: 0 = ended
+        if (data?.event === "onStateChange" && data?.info === 0) {
+          setIsPaused(false);
+          moveToNext();
+        }
+      } catch {}
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [moveToNext]);
+
+  // Reset pause state on reel change
+  useEffect(() => {
+    setIsPaused(false);
+  }, [currentIndex]);
 
   if (isLoading || !user) return null;
 
@@ -297,13 +337,14 @@ export default function ShortReels() {
             </div>
           )}
 
-          {/* Preloaded iframes — current is visible, others hidden off-screen */}
+          {/* Preloaded iframes — current visible, others off-screen */}
           {preloadReels.map((reel) => {
             const isCurrent = reel.videoId === currentReel?.videoId;
-            const src = `https://www.youtube.com/embed/${reel.videoId}?autoplay=${isCurrent ? "1" : "0"}&mute=0&controls=1&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=0`;
+            const src = `https://www.youtube.com/embed/${reel.videoId}?autoplay=${isCurrent ? "1" : "0"}&mute=0&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=1&origin=${window.location.origin}`;
             return (
               <iframe
                 key={reel.videoId}
+                ref={isCurrent ? currentIframeRef : undefined}
                 src={src}
                 className="absolute w-full h-full z-[3]"
                 style={{
@@ -319,6 +360,22 @@ export default function ShortReels() {
               />
             );
           })}
+
+          {/* Pause indicator */}
+          <AnimatePresence>
+            {isPaused && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                className="absolute inset-0 z-[11] flex items-center justify-center pointer-events-none"
+              >
+                <div className="w-20 h-20 rounded-full bg-black/50 flex items-center justify-center">
+                  <Pause className="w-10 h-10 text-white fill-white" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* YouTube logo cover */}
           <div
