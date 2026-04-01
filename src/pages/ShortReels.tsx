@@ -208,11 +208,6 @@ export default function ShortReels() {
   const showLoading = candidatesLoading && reelQueue.length === 0;
   const showEmpty = !candidatesLoading && reelQueue.length === 0;
 
-  // Build YouTube embed URL — autoplay, no controls, loop
-  const embedUrl = currentReel
-    ? `https://www.youtube.com/embed/${currentReel.videoId}?autoplay=1&mute=0&controls=1&modestbranding=1&playsinline=1&rel=0&showinfo=0&iv_load_policy=3&fs=0&loop=0&enablejsapi=0`
-    : "";
-
   return (
     <div className="fixed inset-0 z-50 bg-black text-white">
       {/* Header */}
