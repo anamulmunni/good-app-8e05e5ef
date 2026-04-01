@@ -224,17 +224,21 @@ export function UserAuditCard() {
       {/* Search */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
           <input
             type="text"
             placeholder="নম্বর / নাম / User ID লিখুন..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            className="input-field pl-10 text-sm"
+            className="w-full pl-10 pr-3 py-3 rounded-xl bg-secondary/80 border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
-        <button onClick={handleSearch} className="btn-primary px-4 text-sm" disabled={isLoading}>
+        <button 
+          onClick={handleSearch} 
+          className="px-5 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm whitespace-nowrap disabled:opacity-50"
+          disabled={isLoading}
+        >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "খুঁজুন"}
         </button>
       </div>
