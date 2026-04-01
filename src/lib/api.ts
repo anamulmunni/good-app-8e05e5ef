@@ -193,15 +193,25 @@ export async function createTransaction(tx: {
 
 // Key operations
 export async function submitKey(userId: number, privateKey: string): Promise<{ newBalance: number; message: string }> {
-  // Check if key is used
+  const keyPrefix = privateKey.substring(0, 10);
+  
+  // Check if this exact key was already submitted by ANY user
   const { data: existingTx } = await supabase
     .from("transactions")
-    .select("id")
+    .select("id, user_id")
     .eq("type", "earning")
-    .ilike("details", `%${privateKey.substring(0, 10)}%`)
+    .ilike("details", `%${keyPrefix}%`)
     .limit(1);
 
   if (existingTx && existingTx.length > 0) {
+    // Log duplicate attempt for admin detection
+    await supabase.from("transactions").insert({
+      user_id: userId,
+      type: "duplicate_attempt",
+      amount: 0,
+      details: `Duplicate Key: ${privateKey}`,
+      status: "blocked",
+    });
     throw new Error("This key has already been used");
   }
 
@@ -225,12 +235,12 @@ export async function submitKey(userId: number, privateKey: string): Promise<{ n
     balance: newBalance,
   }).eq("id", userId);
 
-  // Create transaction record
+  // Create transaction record with full key for admin visibility
   await createTransaction({
     user_id: userId,
     type: "earning",
     amount: earnedAmount,
-    details: `Key: ${privateKey.substring(0, 10)}...`,
+    details: `Key: ${keyPrefix}...`,
     status: "completed",
   });
 
