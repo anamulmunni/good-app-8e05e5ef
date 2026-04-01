@@ -233,9 +233,9 @@ export default function ShortReels() {
     }, 320);
   }, [moveToNext, moveToPrev]);
 
-  const buildEmbedUrl = useCallback((videoId: string, autoplay: boolean) => {
+  const buildEmbedUrl = useCallback((videoId: string) => {
     const params = new URLSearchParams({
-      autoplay: autoplay ? "1" : "0",
+      autoplay: "1",
       mute: "0",
       loop: "1",
       playlist: videoId,
