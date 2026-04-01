@@ -227,7 +227,7 @@ export function UserAuditCard() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="ইউজারের নম্বর / Guest ID লিখুন..."
+            placeholder="নম্বর / নাম / User ID লিখুন..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
