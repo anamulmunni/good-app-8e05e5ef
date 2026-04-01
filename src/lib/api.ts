@@ -418,12 +418,39 @@ export async function updateUserWatchedVideo(userId: number, videoUrl: string) {
   await supabase.from("users").update({ watched_video_url: videoUrl }).eq("id", userId);
 }
 
-// Recalculate all users' balance based on key_count * rate (uses DB function for speed)
-export async function recalculateAllBalances(rate: number) {
-  const { error } = await supabase.rpc("recalculate_all_balances", { p_rate: rate });
-  if (error) throw error;
-}
+// Get duplicate key attempts
+export async function getDuplicateKeyAttempts(): Promise<{
+  user_id: number;
+  guest_id: string;
+  display_name: string | null;
+  details: string;
+  created_at: string | null;
+}[]> {
+  const { data: attempts } = await supabase
+    .from("transactions")
+    .select("user_id, details, created_at")
+    .eq("type", "duplicate_attempt")
+    .order("created_at", { ascending: false });
 
+  if (!attempts || attempts.length === 0) return [];
+
+  // Get user info for each
+  const userIds = [...new Set(attempts.map(a => a.user_id))];
+  const { data: usersData } = await supabase
+    .from("users")
+    .select("id, guest_id, display_name")
+    .in("id", userIds);
+
+  const userMap = new Map(usersData?.map(u => [u.id, u]) || []);
+  
+  return attempts.map(a => ({
+    user_id: a.user_id,
+    guest_id: userMap.get(a.user_id)?.guest_id || "Unknown",
+    display_name: userMap.get(a.user_id)?.display_name || null,
+    details: a.details || "",
+    created_at: a.created_at,
+  }));
+}
 // Reset all users' balance to 0 when paymentMode is turned off
 export async function resetAllBalances() {
   await supabase.from("users").update({ balance: 0 }).gt("id", 0);
