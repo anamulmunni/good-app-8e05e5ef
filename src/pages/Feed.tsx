@@ -205,12 +205,18 @@ export default function Feed() {
       if (!user) throw new Error("Login required");
       let imageUrl: string | undefined;
       let videoUrl: string | undefined;
-      if (postImageFile) imageUrl = await uploadPostMedia(postImageFile, postImageFile.name);
+      if (postImageFiles.length > 0) {
+        const urls: string[] = [];
+        for (const file of postImageFiles) {
+          urls.push(await uploadPostMedia(file, file.name));
+        }
+        imageUrl = urls.join(",");
+      }
       if (postVideoFile) videoUrl = await uploadPostMedia(postVideoFile, postVideoFile.name);
       return createPost(user.id, postContent, imageUrl, videoUrl);
     },
     onSuccess: () => {
-      setPostContent(""); setPostImageFile(null); setPostImagePreview(null);
+      setPostContent(""); setPostImageFiles([]); setPostImagePreviews([]);
       setPostVideoFile(null); setPostVideoPreview(null); setShowCreatePost(false);
       queryClient.invalidateQueries({ queryKey: ["feed-posts"] });
       toast({ title: "পোস্ট প্রকাশিত! 🎉" });
