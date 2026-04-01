@@ -9,6 +9,7 @@ import {
   updateTransactionStatus, updateSetting, deletePoolKey, deleteUsedKeys, deleteAllPoolKeys,
   addSubmittedNumbers, deleteSubmittedNumber, clearAllSubmittedNumbers,
   addResetHistory, recalculateAllBalances, resetAllBalances,
+  getDuplicateKeyAttempts,
 } from "@/lib/api";
 import {
   getUserRequestSubmissions,
