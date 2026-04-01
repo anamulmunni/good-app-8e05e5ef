@@ -252,10 +252,6 @@ export default function AdminPanel() {
     mutationFn: (id: number) => deletePoolKey(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pool"] }); toast({ title: "কি ডিলিট হয়েছে" }); },
   });
-  const deleteUsedKeysMutation = useMutation({
-    mutationFn: deleteUsedKeys,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pool"] }); toast({ title: "সব Used Key ডিলিট হয়েছে" }); },
-  });
   const deleteAllKeysMutation = useMutation({
     mutationFn: deleteAllPoolKeys,
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pool"] }); toast({ title: "সব Key ডিলিট হয়েছে" }); },
