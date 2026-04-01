@@ -110,12 +110,28 @@ export default function Login() {
 
     const tryLogin = async (attempt: number): Promise<void> => {
       try {
+        // Check if user is blocked BEFORE attempting login
+        const { data: userData } = await supabase
+          .from("users")
+          .select("is_blocked, guest_id")
+          .eq("guest_id", normalizedPhone)
+          .maybeSingle();
+
+        if (userData?.is_blocked) {
+          toast({
+            title: "🚫 অ্যাকাউন্ট ব্লক করা হয়েছে",
+            description: "আপনার অ্যাকাউন্টটি ব্লক করা হয়েছে। কারণ: এই ডিভাইস থেকে একাধিক অ্যাকাউন্ট তৈরি করা হয়েছে অথবা নিয়ম লঙ্ঘন করা হয়েছে। একটি ডিভাইসে শুধুমাত্র একটি অ্যাকাউন্ট অনুমোদিত। সমস্যা সমাধানের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const fakeEmail = `${normalizedPhone}@goodapp.local`;
         let { error } = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
         if (error && error.message === "Invalid login credentials") {
-          const { data: userData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
-          if (userData?.email && userData.email !== fakeEmail) {
-            const retryResult = await supabase.auth.signInWithPassword({ email: userData.email, password });
+          const { data: emailData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
+          if (emailData?.email && emailData.email !== fakeEmail) {
+            const retryResult = await supabase.auth.signInWithPassword({ email: emailData.email, password });
             error = retryResult.error;
           }
         }
