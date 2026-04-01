@@ -35,12 +35,50 @@ type AuditData = {
 };
 
 async function fetchUserAudit(guestId: string): Promise<AuditData | null> {
-  // Fetch user
-  const { data: userData, error: userError } = await supabase
+  const searchTerm = guestId.trim();
+  
+  // Try exact guest_id match first
+  let { data: userData, error: userError } = await supabase
     .from("users")
     .select("*")
-    .eq("guest_id", guestId)
+    .eq("guest_id", searchTerm)
     .maybeSingle();
+
+  // If not found, try numeric ID match
+  if (!userData && /^\d+$/.test(searchTerm)) {
+    const numId = parseInt(searchTerm);
+    const { data: byId, error: byIdErr } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", numId)
+      .maybeSingle();
+    if (byIdErr) throw byIdErr;
+    userData = byId;
+  }
+
+  // If still not found, try partial guest_id match
+  if (!userData) {
+    const { data: partial, error: partialErr } = await supabase
+      .from("users")
+      .select("*")
+      .ilike("guest_id", `%${searchTerm}%`)
+      .limit(1)
+      .maybeSingle();
+    if (partialErr) throw partialErr;
+    userData = partial;
+  }
+
+  // If still not found, try display_name match
+  if (!userData) {
+    const { data: byName, error: nameErr } = await supabase
+      .from("users")
+      .select("*")
+      .ilike("display_name", `%${searchTerm}%`)
+      .limit(1)
+      .maybeSingle();
+    if (nameErr) throw nameErr;
+    userData = byName;
+  }
 
   if (userError) throw userError;
   if (!userData) return null;
