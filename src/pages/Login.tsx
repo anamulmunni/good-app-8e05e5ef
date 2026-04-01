@@ -156,13 +156,6 @@ export default function Login() {
       const { data: existingUser } = await supabase.from("users").select("id").eq("guest_id", normalizedPhone).maybeSingle();
       if (existingUser) throw new Error("এই ফোন নম্বর দিয়ে আগেই অ্যাকাউন্ট তৈরি হয়েছে");
 
-      const deviceAccounts = getDeviceAccounts();
-      if (deviceAccounts.length > 0) {
-        for (const oldGuestId of deviceAccounts) {
-          await supabase.from("users").update({ is_blocked: true }).eq("guest_id", oldGuestId);
-        }
-      }
-
       const fakeEmail = `${normalizedPhone}@goodapp.local`;
       const { error } = await supabase.auth.signUp({
         email: fakeEmail,
@@ -173,11 +166,9 @@ export default function Login() {
         if (error.message.includes("already registered")) throw new Error("এই ফোন নম্বর দিয়ে আগেই অ্যাকাউন্ট তৈরি হয়েছে");
         throw error;
       }
-      addDeviceAccount(normalizedPhone);
       toast({
-        title: deviceAccounts.length > 0 ? "⚠️ সতর্কতা!" : "রেজিস্ট্রেশন সফল!",
-        description: deviceAccounts.length > 0 ? "এই ডিভাইসে আগের অ্যাকাউন্ট ব্লক করা হয়েছে।" : "আপনার অ্যাকাউন্ট তৈরি হয়েছে।",
-        variant: deviceAccounts.length > 0 ? "destructive" : "default",
+        title: "রেজিস্ট্রেশন সফল!",
+        description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।",
       });
       navigate("/dashboard");
     } catch (err: unknown) {
