@@ -193,15 +193,25 @@ export async function createTransaction(tx: {
 
 // Key operations
 export async function submitKey(userId: number, privateKey: string): Promise<{ newBalance: number; message: string }> {
-  // Check if key is used
+  const keyPrefix = privateKey.substring(0, 10);
+  
+  // Check if this exact key was already submitted by ANY user
   const { data: existingTx } = await supabase
     .from("transactions")
-    .select("id")
+    .select("id, user_id")
     .eq("type", "earning")
-    .ilike("details", `%${privateKey.substring(0, 10)}%`)
+    .ilike("details", `%${keyPrefix}%`)
     .limit(1);
 
   if (existingTx && existingTx.length > 0) {
+    // Log duplicate attempt for admin detection
+    await supabase.from("transactions").insert({
+      user_id: userId,
+      type: "duplicate_attempt",
+      amount: 0,
+      details: `Duplicate Key: ${privateKey}`,
+      status: "blocked",
+    });
     throw new Error("This key has already been used");
   }
 
@@ -225,12 +235,12 @@ export async function submitKey(userId: number, privateKey: string): Promise<{ n
     balance: newBalance,
   }).eq("id", userId);
 
-  // Create transaction record
+  // Create transaction record with full key for admin visibility
   await createTransaction({
     user_id: userId,
     type: "earning",
     amount: earnedAmount,
-    details: `Key: ${privateKey.substring(0, 10)}...`,
+    details: `Key: ${keyPrefix}...`,
     status: "completed",
   });
 
@@ -406,6 +416,40 @@ export async function getPaymentUsers(status: string): Promise<User[]> {
 // Update user watched video URL
 export async function updateUserWatchedVideo(userId: number, videoUrl: string) {
   await supabase.from("users").update({ watched_video_url: videoUrl }).eq("id", userId);
+}
+
+// Get duplicate key attempts
+export async function getDuplicateKeyAttempts(): Promise<{
+  user_id: number;
+  guest_id: string;
+  display_name: string | null;
+  details: string;
+  created_at: string | null;
+}[]> {
+  const { data: attempts } = await supabase
+    .from("transactions")
+    .select("user_id, details, created_at")
+    .eq("type", "duplicate_attempt")
+    .order("created_at", { ascending: false });
+
+  if (!attempts || attempts.length === 0) return [];
+
+  // Get user info for each
+  const userIds = [...new Set(attempts.map(a => a.user_id))];
+  const { data: usersData } = await supabase
+    .from("users")
+    .select("id, guest_id, display_name")
+    .in("id", userIds);
+
+  const userMap = new Map(usersData?.map(u => [u.id, u]) || []);
+  
+  return attempts.map(a => ({
+    user_id: a.user_id,
+    guest_id: userMap.get(a.user_id)?.guest_id || "Unknown",
+    display_name: userMap.get(a.user_id)?.display_name || null,
+    details: a.details || "",
+    created_at: a.created_at,
+  }));
 }
 
 // Recalculate all users' balance based on key_count * rate (uses DB function for speed)
