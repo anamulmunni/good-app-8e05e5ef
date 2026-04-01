@@ -462,7 +462,8 @@ export function KeySubmitter() {
                 ) : null}
               </motion.div>
 
-              <button
+              {/* Premium "আবার শুরু করুন" Button */}
+              <motion.button
                 onClick={() => {
                   if (pollingRef.current) clearInterval(pollingRef.current);
                   setActiveKey(null);
@@ -470,10 +471,46 @@ export function KeySubmitter() {
                   setIsAutoChecking(false);
                   setCheckCount(0);
                 }}
-                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
+                whileHover={{ scale: 1.04, y: -3 }}
+                whileTap={{ scale: 0.96 }}
+                className="w-full relative py-5 rounded-2xl font-black text-lg overflow-hidden shadow-2xl mt-2"
               >
-                🔄 আবার শুরু করুন
-              </button>
+                {/* Animated neon gradient background */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--emerald))] via-[hsl(var(--cyan))] to-[hsl(var(--blue))]"
+                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                  style={{ backgroundSize: "300% 100%" }}
+                />
+                {/* Shimmering light sweep */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  animate={{ x: ["-100%", "250%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1.2, ease: "easeInOut" }}
+                />
+                {/* Glowing border */}
+                <div className="absolute inset-0 rounded-2xl border-2 border-white/30" />
+                {/* Bottom glow */}
+                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-4/5 h-10 bg-[hsl(var(--cyan))] blur-2xl opacity-50" />
+                {/* Top highlight line */}
+                <div className="absolute top-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+                
+                <span className="relative z-10 flex items-center justify-center gap-3 text-primary-foreground drop-shadow-lg">
+                  <motion.div
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Sparkles className="w-6 h-6" />
+                  </motion.div>
+                  <span>🔄 আবার শুরু করুন</span>
+                  <motion.div
+                    animate={{ x: [0, 6, 0] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                  </motion.div>
+                </span>
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>
