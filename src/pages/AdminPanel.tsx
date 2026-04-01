@@ -964,6 +964,11 @@ export default function AdminPanel() {
           </div>
         </Section>
 
+        {/* User Audit */}
+        <Section icon={FileText} title="ইউজার অডিট রিপোর্ট" color="purple">
+          <UserAuditCard />
+        </Section>
+
         {/* ═══════════════════════════════════════ */}
         {/* ⚙️ SECTION 4: সেটিংস ও ম্যানেজমেন্ট */}
         {/* ═══════════════════════════════════════ */}
