@@ -9,8 +9,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { getPublicSettings } from "@/lib/api";
 
-const DEVICE_ACCOUNTS_KEY = "goodapp_device_accounts";
-
 function mapAuthErrorToBnMessage(input: unknown, fallback = "সার্ভার সমস্যার কারণে এখন লগইন/রেজিস্ট্রেশন হচ্ছে না, কিছুক্ষণ পর আবার চেষ্টা করুন") {
   const raw = String(
     (input as any)?.message ||
