@@ -66,12 +66,12 @@ export default function ShortReels() {
   const [fetchBatch, setFetchBatch] = useState(0);
   const [reelQueue, setReelQueue] = useState<ReelItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
 
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const touchStartTime = useRef(0);
   const swipeLocked = useRef(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) navigate("/");
