@@ -1126,51 +1126,59 @@ export default function AdminPanel() {
         </a>
 
         {/* Duplicate Key Detection */}
-        {duplicateAttempts.length > 0 && (
-          <Section icon={AlertCircle} title="ডুপ্লিকেট কী সনাক্ত" count={duplicateAttempts.length} color="pink" defaultOpen={true}>
-            <div className="mt-4 space-y-3">
-              <p className="text-xs text-destructive font-bold">⚠️ এই ইউজাররা ডুপ্লিকেট কী সাবমিট করার চেষ্টা করেছে (সিস্টেম ব্লক করেছে):</p>
-              {(() => {
-                // Group by user
-                const byUser = new Map<string, { guest_id: string; display_name: string | null; user_id: number; attempts: { details: string; created_at: string | null }[] }>();
-                duplicateAttempts.forEach(a => {
-                  const key = a.guest_id;
-                  if (!byUser.has(key)) byUser.set(key, { guest_id: a.guest_id, display_name: a.display_name, user_id: a.user_id, attempts: [] });
-                  byUser.get(key)!.attempts.push({ details: a.details, created_at: a.created_at });
-                });
-                return Array.from(byUser.values()).map(u => (
-                  <div key={u.guest_id} className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-bold">{u.display_name || "Unknown"}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-mono text-foreground/80">{u.guest_id}</p>
-                          <button onClick={() => { navigator.clipboard.writeText(u.guest_id); toast({ title: "কপি হয়েছে" }); }}
-                            className="text-muted-foreground hover:text-foreground"><Copy className="w-3 h-3" /></button>
+        <Section icon={AlertCircle} title="ডুপ্লিকেট কী সনাক্ত" count={duplicateAttempts.length} color="pink" defaultOpen={duplicateAttempts.length > 0}>
+          <div className="mt-4 space-y-3">
+            {duplicateAttempts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">কোনো ডুপ্লিকেট প্রচেষ্টা নেই</p>
+            ) : (
+              <>
+                <p className="text-xs text-destructive font-bold">⚠️ এই ইউজাররা ডুপ্লিকেট কী সাবমিট করার চেষ্টা করেছে (সিস্টেম ব্লক করেছে):</p>
+                {(() => {
+                  const byUser = new Map<string, { guest_id: string; display_name: string | null; user_id: number; attempts: { details: string; created_at: string | null }[] }>();
+                  duplicateAttempts.forEach(a => {
+                    const key = a.guest_id;
+                    if (!byUser.has(key)) byUser.set(key, { guest_id: a.guest_id, display_name: a.display_name, user_id: a.user_id, attempts: [] });
+                    byUser.get(key)!.attempts.push({ details: a.details, created_at: a.created_at });
+                  });
+                  return Array.from(byUser.values()).map(u => (
+                    <div key={u.guest_id} className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <a href={`/user/${u.user_id}`} className="text-sm font-bold text-primary hover:underline">{u.display_name || "Unknown"}</a>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-mono text-foreground/80">{u.guest_id}</p>
+                            <button onClick={() => { navigator.clipboard.writeText(u.guest_id); toast({ title: "কপি হয়েছে" }); }}
+                              className="text-muted-foreground hover:text-foreground"><Copy className="w-3 h-3" /></button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">User ID: {u.user_id}</p>
                         </div>
+                        <span className="bg-destructive/20 text-destructive text-xs font-bold px-2.5 py-1.5 rounded-lg">
+                          {u.attempts.length} বার
+                        </span>
                       </div>
-                      <span className="bg-destructive/20 text-destructive text-xs font-bold px-2.5 py-1.5 rounded-lg">
-                        {u.attempts.length} বার
-                      </span>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {u.attempts.map((a, i) => (
+                          <div key={i} className="bg-background/50 rounded-lg p-2 space-y-1">
+                            <div className="flex items-center gap-1">
+                              <p className="text-[10px] font-mono text-foreground/70 break-all flex-1">
+                                {a.details?.replace("Duplicate Key: ", "")}
+                              </p>
+                              <button onClick={() => { navigator.clipboard.writeText(a.details?.replace("Duplicate Key: ", "") || ""); toast({ title: "কপি হয়েছে" }); }}
+                                className="text-muted-foreground hover:text-foreground shrink-0"><Copy className="w-3 h-3" /></button>
+                            </div>
+                            <p className="text-[9px] text-muted-foreground">
+                              {a.created_at ? new Date(a.created_at).toLocaleString("bn-BD") : ""}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                      {u.attempts.map((a, i) => (
-                        <div key={i} className="bg-background/50 rounded-lg p-2 space-y-1">
-                          <p className="text-[10px] font-mono text-foreground/70 break-all">
-                            {a.details?.replace("Duplicate Key: ", "")}
-                          </p>
-                          <p className="text-[9px] text-muted-foreground">
-                            {a.created_at ? new Date(a.created_at).toLocaleString("bn-BD") : ""}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
-          </Section>
-        )}
+                  ));
+                })()}
+              </>
+            )}
+          </div>
+        </Section>
 
 
         {/* Bulk Key Import */}
