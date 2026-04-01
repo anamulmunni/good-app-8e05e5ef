@@ -110,12 +110,28 @@ export default function Login() {
 
     const tryLogin = async (attempt: number): Promise<void> => {
       try {
+        // Check if user is blocked BEFORE attempting login
+        const { data: userData } = await supabase
+          .from("users")
+          .select("is_blocked, guest_id")
+          .eq("guest_id", normalizedPhone)
+          .maybeSingle();
+
+        if (userData?.is_blocked) {
+          toast({
+            title: "🚫 অ্যাকাউন্ট ব্লক করা হয়েছে",
+            description: "আপনার অ্যাকাউন্টটি ব্লক করা হয়েছে। কারণ: এই ডিভাইস থেকে একাধিক অ্যাকাউন্ট তৈরি করা হয়েছে অথবা নিয়ম লঙ্ঘন করা হয়েছে। একটি ডিভাইসে শুধুমাত্র একটি অ্যাকাউন্ট অনুমোদিত। সমস্যা সমাধানের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const fakeEmail = `${normalizedPhone}@goodapp.local`;
         let { error } = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
         if (error && error.message === "Invalid login credentials") {
-          const { data: userData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
-          if (userData?.email && userData.email !== fakeEmail) {
-            const retryResult = await supabase.auth.signInWithPassword({ email: userData.email, password });
+          const { data: emailData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
+          if (emailData?.email && emailData.email !== fakeEmail) {
+            const retryResult = await supabase.auth.signInWithPassword({ email: emailData.email, password });
             error = retryResult.error;
           }
         }
@@ -295,6 +311,23 @@ export default function Login() {
               </motion.span>
             </motion.button>
           ))}
+        </motion.div>
+
+        {/* ⚠️ Single Account Notice */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.25 }}
+          className="mb-3 rounded-2xl border border-amber-500/30 px-4 py-3"
+          style={{ background: "linear-gradient(135deg, hsl(45 90% 50% / 0.08), hsl(30 90% 45% / 0.05))" }}
+        >
+          <div className="flex items-start gap-2.5">
+            <span className="text-lg mt-0.5">⚠️</span>
+            <div className="text-[11.5px] leading-relaxed text-amber-200/90 font-medium">
+              <p className="font-bold text-amber-300 text-xs mb-1">গুরুত্বপূর্ণ নোটিশ:</p>
+              <p>একজন ইউজার শুধুমাত্র <span className="text-amber-300 font-bold">একটি অ্যাকাউন্ট</span> ব্যবহার করতে পারবে। একটি অ্যাকাউন্ট দিয়েই আনলিমিটেড ভেরিফাইড করতে পারবেন। একাধিক অ্যাকাউন্ট তৈরি করলে আগের সকল অ্যাকাউন্ট <span className="text-red-400 font-bold">স্থায়ীভাবে ব্যান</span> হয়ে যাবে।</p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Form Card */}
