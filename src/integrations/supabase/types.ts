@@ -947,28 +947,17 @@ export type Database = {
         Returns: boolean
       }
       recalculate_all_balances: { Args: { p_rate: number }; Returns: undefined }
-      submit_user_request_batch:
-        | {
-            Args: {
-              p_password: string
-              p_submitter_name: string
-              p_submitter_payment_method?: string
-              p_submitter_payment_number?: string
-              p_target_guest_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_password: string
-              p_submitter_name: string
-              p_submitter_payment_method?: string
-              p_submitter_payment_number?: string
-              p_submitter_rate?: number
-              p_target_guest_id: string
-            }
-            Returns: string
-          }
+      submit_user_request_batch: {
+        Args: {
+          p_password: string
+          p_submitter_name: string
+          p_submitter_payment_method?: string
+          p_submitter_payment_number?: string
+          p_submitter_rate?: number
+          p_target_guest_id: string
+        }
+        Returns: string
+      }
       sync_user_request_submission_count: {
         Args: { p_batch_id: string }
         Returns: undefined

@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.submit_user_request_batch(text, text, text, text, text);
