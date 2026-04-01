@@ -182,11 +182,13 @@ export default function Feed() {
     enabled: searchQuery.length >= 2,
   });
 
+  // Only load reactions for currently visible posts (not all 1000)
   useEffect(() => {
-    if (user && allPosts.length > 0) {
-      getUserReactions(user.id, allPosts.map(p => p.id)).then(setUserReactions);
+    if (user && posts.length > 0) {
+      const visibleIds = posts.map(p => p.id);
+      getUserReactions(user.id, visibleIds).then(setUserReactions);
     }
-  }, [user, allPosts]);
+  }, [user, posts.length]);
 
   useEffect(() => {
     const channel = supabase.channel("feed-realtime")
