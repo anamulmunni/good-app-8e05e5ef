@@ -33,21 +33,6 @@ function mapAuthErrorToBnMessage(input: unknown, fallback = "সার্ভা�
   return (input as any)?.message || fallback;
 }
 
-function getDeviceAccounts(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(DEVICE_ACCOUNTS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function addDeviceAccount(guestId: string) {
-  const accounts = getDeviceAccounts();
-  if (!accounts.includes(guestId)) {
-    accounts.push(guestId);
-    localStorage.setItem(DEVICE_ACCOUNTS_KEY, JSON.stringify(accounts));
-  }
-}
 
 const FEATURES = [
   { icon: MessageCircle, title: "মেসেঞ্জার", desc: "বন্ধুদের সাথে ফ্রি চ্যাট, ইমোজি, থিম কাস্টমাইজ করুন" },
