@@ -1421,7 +1421,7 @@ export default function Feed() {
                 </button>
                 <h2 className="font-bold text-base text-gray-900 dark:text-foreground">পোস্ট তৈরি করুন</h2>
                 <button onClick={() => createPostMutation.mutate()}
-                  disabled={createPostMutation.isPending || (!postContent.trim() && !postImageFile && !postVideoFile)}
+                  disabled={createPostMutation.isPending || (!postContent.trim() && postImageFiles.length === 0 && !postVideoFile)}
                   className="px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm font-bold disabled:opacity-40">
                   {createPostMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "পোস্ট"}
                 </button>
