@@ -1228,16 +1228,10 @@ export default function AdminPanel() {
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => { navigator.clipboard.writeText(pool?.map(i => i.private_key).join("\n") || ""); toast({ title: "সব Key কপি হয়েছে" }); }}
-                    className="btn-primary bg-[hsl(var(--emerald))] text-xs py-2"><Copy className="w-3 h-3" /> কপি ({pool?.length || 0})</button>
-                  {pool?.some(p => p.is_used) && (
-                    <button onClick={() => deleteUsedKeysMutation.mutate()} disabled={deleteUsedKeysMutation.isPending}
-                      className="btn-primary bg-destructive text-xs py-2">
-                      {deleteUsedKeysMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Trash2 className="w-3 h-3" /> Used ডিলিট ({pool?.filter(p => p.is_used).length})</>}
-                    </button>
-                  )}
+                    className="btn-primary bg-[hsl(var(--emerald))] text-xs py-2"><Copy className="w-3 h-3" /> সব কপি ({pool?.length || 0})</button>
                   {pool && pool.length > 0 && (
                     <button onClick={() => { if (confirm("সত্যিই সব Key ডিলিট করতে চান?")) deleteAllKeysMutation.mutate(); }} disabled={deleteAllKeysMutation.isPending}
-                      className="btn-primary bg-destructive/80 text-xs py-2">
+                      className="btn-primary bg-destructive text-xs py-2">
                       {deleteAllKeysMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Trash2 className="w-3 h-3" /> সব ডিলিট ({pool?.length})</>}
                     </button>
                   )}
@@ -1246,16 +1240,14 @@ export default function AdminPanel() {
                   {pool?.map(item => (
                     <div key={item.id} className="flex items-center justify-between p-2.5 bg-secondary/50 rounded-xl border border-border">
                       <div className="flex-1 truncate mr-3">
-                        <p className="text-xs font-mono truncate">{item.private_key}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-[10px] text-muted-foreground truncate">{item.verify_url}</p>
-                          {item.added_by !== "Unknown" && <span className="text-[9px] bg-[hsl(var(--blue))]/20 text-[hsl(var(--blue))] px-1.5 py-0.5 rounded font-bold shrink-0">{item.added_by}</span>}
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-mono truncate">{item.private_key}</p>
+                          <button onClick={() => { navigator.clipboard.writeText(item.private_key); toast({ title: "কপি হয়েছে" }); }}
+                            className="text-muted-foreground hover:text-foreground shrink-0"><Copy className="w-3 h-3" /></button>
                         </div>
+                        {item.added_by !== "Unknown" && <span className="text-[9px] bg-[hsl(var(--blue))]/20 text-[hsl(var(--blue))] px-1.5 py-0.5 rounded font-bold mt-0.5 inline-block">{item.added_by}</span>}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${item.is_used ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary"}`}>{item.is_used ? "USED" : "READY"}</span>
-                        <button onClick={() => deletePoolMutation.mutate(item.id)} className="text-destructive hover:bg-destructive/10 p-1 rounded"><XCircle className="w-3.5 h-3.5" /></button>
-                      </div>
+                      <button onClick={() => deletePoolMutation.mutate(item.id)} className="text-destructive hover:bg-destructive/10 p-1 rounded shrink-0"><XCircle className="w-3.5 h-3.5" /></button>
                     </div>
                   ))}
                 </div>
