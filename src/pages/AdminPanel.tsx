@@ -536,7 +536,7 @@ export default function AdminPanel() {
                     <div>
                       <p className="font-black text-2xl text-[hsl(var(--orange))]">{w.amount} TK</p>
                       <p className="text-sm text-muted-foreground">{w.details}</p>
-                      {wxUser && <p className="text-xs text-muted-foreground mt-1">User: <span className="font-mono font-bold text-foreground">{wxUser.guest_id}</span> ({wxUser.display_name})</p>}
+                      {wxUser && <p className="text-xs text-muted-foreground mt-1">User: <span className="font-mono font-bold text-foreground">ID: {wxUser.id}</span> ({wxUser.display_name || wxUser.guest_id})</p>}
                       <p className="text-[10px] text-muted-foreground">{new Date(w.created_at || "").toLocaleString("bn-BD")}</p>
                     </div>
                   </div>
