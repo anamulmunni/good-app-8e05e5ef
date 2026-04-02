@@ -193,25 +193,26 @@ export async function createTransaction(tx: {
 
 // Key operations
 export async function submitKey(userId: number, privateKey: string): Promise<{ newBalance: number; message: string }> {
-  // Use longer prefix (20 chars) for more accurate duplicate detection
-  const keyPrefix = privateKey.substring(0, 20);
-  
-  // Check if this exact key was already submitted by ANY user
-  // Use exact prefix match to avoid false positives from substring matching
-  const { data: existingTx } = await supabase
-    .from("transactions")
-    .select("id, user_id")
-    .eq("type", "earning")
-    .like("details", `Key: ${keyPrefix}%`)
+  const normalizedPrivateKey = privateKey.trim();
+  const keyPrefix = normalizedPrivateKey.substring(0, 20);
+
+  // Check if this exact key was already used before
+  const { data: existingUsedKey, error: duplicateCheckError } = await supabase
+    .from("verification_pool")
+    .select("id")
+    .eq("private_key", normalizedPrivateKey)
+    .eq("is_used", true)
     .limit(1);
 
-  if (existingTx && existingTx.length > 0) {
+  if (duplicateCheckError) throw duplicateCheckError;
+
+  if (existingUsedKey && existingUsedKey.length > 0) {
     // Log duplicate attempt for admin detection
     await supabase.from("transactions").insert({
       user_id: userId,
       type: "duplicate_attempt",
       amount: 0,
-      details: `Duplicate Key: ${privateKey}`,
+      details: `Duplicate Key: ${normalizedPrivateKey}`,
       status: "blocked",
     });
     throw new Error("This key has already been used");
