@@ -942,8 +942,8 @@ export default function AdminPanel() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="font-mono text-sm font-bold">{item.phone_number}</span>
-                          {matchedUser?.display_name && <span className="text-xs text-muted-foreground ml-2">({matchedUser.display_name})</span>}
+                          <span className="font-mono text-sm font-bold">ID: {matchedUser?.id || "?"} ({item.phone_number})</span>
+                          {matchedUser?.display_name && <span className="text-xs text-muted-foreground ml-2">{matchedUser.display_name}</span>}
                         </div>
                         <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{item.verified_count} টা</span>
                       </div>
