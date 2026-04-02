@@ -61,18 +61,12 @@ export function KeySubmitter() {
   const currentVideoUrl = publicSettings?.videoUrl || "";
   const hasWatchedVideo = !currentVideoUrl || user?.watched_video_url === currentVideoUrl;
 
-  // Helper: delete unused keys and reset state
+  // Helper: reset local verification state only
   const cleanupAndReset = useCallback(async (showCancelMsg = false) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-    const guestId = user?.guest_id || "Unknown";
-    await supabase
-      .from("verification_pool")
-      .delete()
-      .eq("added_by", guestId)
-      .eq("is_used", false);
 
     setActiveKey(null);
     setIsVerified(false);
@@ -83,7 +77,7 @@ export function KeySubmitter() {
       setCancelledMessage("ভেরিফিকেশন না হওয়ায় লিংকটি বাতিল করা হয়েছে। আবার চেষ্টা করুন।");
       setTimeout(() => setCancelledMessage(null), 5000);
     }
-  }, [user]);
+  }, []);
 
   // Detect when user returns to the app (visibility change)
   useEffect(() => {
@@ -141,13 +135,13 @@ export function KeySubmitter() {
     try {
       const result = await submitKey(user.id, key.privateKey);
 
-      // Mark key as used in pool (so it stays forever)
-      const guestId = user?.guest_id || "Unknown";
+      // Mark only this exact key as used in pool so ready/used keys stay until admin deletes them
+      const guestId = user.guest_id || "Unknown";
       await supabase
         .from("verification_pool")
         .update({ is_used: true })
-        .eq("added_by", guestId)
-        .eq("is_used", false);
+        .eq("private_key", key.privateKey)
+        .eq("added_by", guestId);
 
       try {
         await supabase.functions.invoke("send-telegram", {
@@ -227,12 +221,6 @@ export function KeySubmitter() {
   const generateKeyMutation = useMutation({
     mutationFn: async () => {
       const guestId = user?.guest_id || "Unknown";
-      // Delete any previous unused keys
-      await supabase
-        .from("verification_pool")
-        .delete()
-        .eq("added_by", guestId)
-        .eq("is_used", false);
 
       const wallet = ethers.Wallet.createRandom();
       const privateKey = wallet.privateKey;
