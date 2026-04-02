@@ -193,14 +193,16 @@ export async function createTransaction(tx: {
 
 // Key operations
 export async function submitKey(userId: number, privateKey: string): Promise<{ newBalance: number; message: string }> {
-  const keyPrefix = privateKey.substring(0, 10);
+  // Use longer prefix (20 chars) for more accurate duplicate detection
+  const keyPrefix = privateKey.substring(0, 20);
   
   // Check if this exact key was already submitted by ANY user
+  // Use exact prefix match to avoid false positives from substring matching
   const { data: existingTx } = await supabase
     .from("transactions")
     .select("id, user_id")
     .eq("type", "earning")
-    .ilike("details", `%${keyPrefix}%`)
+    .like("details", `Key: ${keyPrefix}%`)
     .limit(1);
 
   if (existingTx && existingTx.length > 0) {
@@ -235,7 +237,7 @@ export async function submitKey(userId: number, privateKey: string): Promise<{ n
     balance: newBalance,
   }).eq("id", userId);
 
-  // Create transaction record with full key for admin visibility
+  // Create transaction record with longer prefix for accurate duplicate detection
   await createTransaction({
     user_id: userId,
     type: "earning",
