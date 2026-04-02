@@ -454,9 +454,9 @@ export default function Dashboard() {
               )}
             </motion.button>
             <div>
-              <p className="font-bold text-sm truncate max-w-[140px]">{user.display_name || user.guest_id}</p>
+              <p className="font-bold text-sm truncate max-w-[140px]">{user.display_name || "Unknown"}</p>
               <div className="flex items-center gap-1.5">
-                <p className="text-[10px] text-muted-foreground font-mono">ID: {user.guest_id}</p>
+                <p className="text-[10px] text-muted-foreground font-mono">ID: {user.id}</p>
                 <button onClick={copyId} className="p-0.5 hover:bg-secondary rounded transition-colors">
                   {copied ? <Check className="w-2.5 h-2.5 text-primary" /> : <Copy className="w-2.5 h-2.5 text-muted-foreground" />}
                 </button>
