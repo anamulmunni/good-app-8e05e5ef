@@ -630,8 +630,8 @@ export default function AdminPanel() {
               <p className="text-sm font-bold">রিকুয়েস্ট পাঠানো নম্বর দিয়ে Cancel করুন</p>
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input type="text" value={requesterRequestSearch} onChange={(e) => setRequesterRequestSearch(e.target.value)}
-                  placeholder="01XXXXXXXXX" className="input-field pl-10 text-sm" />
+                 <input type="text" value={requesterRequestSearch} onChange={(e) => setRequesterRequestSearch(e.target.value)}
+                  placeholder="User ID / ফোন নম্বর" className="input-field pl-10 text-sm" />
               </div>
               {trimmedRequesterSearch && (
                 <div className="space-y-2">
