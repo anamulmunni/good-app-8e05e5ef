@@ -106,7 +106,7 @@ async function fetchUserAudit(guestId: string): Promise<AuditData | null> {
   const { data: resets, error: resetsError } = await supabase
     .from("reset_history")
     .select("*")
-    .eq("phone_number", guestId)
+    .eq("phone_number", userData.guest_id)
     .order("reset_at", { ascending: true });
 
   if (resetsError) throw resetsError;
