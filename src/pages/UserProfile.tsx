@@ -330,8 +330,18 @@ export default function UserProfile() {
                   )}
 
                   {/* Image */}
-                  {post.image_url && (
-                    <img src={post.image_url} alt="" className="w-full max-h-[500px] object-cover" />
+                  {post.image_url && (() => {
+                    const imageUrls = post.image_url!.split(",").map(u => u.trim()).filter(Boolean);
+                    return (
+                      <div className={imageUrls.length === 1 ? "" : "grid grid-cols-2 gap-0.5"}>
+                        {imageUrls.map((url, imgIdx) => (
+                          <button key={imgIdx} onClick={() => setViewingImage(url)} className="block w-full">
+                            <img src={url} alt="" className={`w-full object-cover ${imageUrls.length === 1 ? 'max-h-[500px]' : 'max-h-[250px]'}`} />
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   )}
 
                   {/* Video */}
