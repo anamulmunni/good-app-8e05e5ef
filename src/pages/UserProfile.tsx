@@ -351,24 +351,29 @@ export default function UserProfile() {
                     </div>
                   )}
 
-                  {/* Reaction summary */}
-                  {(post.likes_count > 0 || post.comments_count > 0) && (
-                    <div className="px-3 py-1.5 flex items-center justify-between text-xs text-gray-500">
-                      <div className="flex items-center gap-1">
-                        {post.likes_count > 0 && (
-                          <>
+                  {/* Reaction summary - Facebook style */}
+                  <div className="px-3 py-1.5 flex items-center justify-between text-[13px] text-gray-500">
+                    <div className="flex items-center gap-1">
+                      {post.likes_count > 0 && (
+                        <>
+                          <span className="flex -space-x-0.5">
                             <span className="w-[18px] h-[18px] rounded-full bg-blue-600 flex items-center justify-center text-[10px]">👍</span>
-                            <span>{post.likes_count}</span>
-                          </>
-                        )}
-                      </div>
+                            {myReaction && myReaction !== "like" && (
+                              <span className="w-[18px] h-[18px] rounded-full bg-red-500 flex items-center justify-center text-[10px]">{REACTION_EMOJIS[myReaction]}</span>
+                            )}
+                          </span>
+                          <span>{post.likes_count}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
                       {post.comments_count > 0 && (
                         <button onClick={() => openComments(post.id)} className="hover:underline">
                           {post.comments_count} মন্তব্য
                         </button>
                       )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Action buttons - FB Lite style */}
                   <div className="px-3 py-0.5 border-t border-gray-200 dark:border-border/20 grid grid-cols-3">
