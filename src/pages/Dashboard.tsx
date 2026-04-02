@@ -1050,7 +1050,7 @@ export default function Dashboard() {
                               className={`rounded-xl p-3.5 space-y-2 ${(item.requester_verified_count || 0) < minRequestVerified ? "bg-destructive/10 border-2 border-destructive/40" : "bg-secondary/30 border border-border/50"}`}
                             >
                               <div className="flex items-center justify-between">
-                                <p className="text-sm font-bold font-mono">{item.requester_guest_id}</p>
+                                <p className="text-sm font-bold font-mono">ID: {item.requester_user_id}</p>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-primary/20 text-primary">
                                     {item.requester_verified_count} ✓
