@@ -683,8 +683,8 @@ export default function AdminPanel() {
                     )}
                     <div className="bg-[hsl(var(--emerald))]/10 border border-[hsl(var(--emerald))]/20 rounded-lg px-3 py-2">
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mb-1">🧑 যে সাবমিট করেছে:</p>
-                      <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || "Unknown"})</span></p>
-                      <p className="text-xs text-muted-foreground">Name: {batch.submitted_to_admin_by}</p>
+                       <p className="text-sm font-bold">ID: {batch.target_user_id || "?"} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || batch.target_guest_id})</span></p>
+                       <p className="text-xs text-muted-foreground">Name: {batch.submitted_to_admin_by}</p>
                       {(batch.submitter_payment_number || batch.submitter_payment_method) && (
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mt-1 flex items-center gap-1.5">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number || "N/A"}
                         {batch.submitter_payment_number && (
