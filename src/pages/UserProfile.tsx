@@ -472,6 +472,20 @@ export default function UserProfile() {
           </div>
         )}
       </div>
+
+      {/* Image Zoom Viewer */}
+      <AnimatePresence>
+        {viewingImage && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center" onClick={() => setViewingImage(null)}>
+            <button onClick={() => setViewingImage(null)} className="absolute top-4 right-4 z-10 text-white/80 hover:text-white">
+              <X size={28} />
+            </button>
+            <motion.img src={viewingImage} alt="" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }} className="max-w-full max-h-full object-contain p-4" onClick={(e) => e.stopPropagation()} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

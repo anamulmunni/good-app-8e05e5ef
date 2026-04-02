@@ -1173,29 +1173,36 @@ export default function Feed() {
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-border/20">
                 {notificationsList.map((n: any) => (
-                  <div key={n.id} className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-secondary/30 transition-colors ${!n.is_read ? "bg-blue-50/60 dark:bg-primary/5" : ""}`}>
-                    <button onClick={() => n.from_user_id && navigate(`/user/${n.from_user_id}`)}
-                      className="w-10 h-10 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0">
+                  <button key={n.id}
+                    onClick={() => {
+                      if (n.reference_id) { setActiveTab("home"); setTimeout(() => openComments(n.reference_id), 100); }
+                      else if (n.from_user_id) navigate(`/user/${n.from_user_id}`);
+                    }}
+                    className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-secondary/30 transition-colors ${!n.is_read ? "bg-blue-50/60 dark:bg-primary/5" : ""}`}>
+                    <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-primary/20 flex items-center justify-center overflow-hidden shrink-0 relative">
                       {n.from_user?.avatar_url ? <img src={n.from_user.avatar_url} className="w-full h-full object-cover" /> :
-                        <User className="w-5 h-5 text-gray-400" />}
-                    </button>
-                    <button onClick={() => { if (n.reference_id) { setActiveTab("home"); openComments(n.reference_id); } }}
-                      className="flex-1 min-w-0 text-left">
-                      <p className="text-[13px] text-gray-900 dark:text-foreground">
-                        <span className="font-bold text-blue-600 dark:text-primary cursor-pointer inline-flex items-center gap-1" onClick={(e) => { e.stopPropagation(); if (n.from_user_id) navigate(`/user/${n.from_user_id}`); }}>
-                          <span>{n.from_user?.display_name || "কেউ"}</span>
-                          {n.from_user?.is_verified_badge && <VerifiedBadge className="h-3 w-3" />}
-                        </span>
-                        {n.type === "mention" && " আপনাকে মেন্টশন করেছে"}
+                        <User className="w-6 h-6 text-gray-400" />}
+                      {/* Reaction type icon overlay */}
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] ${
+                        n.type === "like" ? "bg-blue-600" : n.type === "comment" || n.type === "reply" ? "bg-green-500" : n.type === "mention" ? "bg-orange-500" : "bg-gray-400"
+                      }`}>
+                        {n.type === "like" ? "👍" : n.type === "comment" ? "💬" : n.type === "reply" ? "↩️" : n.type === "mention" ? "@" : "🔔"}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] text-gray-900 dark:text-foreground leading-snug">
+                        <span className="font-bold">{n.from_user?.display_name || "কেউ"}</span>
+                        {n.from_user?.is_verified_badge && <VerifiedBadge className="h-3 w-3 inline ml-0.5" />}
+                        {n.type === "mention" && " আপনাকে একটি মন্তব্যে মেন্টশন করেছে"}
                         {n.type === "like" && " আপনার পোস্টে লাইক দিয়েছে"}
                         {n.type === "comment" && " আপনার পোস্টে মন্তব্য করেছে"}
                         {n.type === "reply" && " আপনার মন্তব্যে রিপ্লাই দিয়েছে"}
                       </p>
-                      {n.content && <p className="text-[12px] text-gray-500 dark:text-muted-foreground truncate mt-0.5">"{n.content}"</p>}
-                      <p className="text-[11px] text-gray-400 dark:text-muted-foreground mt-0.5">{timeAgo(n.created_at)}</p>
-                    </button>
-                    {!n.is_read && <div className="w-3 h-3 rounded-full bg-red-600 shrink-0" />}
-                  </div>
+                      {n.content && <p className="text-[13px] text-gray-500 dark:text-muted-foreground truncate mt-0.5">"{n.content}"</p>}
+                      <p className="text-[12px] text-blue-500 mt-0.5">{timeAgo(n.created_at)}</p>
+                    </div>
+                    {!n.is_read && <div className="w-3 h-3 rounded-full bg-blue-600 shrink-0 mt-2" />}
+                  </button>
                 ))}
               </div>
             )}
