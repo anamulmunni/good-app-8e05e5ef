@@ -193,30 +193,8 @@ export async function createTransaction(tx: {
 
 // Key operations
 export async function submitKey(userId: number, privateKey: string): Promise<{ newBalance: number; message: string }> {
-  const normalizedPrivateKey = privateKey.trim();
-  const keyPrefix = normalizedPrivateKey.substring(0, 20);
-
-  // Check if this exact key was already used before
-  const { data: existingUsedKey, error: duplicateCheckError } = await supabase
-    .from("verification_pool")
-    .select("id")
-    .eq("private_key", normalizedPrivateKey)
-    .eq("is_used", true)
-    .limit(1);
-
-  if (duplicateCheckError) throw duplicateCheckError;
-
-  if (existingUsedKey && existingUsedKey.length > 0) {
-    // Log duplicate attempt for admin detection
-    await supabase.from("transactions").insert({
-      user_id: userId,
-      type: "duplicate_attempt",
-      amount: 0,
-      details: `Duplicate Key: ${normalizedPrivateKey}`,
-      status: "blocked",
-    });
-    throw new Error("This key has already been used");
-  }
+  // No duplicate check needed — keys are auto-generated fresh every time
+  // Verified = instant submit, not verified = cancelled & new key generated
 
   // Get reward rate
   const settings = await getPublicSettings();
@@ -238,12 +216,12 @@ export async function submitKey(userId: number, privateKey: string): Promise<{ n
     balance: newBalance,
   }).eq("id", userId);
 
-  // Create transaction record with longer prefix for accurate duplicate detection
+  // Create transaction record
   await createTransaction({
     user_id: userId,
     type: "earning",
     amount: earnedAmount,
-    details: `Key: ${keyPrefix}...`,
+    details: `Verified Key`,
     status: "completed",
   });
 
