@@ -342,7 +342,6 @@ export default function UserProfile() {
                       </div>
                     );
                   })()}
-                  )}
 
                   {/* Video */}
                   {post.video_url && (
