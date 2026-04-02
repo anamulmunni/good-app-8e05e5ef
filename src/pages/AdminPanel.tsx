@@ -1147,11 +1147,10 @@ export default function AdminPanel() {
                         <div>
                           <a href={`/user/${u.user_id}`} className="text-sm font-bold text-primary hover:underline">{u.display_name || "Unknown"}</a>
                           <div className="flex items-center gap-2">
-                            <p className="text-xs font-mono text-foreground/80">{u.guest_id}</p>
-                            <button onClick={() => { navigator.clipboard.writeText(u.guest_id); toast({ title: "কপি হয়েছে" }); }}
+                            <p className="text-xs font-mono text-foreground/80">ID: {u.user_id} ({u.guest_id})</p>
+                            <button onClick={() => { navigator.clipboard.writeText(String(u.user_id)); toast({ title: "কপি হয়েছে" }); }}
                               className="text-muted-foreground hover:text-foreground"><Copy className="w-3 h-3" /></button>
                           </div>
-                          <p className="text-[10px] text-muted-foreground">User ID: {u.user_id}</p>
                         </div>
                         <span className="bg-destructive/20 text-destructive text-xs font-bold px-2.5 py-1.5 rounded-lg">
                           {u.attempts.length} বার
