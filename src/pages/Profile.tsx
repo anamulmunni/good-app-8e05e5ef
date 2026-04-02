@@ -296,7 +296,7 @@ export default function Profile() {
                 className="inline-flex items-center gap-2 bg-secondary/60 backdrop-blur-sm px-4 py-1.5 rounded-full border border-border/50"
                 whileHover={{ scale: 1.02 }}
               >
-                <p className="text-xs text-muted-foreground font-mono">{user.guest_id}</p>
+                <p className="text-xs text-muted-foreground font-mono">ID: {user.id}</p>
                 <motion.button
                   onClick={copyId}
                   className="p-1 hover:bg-primary/20 rounded transition-colors"
