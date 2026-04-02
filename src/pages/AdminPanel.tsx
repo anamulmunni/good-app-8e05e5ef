@@ -1233,7 +1233,7 @@ export default function AdminPanel() {
           <div className="mt-4 space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" placeholder="ফোন নম্বর দিয়ে সার্চ..." value={userMgmtSearch} onChange={(e) => setUserMgmtSearch(e.target.value)} className="input-field pl-10 text-sm" />
+              <input type="text" placeholder="User ID / নাম / ফোন নম্বর..." value={userMgmtSearch} onChange={(e) => setUserMgmtSearch(e.target.value)} className="input-field pl-10 text-sm" />
             </div>
             <div className="space-y-2.5 max-h-[500px] overflow-y-auto">
               {users?.filter(u => !userMgmtSearch || u.guest_id.includes(userMgmtSearch)).map(u => (
