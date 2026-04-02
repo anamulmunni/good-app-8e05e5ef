@@ -237,7 +237,7 @@ export async function submitKey(userId: number, privateKey: string): Promise<{ n
     balance: newBalance,
   }).eq("id", userId);
 
-  // Create transaction record with full key for admin visibility
+  // Create transaction record with longer prefix for accurate duplicate detection
   await createTransaction({
     user_id: userId,
     type: "earning",
