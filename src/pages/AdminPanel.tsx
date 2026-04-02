@@ -158,9 +158,19 @@ export default function AdminPanel() {
     queryFn: () => getUserRequestSubmissions(true),
     enabled: isLoggedIn,
   });
+  const resolveToGuestId = async (input: string): Promise<string> => {
+    if (/^\d+$/.test(input)) {
+      const { data: u } = await supabase.from("users").select("guest_id").eq("id", parseInt(input)).maybeSingle();
+      if (u) return u.guest_id;
+    }
+    return input;
+  };
   const { data: requesterActiveRequests = [] } = useQuery({
     queryKey: ["admin-requester-active-requests", trimmedRequesterSearch],
-    queryFn: () => getActiveRequestsByRequester(trimmedRequesterSearch),
+    queryFn: async () => {
+      const guestId = await resolveToGuestId(trimmedRequesterSearch);
+      return getActiveRequestsByRequester(guestId);
+    },
     enabled: isLoggedIn && trimmedRequesterSearch.length > 0,
   });
   const { data: resetHistoryData } = useQuery({ queryKey: ["admin-reset-history"], queryFn: getResetHistory, enabled: isLoggedIn });
