@@ -148,33 +148,16 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background pb-24 overflow-hidden">
-      {/* Animated background */}
+      {/* Simplified background for performance */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
+        <div
           className="absolute top-[-20%] right-[-20%] w-[600px] h-[600px] rounded-full blur-[120px]"
-          style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.15), transparent 70%)" }}
-          animate={{ scale: [1, 1.2, 1], x: [0, 30, 0], y: [0, -20, 0] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.1), transparent 70%)" }}
         />
-        <motion.div
+        <div
           className="absolute bottom-[-15%] left-[-15%] w-[500px] h-[500px] rounded-full blur-[120px]"
-          style={{ background: "radial-gradient(circle, hsl(var(--purple) / 0.12), transparent 70%)" }}
-          animate={{ scale: [1, 1.15, 1], x: [0, -20, 0], y: [0, 15, 0] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          style={{ background: "radial-gradient(circle, hsl(var(--purple) / 0.08), transparent 70%)" }}
         />
-        <motion.div
-          className="absolute top-[40%] left-[50%] w-[300px] h-[300px] rounded-full blur-[100px]"
-          style={{ background: "radial-gradient(circle, hsl(var(--cyan) / 0.08), transparent 70%)" }}
-          animate={{ scale: [0.8, 1.1, 0.8], x: [-50, 50, -50] }}
-          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 4 }}
-        />
-        {/* Floating particles */}
-        <FloatingParticle delay={0} x="10%" size={4} color="hsl(var(--primary) / 0.3)" />
-        <FloatingParticle delay={2} x="30%" size={3} color="hsl(var(--cyan) / 0.4)" />
-        <FloatingParticle delay={4} x="60%" size={5} color="hsl(var(--purple) / 0.3)" />
-        <FloatingParticle delay={1} x="80%" size={3} color="hsl(var(--amber) / 0.3)" />
-        <FloatingParticle delay={3} x="45%" size={4} color="hsl(var(--emerald) / 0.3)" />
-        <FloatingParticle delay={5} x="90%" size={3} color="hsl(var(--pink) / 0.3)" />
       </div>
 
       {/* Header */}

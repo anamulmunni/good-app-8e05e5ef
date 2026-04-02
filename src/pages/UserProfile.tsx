@@ -30,6 +30,7 @@ export default function UserProfile() {
   const [loadingComments, setLoadingComments] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const [showPostMenu, setShowPostMenu] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   const targetUserId = parseInt(userId || "0");
 
@@ -195,19 +196,21 @@ export default function UserProfile() {
 
       {/* Cover Photo + Profile */}
       <div className="bg-white dark:bg-card">
-        <div className="h-[150px] bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden relative">
+        <div className="h-[150px] bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden relative cursor-pointer"
+          onClick={() => (targetUser as any).cover_url && setViewingImage((targetUser as any).cover_url)}>
           {(targetUser as any).cover_url && (
             <img src={(targetUser as any).cover_url} alt="Cover" className="w-full h-full object-cover object-center" />
           )}
         </div>
         <div className="px-4 pb-4 pt-3">
-          <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white dark:border-card bg-gray-200 flex items-center justify-center shadow-lg">
+          <button onClick={() => targetUser.avatar_url && setViewingImage(targetUser.avatar_url)}
+            className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white dark:border-card bg-gray-200 flex items-center justify-center shadow-lg -mt-14">
             {targetUser.avatar_url ? (
               <img src={targetUser.avatar_url} alt="" className="w-full h-full object-cover" />
             ) : (
               <User className="w-12 h-12 text-gray-400" />
             )}
-          </div>
+          </button>
           <h2 className="text-[22px] font-black text-gray-900 dark:text-foreground mt-2 inline-flex items-center gap-1.5">
             <span>{targetUser.display_name || "User"}</span>
             {targetUser.is_verified_badge && <VerifiedBadge className="h-5 w-5" />}
@@ -327,9 +330,18 @@ export default function UserProfile() {
                   )}
 
                   {/* Image */}
-                  {post.image_url && (
-                    <img src={post.image_url} alt="" className="w-full max-h-[500px] object-cover" />
-                  )}
+                  {post.image_url && (() => {
+                    const imageUrls = post.image_url!.split(",").map(u => u.trim()).filter(Boolean);
+                    return (
+                      <div className={imageUrls.length === 1 ? "" : "grid grid-cols-2 gap-0.5"}>
+                        {imageUrls.map((url, imgIdx) => (
+                          <button key={imgIdx} onClick={() => setViewingImage(url)} className="block w-full">
+                            <img src={url} alt="" className={`w-full object-cover ${imageUrls.length === 1 ? 'max-h-[500px]' : 'max-h-[250px]'}`} />
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* Video */}
                   {post.video_url && (
@@ -338,24 +350,29 @@ export default function UserProfile() {
                     </div>
                   )}
 
-                  {/* Reaction summary */}
-                  {(post.likes_count > 0 || post.comments_count > 0) && (
-                    <div className="px-3 py-1.5 flex items-center justify-between text-xs text-gray-500">
-                      <div className="flex items-center gap-1">
-                        {post.likes_count > 0 && (
-                          <>
+                  {/* Reaction summary - Facebook style */}
+                  <div className="px-3 py-1.5 flex items-center justify-between text-[13px] text-gray-500">
+                    <div className="flex items-center gap-1">
+                      {post.likes_count > 0 && (
+                        <>
+                          <span className="flex -space-x-0.5">
                             <span className="w-[18px] h-[18px] rounded-full bg-blue-600 flex items-center justify-center text-[10px]">👍</span>
-                            <span>{post.likes_count}</span>
-                          </>
-                        )}
-                      </div>
+                            {myReaction && myReaction !== "like" && (
+                              <span className="w-[18px] h-[18px] rounded-full bg-red-500 flex items-center justify-center text-[10px]">{REACTION_EMOJIS[myReaction]}</span>
+                            )}
+                          </span>
+                          <span>{post.likes_count}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
                       {post.comments_count > 0 && (
                         <button onClick={() => openComments(post.id)} className="hover:underline">
                           {post.comments_count} মন্তব্য
                         </button>
                       )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Action buttons - FB Lite style */}
                   <div className="px-3 py-0.5 border-t border-gray-200 dark:border-border/20 grid grid-cols-3">
@@ -455,6 +472,20 @@ export default function UserProfile() {
           </div>
         )}
       </div>
+
+      {/* Image Zoom Viewer */}
+      <AnimatePresence>
+        {viewingImage && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center" onClick={() => setViewingImage(null)}>
+            <button onClick={() => setViewingImage(null)} className="absolute top-4 right-4 z-10 text-white/80 hover:text-white">
+              <X size={28} />
+            </button>
+            <motion.img src={viewingImage} alt="" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }} className="max-w-full max-h-full object-contain p-4" onClick={(e) => e.stopPropagation()} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
