@@ -103,13 +103,21 @@ export default function Dashboard() {
       if ((user.key_count || 0) < freshMinVerified) {
         throw new Error(`সর্বনিম্ন ${freshMinVerified} টি ভেরিফাইড কাউন্ট দরকার। আপনার আছে ${user.key_count || 0} টি।`);
       }
+      // Look up target user by numeric ID or guest_id
+      const targetInput = requestTargetNumber.trim();
+      let targetGuestId = targetInput;
+      if (/^\d+$/.test(targetInput)) {
+        const { data: targetUser } = await supabase.from("users").select("guest_id").eq("id", parseInt(targetInput)).maybeSingle();
+        if (!targetUser) throw new Error("এই ID তে কোনো ইউজার পাওয়া যায়নি");
+        targetGuestId = targetUser.guest_id;
+      }
       await createUserTransferRequest({
         requesterUserId: user.id,
         requesterGuestId: user.guest_id,
         requesterVerifiedCount: user.key_count || 0,
         requesterPaymentNumber: requestPaymentNumber.trim(),
         requesterPaymentMethod: requestPaymentMethod,
-        targetGuestId: requestTargetNumber.trim(),
+        targetGuestId: targetGuestId,
       });
     },
     onSuccess: () => {
