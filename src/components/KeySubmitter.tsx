@@ -327,7 +327,7 @@ export function KeySubmitter() {
               <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-secondary/80 to-secondary/40 rounded-xl border border-border/60">
                 <div className="flex-1 truncate">
                   <p className="text-[10px] text-muted-foreground mb-0.5 uppercase tracking-wider">আপনার আইডি (UID)</p>
-                  <p className="font-mono text-sm font-black text-primary">{user?.guest_id}</p>
+                  <p className="font-mono text-sm font-black text-primary">{user?.id}</p>
                 </div>
                 <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
                   <CircleDot className="w-4 h-4 text-primary" />
