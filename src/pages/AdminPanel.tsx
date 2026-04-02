@@ -832,7 +832,7 @@ export default function AdminPanel() {
                                 {batch.requests.map(req => (
                                   <div key={req.id} className="flex items-center justify-between bg-background/50 border border-border/60 rounded-lg px-3 py-1.5">
                                     <div>
-                                      <span className="text-sm font-mono font-bold">{req.requester_guest_id}</span>
+                                      <span className="text-sm font-mono font-bold">ID: {req.requester_user_id}</span>
                                       {req.requester_payment_number && (
                                         <p className="text-[10px] text-[hsl(var(--amber))] font-bold">💳 {req.requester_payment_method?.toUpperCase()} — {req.requester_payment_number}</p>
                                       )}
