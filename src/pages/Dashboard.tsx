@@ -941,7 +941,7 @@ export default function Dashboard() {
                   ) : (
                     <div className="space-y-3">
                       <input type="text" value={requestTargetNumber} onChange={(e) => setRequestTargetNumber(e.target.value)}
-                        placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)" className="input-field" />
+                        placeholder="যার কাছে রিকুয়েস্ট যাবে (User ID দিন)" className="input-field" />
                       <div className="bg-secondary/30 p-4 rounded-xl border border-border/50 space-y-3">
                         <p className="text-sm font-bold">আপনার পেমেন্ট নম্বর</p>
                         <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
