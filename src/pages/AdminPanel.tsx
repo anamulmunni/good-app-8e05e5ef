@@ -298,7 +298,7 @@ export default function AdminPanel() {
     onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি request ফিরে গেছে submitter এর কাছে` }); },
   });
 
-  const filteredUsers = users?.filter(u => searchQuery ? u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) : true);
+  const filteredUsers = users?.filter(u => searchQuery ? (String(u.id).includes(searchQuery) || u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) || (u.display_name || "").toLowerCase().includes(searchQuery.toLowerCase())) : true);
 
   // Login screen
   if (!isLoggedIn) {
@@ -396,7 +396,7 @@ export default function AdminPanel() {
             <div className="space-y-1.5 max-h-52 overflow-y-auto">
               {users?.filter(u => u.key_count >= 1).map(u => (
                 <div key={u.id} className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg text-sm">
-                  <span className="font-mono truncate max-w-[200px]">{u.guest_id}</span>
+                  <span className="font-mono truncate max-w-[200px]">ID: {u.id} ({u.display_name || u.guest_id})</span>
                   <span className="text-primary font-bold">{u.key_count} টা</span>
                 </div>
               ))}
@@ -536,7 +536,7 @@ export default function AdminPanel() {
                     <div>
                       <p className="font-black text-2xl text-[hsl(var(--orange))]">{w.amount} TK</p>
                       <p className="text-sm text-muted-foreground">{w.details}</p>
-                      {wxUser && <p className="text-xs text-muted-foreground mt-1">User: <span className="font-mono font-bold text-foreground">{wxUser.guest_id}</span> ({wxUser.display_name})</p>}
+                      {wxUser && <p className="text-xs text-muted-foreground mt-1">User: <span className="font-mono font-bold text-foreground">ID: {wxUser.id}</span> ({wxUser.display_name || wxUser.guest_id})</p>}
                       <p className="text-[10px] text-muted-foreground">{new Date(w.created_at || "").toLocaleString("bn-BD")}</p>
                     </div>
                   </div>
@@ -556,12 +556,12 @@ export default function AdminPanel() {
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <h3 className="font-bold text-primary flex items-center gap-2 text-sm"><CheckCircle className="w-4 h-4" /> হ্যাঁ (পেয়েছে)</h3>
-              {receivedList?.map(u => (<div key={u.id} className="p-2 bg-primary/10 rounded-lg border border-primary/20 text-xs">{u.guest_id} ({u.display_name})</div>))}
+              {receivedList?.map(u => (<div key={u.id} className="p-2 bg-primary/10 rounded-lg border border-primary/20 text-xs">ID: {u.id} ({u.display_name || u.guest_id})</div>))}
               {(!receivedList || receivedList.length === 0) && <p className="text-xs text-muted-foreground">কেউ নেই</p>}
             </div>
             <div className="space-y-2">
               <h3 className="font-bold text-destructive flex items-center gap-2 text-sm"><XCircle className="w-4 h-4" /> না (পায়নি)</h3>
-              {notReceivedList?.map(u => (<div key={u.id} className="p-2 bg-destructive/10 rounded-lg border border-destructive/20 text-xs">{u.guest_id} ({u.display_name})</div>))}
+              {notReceivedList?.map(u => (<div key={u.id} className="p-2 bg-destructive/10 rounded-lg border border-destructive/20 text-xs">ID: {u.id} ({u.display_name || u.guest_id})</div>))}
               {(!notReceivedList || notReceivedList.length === 0) && <p className="text-xs text-muted-foreground">কেউ নেই</p>}
             </div>
           </div>
@@ -606,13 +606,12 @@ export default function AdminPanel() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {Array.from(adminStats.entries()).map(([adminId, stats]) => {
-                      const adminUser = users?.find(u => u.guest_id === adminId);
+                     {Array.from(adminStats.entries()).map(([adminGuestId, stats]) => {
+                      const adminUser = users?.find(u => u.guest_id === adminGuestId);
                       return (
-                        <div key={adminId} className="flex items-center justify-between bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5">
+                        <div key={adminGuestId} className="flex items-center justify-between bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold font-mono truncate">{adminId}</p>
-                            <p className="text-[10px] text-muted-foreground">{adminUser?.display_name || "Unknown"}</p>
+                            <p className="text-sm font-bold truncate">ID: {adminUser?.id || "?"} ({adminUser?.display_name || adminGuestId})</p>
                           </div>
                           <div className="flex items-center gap-3 text-xs">
                             <span className="bg-[hsl(var(--cyan))]/15 text-[hsl(var(--cyan))] font-bold px-2 py-1 rounded-lg">{stats.numbers} নম্বর</span>
@@ -631,8 +630,8 @@ export default function AdminPanel() {
               <p className="text-sm font-bold">রিকুয়েস্ট পাঠানো নম্বর দিয়ে Cancel করুন</p>
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input type="text" value={requesterRequestSearch} onChange={(e) => setRequesterRequestSearch(e.target.value)}
-                  placeholder="01XXXXXXXXX" className="input-field pl-10 text-sm" />
+                 <input type="text" value={requesterRequestSearch} onChange={(e) => setRequesterRequestSearch(e.target.value)}
+                  placeholder="User ID / ফোন নম্বর" className="input-field pl-10 text-sm" />
               </div>
               {trimmedRequesterSearch && (
                 <div className="space-y-2">
@@ -643,8 +642,8 @@ export default function AdminPanel() {
                       <div className="space-y-2 max-h-44 overflow-y-auto">
                         {requesterActiveRequests.map((item) => (
                           <div key={item.id} className="bg-background/50 border border-border rounded-lg p-3">
-                            <p className="text-sm font-mono font-bold">{item.requester_guest_id} → {item.target_guest_id}</p>
-                            <p className="text-xs text-muted-foreground">Status: {item.status} • Verified: {item.requester_verified_count}</p>
+                             <p className="text-sm font-mono font-bold">ID: {item.requester_user_id} → ID: {item.target_user_id || "?"}</p>
+                             <p className="text-xs text-muted-foreground">Status: {item.status} • Verified: {item.requester_verified_count} • {item.requester_guest_id}</p>
                           </div>
                         ))}
                       </div>
@@ -684,8 +683,8 @@ export default function AdminPanel() {
                     )}
                     <div className="bg-[hsl(var(--emerald))]/10 border border-[hsl(var(--emerald))]/20 rounded-lg px-3 py-2">
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mb-1">🧑 যে সাবমিট করেছে:</p>
-                      <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || "Unknown"})</span></p>
-                      <p className="text-xs text-muted-foreground">Name: {batch.submitted_to_admin_by}</p>
+                       <p className="text-sm font-bold">ID: {batch.target_user_id || "?"} <span className="text-xs text-muted-foreground font-normal">({batch.target_display_name || batch.target_guest_id})</span></p>
+                       <p className="text-xs text-muted-foreground">Name: {batch.submitted_to_admin_by}</p>
                       {(batch.submitter_payment_number || batch.submitter_payment_method) && (
                       <p className="text-xs font-bold text-[hsl(var(--emerald))] mt-1 flex items-center gap-1.5">💳 {batch.submitter_payment_method?.toUpperCase() || "N/A"} — {batch.submitter_payment_number || "N/A"}
                         {batch.submitter_payment_number && (
@@ -701,7 +700,7 @@ export default function AdminPanel() {
                         {batch.requests.map((req) => (
                           <div key={req.id} className="flex items-center justify-between bg-background/50 border border-border rounded-lg px-3 py-2">
                             <div>
-                              <p className="text-sm font-mono font-bold">{req.requester_guest_id}</p>
+                              <p className="text-sm font-mono font-bold">ID: {req.requester_user_id} ({req.requester_guest_id})</p>
                               <p className="text-xs text-muted-foreground">Verified: {req.requester_verified_count}</p>
                               {(req.requester_payment_number || req.requester_payment_method) && (
                                 <p className="text-xs font-bold text-[hsl(var(--amber))] flex items-center gap-1.5">💳 {req.requester_payment_method?.toUpperCase() || "N/A"} — {req.requester_payment_number || "N/A"}
@@ -743,7 +742,7 @@ export default function AdminPanel() {
             </div>
             {submittedNumbers?.map(item => (
               <div key={item.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl border border-border">
-                <div><p className="font-mono text-sm font-bold">{item.phone_number}</p><p className="text-[10px] text-muted-foreground">{item.submitted_by} {item.payment_number ? `| ${item.payment_method?.toUpperCase()}: ${item.payment_number}` : ""}</p></div>
+                <div><p className="font-mono text-sm font-bold">{item.phone_number} {(() => { const u = users?.find(u => u.guest_id === item.phone_number); return u ? `(ID: ${u.id})` : ""; })()}</p><p className="text-[10px] text-muted-foreground">{item.submitted_by} {item.payment_number ? `| ${item.payment_method?.toUpperCase()}: ${item.payment_number}` : ""}</p></div>
                 <div className="flex items-center gap-2">
                   <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{users?.find(u => u.guest_id === item.phone_number)?.key_count || 0} টা</span>
                   <button onClick={async () => {
@@ -819,7 +818,7 @@ export default function AdminPanel() {
                         {matchedBatches.map(batch => (
                           <div key={batch.id} className="bg-primary/5 border border-primary/20 rounded-xl p-3 space-y-2">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground">({batch.target_display_name || "Unknown"})</span></p>
+                              <p className="text-sm font-bold">ID: {batch.target_user_id || "?"} <span className="text-xs text-muted-foreground">({batch.target_display_name || batch.target_guest_id})</span></p>
                               <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">{batch.request_count} টি</span>
                             </div>
                             {batch.submitter_payment_number && (
@@ -833,7 +832,7 @@ export default function AdminPanel() {
                                 {batch.requests.map(req => (
                                   <div key={req.id} className="flex items-center justify-between bg-background/50 border border-border/60 rounded-lg px-3 py-1.5">
                                     <div>
-                                      <span className="text-sm font-mono font-bold">{req.requester_guest_id}</span>
+                                      <span className="text-sm font-mono font-bold">ID: {req.requester_user_id}</span>
                                       {req.requester_payment_number && (
                                         <p className="text-[10px] text-[hsl(var(--amber))] font-bold">💳 {req.requester_payment_method?.toUpperCase()} — {req.requester_payment_number}</p>
                                       )}
@@ -943,8 +942,8 @@ export default function AdminPanel() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="font-mono text-sm font-bold">{item.phone_number}</span>
-                          {matchedUser?.display_name && <span className="text-xs text-muted-foreground ml-2">({matchedUser.display_name})</span>}
+                          <span className="font-mono text-sm font-bold">ID: {matchedUser?.id || "?"} ({item.phone_number})</span>
+                          {matchedUser?.display_name && <span className="text-xs text-muted-foreground ml-2">{matchedUser.display_name}</span>}
                         </div>
                         <span className="text-primary font-bold text-sm bg-primary/10 px-2 py-1 rounded-lg">{item.verified_count} টা</span>
                       </div>
@@ -1148,11 +1147,10 @@ export default function AdminPanel() {
                         <div>
                           <a href={`/user/${u.user_id}`} className="text-sm font-bold text-primary hover:underline">{u.display_name || "Unknown"}</a>
                           <div className="flex items-center gap-2">
-                            <p className="text-xs font-mono text-foreground/80">{u.guest_id}</p>
-                            <button onClick={() => { navigator.clipboard.writeText(u.guest_id); toast({ title: "কপি হয়েছে" }); }}
+                            <p className="text-xs font-mono text-foreground/80">ID: {u.user_id} ({u.guest_id})</p>
+                            <button onClick={() => { navigator.clipboard.writeText(String(u.user_id)); toast({ title: "কপি হয়েছে" }); }}
                               className="text-muted-foreground hover:text-foreground"><Copy className="w-3 h-3" /></button>
                           </div>
-                          <p className="text-[10px] text-muted-foreground">User ID: {u.user_id}</p>
                         </div>
                         <span className="bg-destructive/20 text-destructive text-xs font-bold px-2.5 py-1.5 rounded-lg">
                           {u.attempts.length} বার
@@ -1234,15 +1232,15 @@ export default function AdminPanel() {
           <div className="mt-4 space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" placeholder="ফোন নম্বর দিয়ে সার্চ..." value={userMgmtSearch} onChange={(e) => setUserMgmtSearch(e.target.value)} className="input-field pl-10 text-sm" />
+              <input type="text" placeholder="User ID / নাম / ফোন নম্বর..." value={userMgmtSearch} onChange={(e) => setUserMgmtSearch(e.target.value)} className="input-field pl-10 text-sm" />
             </div>
             <div className="space-y-2.5 max-h-[500px] overflow-y-auto">
-              {users?.filter(u => !userMgmtSearch || u.guest_id.includes(userMgmtSearch)).map(u => (
+              {users?.filter(u => !userMgmtSearch || String(u.id).includes(userMgmtSearch) || u.guest_id.includes(userMgmtSearch) || (u.display_name || "").toLowerCase().includes(userMgmtSearch.toLowerCase())).map(u => (
                 <div key={u.id} className="bg-secondary/50 border border-border rounded-xl p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-mono text-sm font-bold">{u.guest_id}</p>
-                      <p className="text-xs text-muted-foreground">{u.display_name || "Unknown"} • Verified: <span className="text-primary font-bold">{u.key_count || 0}</span></p>
+                      <p className="font-mono text-sm font-bold">ID: {u.id}</p>
+                      <p className="text-xs text-muted-foreground">{u.display_name || "Unknown"} • {u.guest_id} • Verified: <span className="text-primary font-bold">{u.key_count || 0}</span></p>
                       {u.email && <p className="text-[10px] text-muted-foreground">Email: {u.email}</p>}
                     </div>
                     <div className="flex items-center gap-1.5">

@@ -103,13 +103,21 @@ export default function Dashboard() {
       if ((user.key_count || 0) < freshMinVerified) {
         throw new Error(`সর্বনিম্ন ${freshMinVerified} টি ভেরিফাইড কাউন্ট দরকার। আপনার আছে ${user.key_count || 0} টি।`);
       }
+      // Look up target user by numeric ID or guest_id
+      const targetInput = requestTargetNumber.trim();
+      let targetGuestId = targetInput;
+      if (/^\d+$/.test(targetInput)) {
+        const { data: targetUser } = await supabase.from("users").select("guest_id").eq("id", parseInt(targetInput)).maybeSingle();
+        if (!targetUser) throw new Error("এই ID তে কোনো ইউজার পাওয়া যায়নি");
+        targetGuestId = targetUser.guest_id;
+      }
       await createUserTransferRequest({
         requesterUserId: user.id,
         requesterGuestId: user.guest_id,
         requesterVerifiedCount: user.key_count || 0,
         requesterPaymentNumber: requestPaymentNumber.trim(),
         requesterPaymentMethod: requestPaymentMethod,
-        targetGuestId: requestTargetNumber.trim(),
+        targetGuestId: targetGuestId,
       });
     },
     onSuccess: () => {
@@ -272,8 +280,8 @@ export default function Dashboard() {
   const requestCountdownText = formatCountdown(requestLockRemainingMs);
 
   const copyId = () => {
-    if (user?.guest_id) {
-      navigator.clipboard.writeText(user.guest_id);
+    if (user?.id) {
+      navigator.clipboard.writeText(String(user.id));
       setCopied(true);
       toast({ title: "ID কপি করা হয়েছে" });
       setTimeout(() => setCopied(false), 2000);
@@ -454,9 +462,9 @@ export default function Dashboard() {
               )}
             </motion.button>
             <div>
-              <p className="font-bold text-sm truncate max-w-[140px]">{user.display_name || user.guest_id}</p>
+              <p className="font-bold text-sm truncate max-w-[140px]">{user.display_name || "Unknown"}</p>
               <div className="flex items-center gap-1.5">
-                <p className="text-[10px] text-muted-foreground font-mono">ID: {user.guest_id}</p>
+                <p className="text-[10px] text-muted-foreground font-mono">ID: {user.id}</p>
                 <button onClick={copyId} className="p-0.5 hover:bg-secondary rounded transition-colors">
                   {copied ? <Check className="w-2.5 h-2.5 text-primary" /> : <Copy className="w-2.5 h-2.5 text-muted-foreground" />}
                 </button>
@@ -941,7 +949,7 @@ export default function Dashboard() {
                   ) : (
                     <div className="space-y-3">
                       <input type="text" value={requestTargetNumber} onChange={(e) => setRequestTargetNumber(e.target.value)}
-                        placeholder="যার কাছে রিকুয়েস্ট যাবে (01XXXXXXXXX)" className="input-field" />
+                        placeholder="যার কাছে রিকুয়েস্ট যাবে (User ID দিন)" className="input-field" />
                       <div className="bg-secondary/30 p-4 rounded-xl border border-border/50 space-y-3">
                         <p className="text-sm font-bold">আপনার পেমেন্ট নম্বর</p>
                         <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
@@ -1050,7 +1058,7 @@ export default function Dashboard() {
                               className={`rounded-xl p-3.5 space-y-2 ${(item.requester_verified_count || 0) < minRequestVerified ? "bg-destructive/10 border-2 border-destructive/40" : "bg-secondary/30 border border-border/50"}`}
                             >
                               <div className="flex items-center justify-between">
-                                <p className="text-sm font-bold font-mono">{item.requester_guest_id}</p>
+                                <p className="text-sm font-bold font-mono">ID: {item.requester_user_id}</p>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-primary/20 text-primary">
                                     {item.requester_verified_count} ✓

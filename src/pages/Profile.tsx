@@ -69,8 +69,8 @@ export default function Profile() {
   });
 
   const copyId = () => {
-    if (user?.guest_id) {
-      navigator.clipboard.writeText(user.guest_id);
+    if (user?.id) {
+      navigator.clipboard.writeText(String(user.id));
       setCopied(true);
       toast({ title: "কপি করা হয়েছে" });
       setTimeout(() => setCopied(false), 2000);
@@ -296,7 +296,7 @@ export default function Profile() {
                 className="inline-flex items-center gap-2 bg-secondary/60 backdrop-blur-sm px-4 py-1.5 rounded-full border border-border/50"
                 whileHover={{ scale: 1.02 }}
               >
-                <p className="text-xs text-muted-foreground font-mono">{user.guest_id}</p>
+                <p className="text-xs text-muted-foreground font-mono">ID: {user.id}</p>
                 <motion.button
                   onClick={copyId}
                   className="p-1 hover:bg-primary/20 rounded transition-colors"
