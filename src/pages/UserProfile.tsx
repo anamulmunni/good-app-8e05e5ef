@@ -30,6 +30,7 @@ export default function UserProfile() {
   const [loadingComments, setLoadingComments] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const [showPostMenu, setShowPostMenu] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   const targetUserId = parseInt(userId || "0");
 
