@@ -298,7 +298,7 @@ export default function AdminPanel() {
     onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি request ফিরে গেছে submitter এর কাছে` }); },
   });
 
-  const filteredUsers = users?.filter(u => searchQuery ? u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) : true);
+  const filteredUsers = users?.filter(u => searchQuery ? (String(u.id).includes(searchQuery) || u.guest_id.toLowerCase().includes(searchQuery.toLowerCase()) || (u.display_name || "").toLowerCase().includes(searchQuery.toLowerCase())) : true);
 
   // Login screen
   if (!isLoggedIn) {
