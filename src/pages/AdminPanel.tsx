@@ -396,7 +396,7 @@ export default function AdminPanel() {
             <div className="space-y-1.5 max-h-52 overflow-y-auto">
               {users?.filter(u => u.key_count >= 1).map(u => (
                 <div key={u.id} className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg text-sm">
-                  <span className="font-mono truncate max-w-[200px]">{u.guest_id}</span>
+                  <span className="font-mono truncate max-w-[200px]">ID: {u.id} ({u.display_name || u.guest_id})</span>
                   <span className="text-primary font-bold">{u.key_count} টা</span>
                 </div>
               ))}
