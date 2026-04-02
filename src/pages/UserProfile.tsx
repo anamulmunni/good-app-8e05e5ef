@@ -196,19 +196,21 @@ export default function UserProfile() {
 
       {/* Cover Photo + Profile */}
       <div className="bg-white dark:bg-card">
-        <div className="h-[150px] bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden relative">
+        <div className="h-[150px] bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden relative cursor-pointer"
+          onClick={() => (targetUser as any).cover_url && setViewingImage((targetUser as any).cover_url)}>
           {(targetUser as any).cover_url && (
             <img src={(targetUser as any).cover_url} alt="Cover" className="w-full h-full object-cover object-center" />
           )}
         </div>
         <div className="px-4 pb-4 pt-3">
-          <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white dark:border-card bg-gray-200 flex items-center justify-center shadow-lg">
+          <button onClick={() => targetUser.avatar_url && setViewingImage(targetUser.avatar_url)}
+            className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white dark:border-card bg-gray-200 flex items-center justify-center shadow-lg -mt-14">
             {targetUser.avatar_url ? (
               <img src={targetUser.avatar_url} alt="" className="w-full h-full object-cover" />
             ) : (
               <User className="w-12 h-12 text-gray-400" />
             )}
-          </div>
+          </button>
           <h2 className="text-[22px] font-black text-gray-900 dark:text-foreground mt-2 inline-flex items-center gap-1.5">
             <span>{targetUser.display_name || "User"}</span>
             {targetUser.is_verified_badge && <VerifiedBadge className="h-5 w-5" />}
