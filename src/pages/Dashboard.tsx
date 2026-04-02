@@ -272,8 +272,8 @@ export default function Dashboard() {
   const requestCountdownText = formatCountdown(requestLockRemainingMs);
 
   const copyId = () => {
-    if (user?.guest_id) {
-      navigator.clipboard.writeText(user.guest_id);
+    if (user?.id) {
+      navigator.clipboard.writeText(String(user.id));
       setCopied(true);
       toast({ title: "ID কপি করা হয়েছে" });
       setTimeout(() => setCopied(false), 2000);
