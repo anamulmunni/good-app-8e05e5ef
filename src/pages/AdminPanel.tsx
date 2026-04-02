@@ -556,7 +556,7 @@ export default function AdminPanel() {
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <h3 className="font-bold text-primary flex items-center gap-2 text-sm"><CheckCircle className="w-4 h-4" /> হ্যাঁ (পেয়েছে)</h3>
-              {receivedList?.map(u => (<div key={u.id} className="p-2 bg-primary/10 rounded-lg border border-primary/20 text-xs">{u.guest_id} ({u.display_name})</div>))}
+              {receivedList?.map(u => (<div key={u.id} className="p-2 bg-primary/10 rounded-lg border border-primary/20 text-xs">ID: {u.id} ({u.display_name || u.guest_id})</div>))}
               {(!receivedList || receivedList.length === 0) && <p className="text-xs text-muted-foreground">কেউ নেই</p>}
             </div>
             <div className="space-y-2">
