@@ -300,7 +300,10 @@ export default function AdminPanel() {
     onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি রিকুয়েস্ট রিসেট হয়েছে` }); },
   });
   const cancelRequesterRequestsMutation = useMutation({
-    mutationFn: adminCancelRequestsByRequester,
+    mutationFn: async (input: string) => {
+      const guestId = await resolveToGuestId(input);
+      return adminCancelRequestsByRequester(guestId);
+    },
     onSuccess: (count) => { refreshRequestPanels(); toast({ title: `${count} টি active request cancel হয়েছে` }); },
   });
   const cancelTransferBatchMutation = useMutation({
