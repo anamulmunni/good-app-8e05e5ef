@@ -561,7 +561,7 @@ export default function AdminPanel() {
             </div>
             <div className="space-y-2">
               <h3 className="font-bold text-destructive flex items-center gap-2 text-sm"><XCircle className="w-4 h-4" /> না (পায়নি)</h3>
-              {notReceivedList?.map(u => (<div key={u.id} className="p-2 bg-destructive/10 rounded-lg border border-destructive/20 text-xs">{u.guest_id} ({u.display_name})</div>))}
+              {notReceivedList?.map(u => (<div key={u.id} className="p-2 bg-destructive/10 rounded-lg border border-destructive/20 text-xs">ID: {u.id} ({u.display_name || u.guest_id})</div>))}
               {(!notReceivedList || notReceivedList.length === 0) && <p className="text-xs text-muted-foreground">কেউ নেই</p>}
             </div>
           </div>
