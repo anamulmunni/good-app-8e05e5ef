@@ -10,22 +10,38 @@ import IncomingCallHandler from "./components/IncomingCallHandler";
 import FloatingDashboardButton from "./components/FloatingDashboardButton";
 import { useOnlineHeartbeat } from "@/hooks/use-online";
 
-// Lazy load heavy pages
-const Register = lazy(() => import("./pages/Register"));
-const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Profile = lazy(() => import("./pages/Profile"));
-const AdminPanel = lazy(() => import("./pages/AdminPanel"));
-const AddKeys = lazy(() => import("./pages/AddKeys"));
-const Chat = lazy(() => import("./pages/Chat"));
-const Feed = lazy(() => import("./pages/Feed"));
-const Reels = lazy(() => import("./pages/Reels"));
-const ShortReels = lazy(() => import("./pages/ShortReels"));
-const UserProfile = lazy(() => import("./pages/UserProfile"));
-const ChannelPage = lazy(() => import("./pages/ChannelPage"));
-const WatchVideo = lazy(() => import("./pages/WatchVideo"));
-const CallPage = lazy(() => import("./pages/CallPage"));
-const Install = lazy(() => import("./pages/Install"));
+// Retry wrapper for lazy imports to handle transient network failures
+function lazyRetry(factory: () => Promise<any>, retries = 3): ReturnType<typeof lazy> {
+  return lazy(() =>
+    factory().catch((err) => {
+      if (retries > 0) {
+        return new Promise<void>((resolve) => setTimeout(resolve, 500)).then(() =>
+          lazyRetry(factory, retries - 1) as any
+        );
+      }
+      // Force reload as last resort for stale chunk errors
+      window.location.reload();
+      throw err;
+    })
+  );
+}
+
+// Lazy load heavy pages with retry
+const Register = lazyRetry(() => import("./pages/Register"));
+const VerifyEmail = lazyRetry(() => import("./pages/VerifyEmail"));
+const Dashboard = lazyRetry(() => import("./pages/Dashboard"));
+const Profile = lazyRetry(() => import("./pages/Profile"));
+const AdminPanel = lazyRetry(() => import("./pages/AdminPanel"));
+const AddKeys = lazyRetry(() => import("./pages/AddKeys"));
+const Chat = lazyRetry(() => import("./pages/Chat"));
+const Feed = lazyRetry(() => import("./pages/Feed"));
+const Reels = lazyRetry(() => import("./pages/Reels"));
+const ShortReels = lazyRetry(() => import("./pages/ShortReels"));
+const UserProfile = lazyRetry(() => import("./pages/UserProfile"));
+const ChannelPage = lazyRetry(() => import("./pages/ChannelPage"));
+const WatchVideo = lazyRetry(() => import("./pages/WatchVideo"));
+const CallPage = lazyRetry(() => import("./pages/CallPage"));
+const Install = lazyRetry(() => import("./pages/Install"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
