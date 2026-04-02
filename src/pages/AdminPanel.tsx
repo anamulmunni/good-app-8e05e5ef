@@ -642,8 +642,8 @@ export default function AdminPanel() {
                       <div className="space-y-2 max-h-44 overflow-y-auto">
                         {requesterActiveRequests.map((item) => (
                           <div key={item.id} className="bg-background/50 border border-border rounded-lg p-3">
-                            <p className="text-sm font-mono font-bold">{item.requester_guest_id} → {item.target_guest_id}</p>
-                            <p className="text-xs text-muted-foreground">Status: {item.status} • Verified: {item.requester_verified_count}</p>
+                             <p className="text-sm font-mono font-bold">ID: {item.requester_user_id} → ID: {item.target_user_id || "?"}</p>
+                             <p className="text-xs text-muted-foreground">Status: {item.status} • Verified: {item.requester_verified_count} • {item.requester_guest_id}</p>
                           </div>
                         ))}
                       </div>
