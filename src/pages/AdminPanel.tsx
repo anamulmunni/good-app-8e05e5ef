@@ -818,7 +818,7 @@ export default function AdminPanel() {
                         {matchedBatches.map(batch => (
                           <div key={batch.id} className="bg-primary/5 border border-primary/20 rounded-xl p-3 space-y-2">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-bold">{batch.target_guest_id} <span className="text-xs text-muted-foreground">({batch.target_display_name || "Unknown"})</span></p>
+                              <p className="text-sm font-bold">ID: {batch.target_user_id || "?"} <span className="text-xs text-muted-foreground">({batch.target_display_name || batch.target_guest_id})</span></p>
                               <span className="text-xs font-bold px-2 py-1 rounded-lg bg-primary/20 text-primary">{batch.request_count} টি</span>
                             </div>
                             {batch.submitter_payment_number && (
