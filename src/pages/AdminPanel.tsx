@@ -606,13 +606,12 @@ export default function AdminPanel() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {Array.from(adminStats.entries()).map(([adminId, stats]) => {
-                      const adminUser = users?.find(u => u.guest_id === adminId);
+                     {Array.from(adminStats.entries()).map(([adminGuestId, stats]) => {
+                      const adminUser = users?.find(u => u.guest_id === adminGuestId);
                       return (
-                        <div key={adminId} className="flex items-center justify-between bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5">
+                        <div key={adminGuestId} className="flex items-center justify-between bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold font-mono truncate">{adminId}</p>
-                            <p className="text-[10px] text-muted-foreground">{adminUser?.display_name || "Unknown"}</p>
+                            <p className="text-sm font-bold truncate">ID: {adminUser?.id || "?"} ({adminUser?.display_name || adminGuestId})</p>
                           </div>
                           <div className="flex items-center gap-3 text-xs">
                             <span className="bg-[hsl(var(--cyan))]/15 text-[hsl(var(--cyan))] font-bold px-2 py-1 rounded-lg">{stats.numbers} নম্বর</span>
