@@ -1236,12 +1236,12 @@ export default function AdminPanel() {
               <input type="text" placeholder="User ID / নাম / ফোন নম্বর..." value={userMgmtSearch} onChange={(e) => setUserMgmtSearch(e.target.value)} className="input-field pl-10 text-sm" />
             </div>
             <div className="space-y-2.5 max-h-[500px] overflow-y-auto">
-              {users?.filter(u => !userMgmtSearch || u.guest_id.includes(userMgmtSearch)).map(u => (
+              {users?.filter(u => !userMgmtSearch || String(u.id).includes(userMgmtSearch) || u.guest_id.includes(userMgmtSearch) || (u.display_name || "").toLowerCase().includes(userMgmtSearch.toLowerCase())).map(u => (
                 <div key={u.id} className="bg-secondary/50 border border-border rounded-xl p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-mono text-sm font-bold">{u.guest_id}</p>
-                      <p className="text-xs text-muted-foreground">{u.display_name || "Unknown"} • Verified: <span className="text-primary font-bold">{u.key_count || 0}</span></p>
+                      <p className="font-mono text-sm font-bold">ID: {u.id}</p>
+                      <p className="text-xs text-muted-foreground">{u.display_name || "Unknown"} • {u.guest_id} • Verified: <span className="text-primary font-bold">{u.key_count || 0}</span></p>
                       {u.email && <p className="text-[10px] text-muted-foreground">Email: {u.email}</p>}
                     </div>
                     <div className="flex items-center gap-1.5">
