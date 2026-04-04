@@ -34,6 +34,14 @@ export default function Profile() {
   const [showSentRequests, setShowSentRequests] = useState(false);
   const [showSubmittedBatches, setShowSubmittedBatches] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsOtpEmail, setSettingsOtpEmail] = useState("");
+  const [settingsOtpCode, setSettingsOtpCode] = useState("");
+  const [settingsOtpSent, setSettingsOtpSent] = useState(false);
+  const [settingsOtpVerified, setSettingsOtpVerified] = useState(false);
+  const [settingsSubmitting, setSettingsSubmitting] = useState(false);
+  const [newLoginPassword, setNewLoginPassword] = useState("");
+  const [newRequestPassword, setNewRequestPassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
