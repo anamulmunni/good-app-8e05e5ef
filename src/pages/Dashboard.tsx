@@ -341,7 +341,8 @@ export default function Dashboard() {
       }
       setGmailSubmitting(true);
       try {
-        const { error } = await supabase.auth.updateUser({ email: gmailInput.trim() });
+        // Use signInWithOtp instead of updateUser - works without an existing auth session
+        const { error } = await supabase.auth.signInWithOtp({ email: gmailInput.trim() });
         if (error) throw error;
         setGmailStep("otp");
         toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${gmailInput.trim()} এ ভেরিফিকেশন কোড পাঠানো হয়েছে` });
@@ -357,10 +358,14 @@ export default function Dashboard() {
         const { error } = await supabase.auth.verifyOtp({
           email: gmailInput.trim(),
           token: gmailOtpCode.trim(),
-          type: "email_change",
+          type: "email",
         });
         if (error) throw error;
-        await supabase.from("users").update({ email: gmailInput.trim() }).eq("id", user.id);
+        // Update email in users table and link auth_id
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const updates: Record<string, any> = { email: gmailInput.trim() };
+        if (authUser?.id) updates.auth_id = authUser.id;
+        await supabase.from("users").update(updates).eq("id", user.id);
         await refreshUser();
         setShowGmailPrompt(false);
         toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
