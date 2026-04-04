@@ -41,6 +41,7 @@ export function useAuth() {
         auth_id: authUser.id,
         guest_id: phone || authUser.id,
         display_name: displayName,
+        email: authUser.email || null,
       } as any)
       .select() as any)
       .single(), 12000, "User create timeout");
