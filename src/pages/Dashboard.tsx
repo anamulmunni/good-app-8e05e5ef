@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
-import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
 import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, TrendingUp, Newspaper, Download, Sparkles, X, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
