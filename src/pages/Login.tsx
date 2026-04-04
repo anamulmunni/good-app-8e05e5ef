@@ -128,14 +128,11 @@ export default function Login() {
       const hasRealEmail = userEmail && !userEmail.endsWith("@goodapp.local");
 
       if (hasRealEmail) {
-        // Send OTP to their Gmail
-        const { error } = await supabase.auth.signInWithOtp({ email: userEmail });
-        if (error) throw error;
+        // User has Gmail - use password login with their real email
         setLoginEmail(userEmail);
-        setLoginStep("otp");
-        toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${userEmail} এ একটি কোড পাঠানো হয়েছে` });
+        setLoginStep("password");
       } else {
-        // Old user without Gmail - allow password login
+        // Old user without Gmail - allow password login with fake email
         setLoginStep("password");
       }
     } catch (err: unknown) {
