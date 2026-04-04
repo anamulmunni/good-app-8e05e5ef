@@ -327,7 +327,132 @@ export default function Dashboard() {
   }
 
   return (
+    // Check if user has a real email
+    const userHasRealEmail = user?.email && !user.email.endsWith("@goodapp.local");
+    const [showGmailPrompt, setShowGmailPrompt] = useState(!userHasRealEmail);
+    const [gmailInput, setGmailInput] = useState("");
+    const [gmailOtpCode, setGmailOtpCode] = useState("");
+    const [gmailStep, setGmailStep] = useState<"email" | "otp">("email");
+    const [gmailSubmitting, setGmailSubmitting] = useState(false);
+
+    const handleGmailSubmit = async () => {
+      if (gmailStep === "email") {
+        if (!gmailInput.trim() || !gmailInput.includes("@")) {
+          toast({ title: "সঠিক Gmail দিন", variant: "destructive" });
+          return;
+        }
+        setGmailSubmitting(true);
+        try {
+          // Update email in auth
+          const { error } = await supabase.auth.updateUser({ email: gmailInput.trim() });
+          if (error) throw error;
+          setGmailStep("otp");
+          toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${gmailInput.trim()} এ ভেরিফিকেশন কোড পাঠানো হয়েছে` });
+        } catch (err: any) {
+          toast({ title: "ব্যর্থ", description: err.message || "কিছু ভুল হয়েছে", variant: "destructive" });
+        } finally {
+          setGmailSubmitting(false);
+        }
+      } else {
+        if (!gmailOtpCode.trim()) return;
+        setGmailSubmitting(true);
+        try {
+          const { error } = await supabase.auth.verifyOtp({
+            email: gmailInput.trim(),
+            token: gmailOtpCode.trim(),
+            type: "email_change",
+          });
+          if (error) throw error;
+          // Update email in users table
+          await supabase.from("users").update({ email: gmailInput.trim() }).eq("id", user.id);
+          await refreshUser();
+          setShowGmailPrompt(false);
+          toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
+        } catch (err: any) {
+          toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "ভুল কোড", variant: "destructive" });
+        } finally {
+          setGmailSubmitting(false);
+        }
+      }
+    };
+
+    return (
     <div className="min-h-screen bg-background pb-24 relative">
+      {/* Gmail force prompt for old users */}
+      <AnimatePresence>
+        {showGmailPrompt && !userHasRealEmail && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-md flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: "spring", damping: 20 }}
+              className="w-full max-w-sm text-center space-y-5"
+            >
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-primary to-[hsl(var(--cyan))] flex items-center justify-center shadow-2xl shadow-primary/30"
+              >
+                <Mail className="w-10 h-10 text-primary-foreground" />
+              </motion.div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-black">Gmail যোগ করুন 📧</h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  আপনার অ্যাকাউন্টের সুরক্ষার জন্য Gmail ভেরিফাই করতে হবে। পরবর্তী লগইনে Gmail কোড দিয়ে লগইন করতে হবে।
+                </p>
+              </div>
+              {gmailStep === "email" ? (
+                <div className="space-y-3">
+                  <input
+                    type="email"
+                    value={gmailInput}
+                    onChange={(e) => setGmailInput(e.target.value)}
+                    placeholder="আপনার Gmail লিখুন..."
+                    className="input-field text-center"
+                  />
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleGmailSubmit}
+                    disabled={gmailSubmitting}
+                    className="w-full py-3.5 rounded-2xl font-black text-primary-foreground bg-gradient-to-r from-primary to-[hsl(var(--cyan))]"
+                  >
+                    {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "কোড পাঠান"}
+                  </motion.button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">{gmailInput} এ কোড পাঠানো হয়েছে</p>
+                  <input
+                    type="text"
+                    value={gmailOtpCode}
+                    onChange={(e) => setGmailOtpCode(e.target.value)}
+                    placeholder="৬ সংখ্যার কোড..."
+                    className="input-field text-center text-2xl tracking-[0.5em] font-mono"
+                    maxLength={6}
+                  />
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleGmailSubmit}
+                    disabled={gmailSubmitting}
+                    className="w-full py-3.5 rounded-2xl font-black text-primary-foreground bg-gradient-to-r from-[hsl(var(--emerald))] to-primary"
+                  >
+                    {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "ভেরিফাই করুন"}
+                  </motion.button>
+                  <button onClick={() => setGmailStep("email")} className="text-xs text-muted-foreground hover:text-primary">
+                    অন্য Gmail ব্যবহার করুন
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary opacity-10 rounded-full blur-[150px]" />
