@@ -70,6 +70,11 @@ export default function Dashboard() {
   const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
+  const [showGmailPrompt, setShowGmailPrompt] = useState(true);
+  const [gmailInput, setGmailInput] = useState("");
+  const [gmailOtpCode, setGmailOtpCode] = useState("");
+  const [gmailStep, setGmailStep] = useState<"email" | "otp">("email");
+  const [gmailSubmitting, setGmailSubmitting] = useState(false);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
