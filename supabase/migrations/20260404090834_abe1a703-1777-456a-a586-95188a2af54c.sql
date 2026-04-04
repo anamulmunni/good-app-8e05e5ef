@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.verification_pool_one_active_key_per_user_uniq;
