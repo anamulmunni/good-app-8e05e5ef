@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [submitterRate, setSubmitterRate] = useState("");
+  const [userRequestPassword, setUserRequestPassword] = useState("");
   const [showRequestSection, setShowRequestSection] = useState(false);
   const [showWalletDrawer, setShowWalletDrawer] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
