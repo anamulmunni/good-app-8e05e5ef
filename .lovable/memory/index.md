@@ -1,4 +1,4 @@
-# GoodDollar Secure Earn App
+# Good App - Secure Earning Platform
 
 ## Design
 - Dark theme with emerald green primary (152 68% 50%)
@@ -19,3 +19,4 @@
 - User can only have ONE pending request at a time (duplicate prevention)
 - When submitting to admin: submitter's bKash number goes to admin, individual payment numbers stay in user history
 - Google login: uses lovable managed auth on lovable domains, skipBrowserRedirect on custom domains
+- Email verification: auto-confirm enabled (no custom domain yet). When domain is added, switch to OTP code verification.

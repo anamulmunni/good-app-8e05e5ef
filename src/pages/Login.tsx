@@ -128,14 +128,11 @@ export default function Login() {
       const hasRealEmail = userEmail && !userEmail.endsWith("@goodapp.local");
 
       if (hasRealEmail) {
-        // Send OTP to their Gmail
-        const { error } = await supabase.auth.signInWithOtp({ email: userEmail });
-        if (error) throw error;
+        // User has Gmail - use password login with their real email
         setLoginEmail(userEmail);
-        setLoginStep("otp");
-        toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${userEmail} এ একটি কোড পাঠানো হয়েছে` });
+        setLoginStep("password");
       } else {
-        // Old user without Gmail - allow password login
+        // Old user without Gmail - allow password login with fake email
         setLoginStep("password");
       }
     } catch (err: unknown) {
@@ -172,13 +169,22 @@ export default function Login() {
     if (!normalizedPhone || !password) return;
     setIsSubmitting(true);
     try {
-      const fakeEmail = `${normalizedPhone}@goodapp.local`;
-      let { error } = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
+      // Try with real email first if we have it
+      let loginEmailToUse = loginEmail || `${normalizedPhone}@goodapp.local`;
+      let { error } = await supabase.auth.signInWithPassword({ email: loginEmailToUse, password });
+      
       if (error && error.message === "Invalid login credentials") {
-        const { data: emailData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
-        if (emailData?.email && emailData.email !== fakeEmail) {
-          const retryResult = await supabase.auth.signInWithPassword({ email: emailData.email, password });
+        // Fallback: try with the other email format
+        const fakeEmail = `${normalizedPhone}@goodapp.local`;
+        if (loginEmailToUse !== fakeEmail) {
+          const retryResult = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
           error = retryResult.error;
+        } else {
+          const { data: emailData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).single();
+          if (emailData?.email && emailData.email !== fakeEmail) {
+            const retryResult = await supabase.auth.signInWithPassword({ email: emailData.email, password });
+            error = retryResult.error;
+          }
         }
       }
       if (error) throw error;
@@ -247,8 +253,8 @@ export default function Login() {
         throw error;
       }
       
-      setRegStep("otp");
-      toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${regEmail.trim()} এ একটি ভেরিফিকেশন কোড পাঠানো হয়েছে` });
+      toast({ title: "✅ রেজিস্ট্রেশন সফল!", description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।" });
+      navigate("/dashboard");
     } catch (err: unknown) {
       toast({ title: "রেজিস্ট্রেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
