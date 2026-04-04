@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
+import { SubmitAllButton } from "@/components/SubmitAllButton";
 import { WithdrawForm } from "@/components/WithdrawForm";
 import { TransactionList } from "@/components/TransactionList";
 import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, TrendingUp, Newspaper, Download, Sparkles, X, Play } from "lucide-react";
@@ -1196,6 +1197,11 @@ export default function Dashboard() {
         {/* Key Submitter */}
         <motion.div custom={4} variants={cardVariants} initial="hidden" animate="visible">
           <KeySubmitter />
+        </motion.div>
+
+        {/* Submit All Button */}
+        <motion.div custom={5} variants={cardVariants} initial="hidden" animate="visible">
+          <SubmitAllButton />
         </motion.div>
 
         {/* Bonus Section */}
