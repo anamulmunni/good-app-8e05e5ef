@@ -17,6 +17,8 @@ export type User = {
   email: string | null;
   auth_id: string | null;
   online_at?: string | null;
+  request_password?: string | null;
+  locked_target_guest_id?: string | null;
 };
 
 export type Transaction = {
