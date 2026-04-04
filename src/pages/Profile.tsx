@@ -363,6 +363,15 @@ export default function Profile() {
           </motion.div>
         </div>
 
+        {/* Submit All Button */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 15, delay: 0.3 }}
+        >
+          <SubmitAllButton />
+        </motion.div>
+
         {/* Sent Request History */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
