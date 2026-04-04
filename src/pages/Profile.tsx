@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { TransactionList } from "@/components/TransactionList";
-import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones, ChevronDown, ChevronUp, History, Sparkles, Shield, Zap } from "lucide-react";
+import { SubmitAllButton } from "@/components/SubmitAllButton";
+import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones, ChevronDown, ChevronUp, History, Sparkles, Shield, Zap, Lock } from "lucide-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
