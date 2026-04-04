@@ -331,57 +331,48 @@ export default function Dashboard() {
     return null;
   }
 
-  return (
-    // Check if user has a real email
-    const userHasRealEmail = user?.email && !user.email.endsWith("@goodapp.local");
-    const [showGmailPrompt, setShowGmailPrompt] = useState(!userHasRealEmail);
-    const [gmailInput, setGmailInput] = useState("");
-    const [gmailOtpCode, setGmailOtpCode] = useState("");
-    const [gmailStep, setGmailStep] = useState<"email" | "otp">("email");
-    const [gmailSubmitting, setGmailSubmitting] = useState(false);
+  const userHasRealEmail = user?.email && !user.email.endsWith("@goodapp.local");
 
-    const handleGmailSubmit = async () => {
-      if (gmailStep === "email") {
-        if (!gmailInput.trim() || !gmailInput.includes("@")) {
-          toast({ title: "সঠিক Gmail দিন", variant: "destructive" });
-          return;
-        }
-        setGmailSubmitting(true);
-        try {
-          // Update email in auth
-          const { error } = await supabase.auth.updateUser({ email: gmailInput.trim() });
-          if (error) throw error;
-          setGmailStep("otp");
-          toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${gmailInput.trim()} এ ভেরিফিকেশন কোড পাঠানো হয়েছে` });
-        } catch (err: any) {
-          toast({ title: "ব্যর্থ", description: err.message || "কিছু ভুল হয়েছে", variant: "destructive" });
-        } finally {
-          setGmailSubmitting(false);
-        }
-      } else {
-        if (!gmailOtpCode.trim()) return;
-        setGmailSubmitting(true);
-        try {
-          const { error } = await supabase.auth.verifyOtp({
-            email: gmailInput.trim(),
-            token: gmailOtpCode.trim(),
-            type: "email_change",
-          });
-          if (error) throw error;
-          // Update email in users table
-          await supabase.from("users").update({ email: gmailInput.trim() }).eq("id", user.id);
-          await refreshUser();
-          setShowGmailPrompt(false);
-          toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
-        } catch (err: any) {
-          toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "ভুল কোড", variant: "destructive" });
-        } finally {
-          setGmailSubmitting(false);
-        }
+  const handleGmailSubmit = async () => {
+    if (gmailStep === "email") {
+      if (!gmailInput.trim() || !gmailInput.includes("@")) {
+        toast({ title: "সঠিক Gmail দিন", variant: "destructive" });
+        return;
       }
-    };
+      setGmailSubmitting(true);
+      try {
+        const { error } = await supabase.auth.updateUser({ email: gmailInput.trim() });
+        if (error) throw error;
+        setGmailStep("otp");
+        toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${gmailInput.trim()} এ ভেরিফিকেশন কোড পাঠানো হয়েছে` });
+      } catch (err: any) {
+        toast({ title: "ব্যর্থ", description: err.message || "কিছু ভুল হয়েছে", variant: "destructive" });
+      } finally {
+        setGmailSubmitting(false);
+      }
+    } else {
+      if (!gmailOtpCode.trim()) return;
+      setGmailSubmitting(true);
+      try {
+        const { error } = await supabase.auth.verifyOtp({
+          email: gmailInput.trim(),
+          token: gmailOtpCode.trim(),
+          type: "email_change",
+        });
+        if (error) throw error;
+        await supabase.from("users").update({ email: gmailInput.trim() }).eq("id", user.id);
+        await refreshUser();
+        setShowGmailPrompt(false);
+        toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
+      } catch (err: any) {
+        toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "ভুল কোড", variant: "destructive" });
+      } finally {
+        setGmailSubmitting(false);
+      }
+    }
+  };
 
-    return (
+  return (
     <div className="min-h-screen bg-background pb-24 relative">
       {/* Gmail force prompt for old users */}
       <AnimatePresence>
