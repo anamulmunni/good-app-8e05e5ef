@@ -1199,6 +1199,11 @@ export default function Dashboard() {
           <KeySubmitter />
         </motion.div>
 
+        {/* Submit All Button */}
+        <motion.div custom={5} variants={cardVariants} initial="hidden" animate="visible">
+          <SubmitAllButton />
+        </motion.div>
+
         {/* Bonus Section */}
         {bonusEnabled && (
           <motion.div
