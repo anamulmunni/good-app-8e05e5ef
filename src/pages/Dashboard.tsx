@@ -970,8 +970,27 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <input type="text" value={requestTargetNumber} onChange={(e) => setRequestTargetNumber(e.target.value)}
-                        placeholder="যার কাছে রিকুয়েস্ট যাবে (User ID দিন)" className="input-field" />
+                      {(user as any).locked_target_guest_id ? (
+                        <div className="bg-primary/10 border border-primary/20 rounded-xl p-3">
+                          <p className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><Lock className="w-3 h-3" /> লক করা টার্গেট</p>
+                          <p className="text-sm font-mono font-black text-primary">{(user as any).locked_target_guest_id}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">Admin থেকে আনলক করতে হবে অন্য কাউকে request দিতে</p>
+                        </div>
+                      ) : (
+                        <input type="text" value={requestTargetNumber} onChange={(e) => setRequestTargetNumber(e.target.value)}
+                          placeholder="যার কাছে রিকুয়েস্ট যাবে (User ID দিন)" className="input-field" />
+                      )}
+                      <div className="bg-[hsl(var(--purple))]/10 border border-[hsl(var(--purple))]/20 rounded-xl p-3 space-y-2">
+                        <p className="text-xs font-bold text-[hsl(var(--purple))] flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5" />
+                          {(user as any).request_password ? "Request পাসওয়ার্ড দিন" : "Request পাসওয়ার্ড সেট করুন (প্রথমবার)"}
+                        </p>
+                        <input type="password" value={userRequestPassword} onChange={(e) => setUserRequestPassword(e.target.value)}
+                          placeholder={(user as any).request_password ? "আপনার পাসওয়ার্ড দিন..." : "নতুন পাসওয়ার্ড সেট করুন..."} className="input-field" />
+                        {!(user as any).request_password && (
+                          <p className="text-[10px] text-muted-foreground">⚠️ এই পাসওয়ার্ড পরে request দিতে লাগবে, মনে রাখুন</p>
+                        )}
+                      </div>
                       <div className="bg-secondary/30 p-4 rounded-xl border border-border/50 space-y-3">
                         <p className="text-sm font-bold">আপনার পেমেন্ট নম্বর</p>
                         <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
@@ -1012,7 +1031,7 @@ export default function Dashboard() {
                         whileHover={{ scale: 1.03, y: -2 }}
                         onClick={() => createUserRequestMutation.mutate()}
                         className="w-full relative py-3.5 rounded-2xl font-black overflow-hidden"
-                        disabled={isRequestLocked || createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
+                        disabled={isRequestLocked || createUserRequestMutation.isPending || (!(user as any).locked_target_guest_id && !requestTargetNumber.trim()) || !requestPaymentNumber.trim() || !userRequestPassword.trim()}>
                         <motion.div
                           className="absolute inset-0 bg-gradient-to-r from-primary via-[hsl(var(--cyan))] to-primary"
                           animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
