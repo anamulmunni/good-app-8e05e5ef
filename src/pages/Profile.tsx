@@ -371,6 +371,202 @@ export default function Profile() {
           </motion.div>
         </div>
 
+        {/* Account Settings - Password Change */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 15, delay: 0.25 }}
+        >
+          <div className="rounded-3xl overflow-hidden relative">
+            <motion.div
+              className="absolute -inset-[1px] rounded-3xl z-0 opacity-50"
+              style={{ background: "linear-gradient(135deg, hsl(var(--amber) / 0.5), transparent 50%, hsl(var(--orange) / 0.5))" }}
+            />
+            <div className="relative z-10 bg-card rounded-3xl overflow-hidden">
+              <motion.button
+                onClick={() => setShowSettings(!showSettings)}
+                className="w-full p-5 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="flex items-center gap-3">
+                  <motion.div
+                    className="p-2.5 rounded-xl bg-[hsl(var(--amber))]/10"
+                    animate={{ rotate: showSettings ? 360 : 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <KeyRound className="w-5 h-5 text-[hsl(var(--amber))]" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-lg font-bold">অ্যাকাউন্ট সেটিংস</h3>
+                    <p className="text-[10px] text-muted-foreground">পাসওয়ার্ড পরিবর্তন করুন</p>
+                  </div>
+                </div>
+                <motion.div animate={{ rotate: showSettings ? 180 : 0 }} transition={{ duration: 0.3 }}>
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                </motion.div>
+              </motion.button>
+              <AnimatePresence>
+                {showSettings && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-5 pb-5 space-y-4">
+                      {/* Email info */}
+                      <div className="bg-secondary/40 rounded-xl p-3 flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-primary" />
+                        <p className="text-sm">{user?.email || "Gmail সেট করা হয়নি"}</p>
+                      </div>
+
+                      {!settingsOtpVerified ? (
+                        <div className="space-y-3">
+                          <p className="text-xs text-muted-foreground">পাসওয়ার্ড পরিবর্তন করতে Gmail কোড দিয়ে ভেরিফাই করুন</p>
+                          {!settingsOtpSent ? (
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              disabled={settingsSubmitting || !user?.email || user.email.endsWith("@goodapp.local")}
+                              onClick={async () => {
+                                setSettingsSubmitting(true);
+                                try {
+                                  const { error } = await supabase.auth.signInWithOtp({ email: user!.email! });
+                                  if (error) throw error;
+                                  setSettingsOtpSent(true);
+                                  setSettingsOtpEmail(user!.email!);
+                                  toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${user!.email} এ কোড পাঠানো হয়েছে` });
+                                } catch (err: any) {
+                                  toast({ title: "ব্যর্থ", description: err.message, variant: "destructive" });
+                                } finally {
+                                  setSettingsSubmitting(false);
+                                }
+                              }}
+                              className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-[hsl(var(--amber))] to-[hsl(var(--orange))] text-primary-foreground"
+                            >
+                              {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "📧 Gmail এ কোড পাঠান"}
+                            </motion.button>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-xs text-muted-foreground">{settingsOtpEmail} এ কোড পাঠানো হয়েছে</p>
+                              <input
+                                type="text"
+                                value={settingsOtpCode}
+                                onChange={(e) => setSettingsOtpCode(e.target.value)}
+                                placeholder="৬ সংখ্যার কোড..."
+                                className="input-field text-center text-xl tracking-[0.4em] font-mono"
+                                maxLength={6}
+                              />
+                              <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                disabled={settingsSubmitting || !settingsOtpCode.trim()}
+                                onClick={async () => {
+                                  setSettingsSubmitting(true);
+                                  try {
+                                    const { error } = await supabase.auth.verifyOtp({
+                                      email: settingsOtpEmail,
+                                      token: settingsOtpCode.trim(),
+                                      type: "email",
+                                    });
+                                    if (error) throw error;
+                                    setSettingsOtpVerified(true);
+                                    toast({ title: "✅ ভেরিফাই হয়েছে!" });
+                                  } catch (err: any) {
+                                    toast({ title: "ভুল কোড", description: err.message, variant: "destructive" });
+                                  } finally {
+                                    setSettingsSubmitting(false);
+                                  }
+                                }}
+                                className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-[hsl(var(--emerald))] to-primary text-primary-foreground"
+                              >
+                                {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "ভেরিফাই করুন"}
+                              </motion.button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="bg-[hsl(var(--emerald))]/10 border border-[hsl(var(--emerald))]/20 rounded-xl p-3 text-center">
+                            <p className="text-sm font-bold text-[hsl(var(--emerald))]">✅ ভেরিফাইড — পাসওয়ার্ড পরিবর্তন করুন</p>
+                          </div>
+
+                          {/* Change Login Password */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-bold flex items-center gap-1.5">
+                              <Lock className="w-3.5 h-3.5 text-primary" /> লগইন পাসওয়ার্ড পরিবর্তন
+                            </p>
+                            <input
+                              type="password"
+                              value={newLoginPassword}
+                              onChange={(e) => setNewLoginPassword(e.target.value)}
+                              placeholder="নতুন লগইন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)..."
+                              className="input-field text-sm"
+                            />
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              disabled={settingsSubmitting || newLoginPassword.length < 6}
+                              onClick={async () => {
+                                setSettingsSubmitting(true);
+                                try {
+                                  const { error } = await supabase.auth.updateUser({ password: newLoginPassword });
+                                  if (error) throw error;
+                                  setNewLoginPassword("");
+                                  toast({ title: "✅ লগইন পাসওয়ার্ড পরিবর্তন হয়েছে" });
+                                } catch (err: any) {
+                                  toast({ title: "ব্যর্থ", description: err.message, variant: "destructive" });
+                                } finally {
+                                  setSettingsSubmitting(false);
+                                }
+                              }}
+                              className="w-full py-2.5 rounded-xl font-bold text-xs bg-primary text-primary-foreground"
+                            >
+                              {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "লগইন পাসওয়ার্ড সেভ"}
+                            </motion.button>
+                          </div>
+
+                          {/* Change Request Password */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-bold flex items-center gap-1.5">
+                              <KeyRound className="w-3.5 h-3.5 text-[hsl(var(--amber))]" /> Request পাসওয়ার্ড পরিবর্তন
+                            </p>
+                            <input
+                              type="password"
+                              value={newRequestPassword}
+                              onChange={(e) => setNewRequestPassword(e.target.value)}
+                              placeholder="নতুন request পাসওয়ার্ড..."
+                              className="input-field text-sm"
+                            />
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              disabled={settingsSubmitting || !newRequestPassword.trim()}
+                              onClick={async () => {
+                                setSettingsSubmitting(true);
+                                try {
+                                  await supabase.from("users").update({ request_password: newRequestPassword.trim() } as any).eq("id", user!.id);
+                                  await refreshUser();
+                                  setNewRequestPassword("");
+                                  toast({ title: "✅ Request পাসওয়ার্ড পরিবর্তন হয়েছে" });
+                                } catch (err: any) {
+                                  toast({ title: "ব্যর্থ", description: err.message, variant: "destructive" });
+                                } finally {
+                                  setSettingsSubmitting(false);
+                                }
+                              }}
+                              className="w-full py-2.5 rounded-xl font-bold text-xs bg-[hsl(var(--amber))] text-primary-foreground"
+                            >
+                              {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Request পাসওয়ার্ড সেভ"}
+                            </motion.button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Submit All Button */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
