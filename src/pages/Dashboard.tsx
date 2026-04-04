@@ -97,20 +97,33 @@ export default function Dashboard() {
   const createUserRequestMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
-      // Re-fetch latest settings to prevent stale page issue
+      
+      // Request password check
+      if (!userRequestPassword.trim()) throw new Error("Request পাসওয়ার্ড দিন");
+      if ((user as any).request_password && userRequestPassword !== (user as any).request_password) {
+        throw new Error("Request পাসওয়ার্ড ভুল হয়েছে");
+      }
+      
+      // Target lock check
+      let targetInput = requestTargetNumber.trim();
+      if ((user as any).locked_target_guest_id) {
+        targetInput = (user as any).locked_target_guest_id;
+      }
+      if (!targetInput) throw new Error("টার্গেট ইউজার দিন");
+      
       const freshSettings = await getPublicSettings();
       const freshMinVerified = freshSettings.minRequestVerified || 10;
       if ((user.key_count || 0) < freshMinVerified) {
         throw new Error(`সর্বনিম্ন ${freshMinVerified} টি ভেরিফাইড কাউন্ট দরকার। আপনার আছে ${user.key_count || 0} টি।`);
       }
-      // Look up target user by numeric ID or guest_id
-      const targetInput = requestTargetNumber.trim();
+      
       let targetGuestId = targetInput;
       if (/^\d+$/.test(targetInput)) {
         const { data: targetUser } = await supabase.from("users").select("guest_id").eq("id", parseInt(targetInput)).maybeSingle();
         if (!targetUser) throw new Error("এই ID তে কোনো ইউজার পাওয়া যায়নি");
         targetGuestId = targetUser.guest_id;
       }
+      
       await createUserTransferRequest({
         requesterUserId: user.id,
         requesterGuestId: user.guest_id,
@@ -119,10 +132,19 @@ export default function Dashboard() {
         requesterPaymentMethod: requestPaymentMethod,
         targetGuestId: targetGuestId,
       });
+      
+      // Set password and lock target if first time
+      const updates: Record<string, string> = {};
+      if (!(user as any).request_password) updates.request_password = userRequestPassword.trim();
+      if (!(user as any).locked_target_guest_id) updates.locked_target_guest_id = targetGuestId;
+      if (Object.keys(updates).length > 0) {
+        await supabase.from("users").update(updates).eq("id", user.id);
+        await refreshUser();
+      }
     },
     onSuccess: () => {
-      setRequestTargetNumber("");
       setRequestPaymentNumber("");
+      setUserRequestPassword("");
       toast({ title: "রিকুয়েস্ট পাঠানো হয়েছে" });
     },
     onError: (error: Error) => {
