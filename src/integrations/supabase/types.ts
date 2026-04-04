@@ -845,9 +845,11 @@ export type Database = {
           is_verified_badge: boolean
           key_count: number
           last_reels_seen_at: string | null
+          locked_target_guest_id: string | null
           online_at: string | null
           payment_scheduled_at: string | null
           payment_status: string
+          request_password: string | null
           watched_video_url: string | null
         }
         Insert: {
@@ -864,9 +866,11 @@ export type Database = {
           is_verified_badge?: boolean
           key_count?: number
           last_reels_seen_at?: string | null
+          locked_target_guest_id?: string | null
           online_at?: string | null
           payment_scheduled_at?: string | null
           payment_status?: string
+          request_password?: string | null
           watched_video_url?: string | null
         }
         Update: {
@@ -883,9 +887,11 @@ export type Database = {
           is_verified_badge?: boolean
           key_count?: number
           last_reels_seen_at?: string | null
+          locked_target_guest_id?: string | null
           online_at?: string | null
           payment_scheduled_at?: string | null
           payment_status?: string
+          request_password?: string | null
           watched_video_url?: string | null
         }
         Relationships: []
