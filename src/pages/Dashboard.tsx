@@ -1274,14 +1274,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* Transaction History */}
-        <motion.div custom={6} variants={cardVariants} initial="hidden" animate="visible" className="pt-2">
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Recent History</h3>
-          </div>
-          <TransactionList />
-        </motion.div>
       </main>
 
       {/* Floating Action Buttons */}

@@ -86,7 +86,7 @@ export function useAuth() {
         setIsLoading(false);
       });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
       if (session?.user) {
         // Skip if we already fetched on mount
@@ -101,7 +101,8 @@ export function useAuth() {
           .finally(() => {
             if (isMounted) setIsLoading(false);
           });
-      } else {
+      } else if (event === 'SIGNED_OUT') {
+        // Only clear user on explicit sign out, not on token refresh issues
         setUser(null);
         setIsLoading(false);
       }
