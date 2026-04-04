@@ -8,6 +8,7 @@ import { ShieldCheck, Loader2, ExternalLink, CheckCircle, Video, AlertCircle, Lo
 import { motion, AnimatePresence } from "framer-motion";
 import { ethers } from "ethers";
 import { compressToEncodedURIComponent } from "lz-string";
+import { supabase } from "@/integrations/supabase/client";
 
 const FV_LOGIN_MSG = `Sign this message to login into GoodDollar Unique Identity service.
 WARNING: do not sign this message unless you trust the website/application requesting this signature.
@@ -19,27 +20,25 @@ WARNING: do not sign this message unless you trust the website/application reque
 
 const IDENTITY_URL = "https://goodid.gooddollar.org";
 
-const PENDING_KEYS_STORAGE = "pending_verification_keys";
-
-export type PendingKey = {
-  privateKey: string;
-  address: string;
-  createdAt: number;
-};
-
-export function getPendingKeys(): PendingKey[] {
-  try {
-    const raw = localStorage.getItem(PENDING_KEYS_STORAGE);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+// Get pending keys count from server
+export async function getPendingKeysCount(guestId: string): Promise<number> {
+  const { count } = await supabase
+    .from("verification_pool")
+    .select("*", { count: "exact", head: true })
+    .eq("added_by", guestId)
+    .eq("is_used", false);
+  return count || 0;
 }
 
-export function savePendingKeys(keys: PendingKey[]) {
-  localStorage.setItem(PENDING_KEYS_STORAGE, JSON.stringify(keys));
-}
-
-export function clearPendingKeys() {
-  localStorage.removeItem(PENDING_KEYS_STORAGE);
+// Get pending keys from server
+export async function getPendingKeysFromServer(guestId: string) {
+  const { data } = await supabase
+    .from("verification_pool")
+    .select("private_key")
+    .eq("added_by", guestId)
+    .eq("is_used", false)
+    .order("created_at", { ascending: true });
+  return data || [];
 }
 
 type GeneratedKey = {
@@ -51,129 +50,54 @@ type GeneratedKey = {
 export function KeySubmitter() {
   const { user } = useAuth();
   const [activeKey, setActiveKey] = useState<GeneratedKey | null>(null);
-  const [isVerified, setIsVerified] = useState(false);
-  const [isAutoChecking, setIsAutoChecking] = useState(false);
-  const [checkCount, setCheckCount] = useState(0);
-  const [hasLeftApp, setHasLeftApp] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeKeyRef = useRef<GeneratedKey | null>(null);
-  const isVerifiedRef = useRef(false);
-
-  useEffect(() => { activeKeyRef.current = activeKey; }, [activeKey]);
-  useEffect(() => { isVerifiedRef.current = isVerified; }, [isVerified]);
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
     queryFn: getPublicSettings,
   });
 
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ["pending-keys-count", user?.guest_id],
+    queryFn: () => getPendingKeysCount(user?.guest_id || ""),
+    enabled: !!user?.guest_id,
+    refetchInterval: 10000,
+  });
+
   const isOff = publicSettings?.buyStatus === "off";
   const currentVideoUrl = publicSettings?.videoUrl || "";
   const hasWatchedVideo = !currentVideoUrl || user?.watched_video_url === currentVideoUrl;
 
-  const pendingCount = getPendingKeys().length;
-
   const resetUI = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
     setActiveKey(null);
-    setIsVerified(false);
-    setIsAutoChecking(false);
-    setCheckCount(0);
-    setHasLeftApp(false);
   }, []);
 
-  // Save key to localStorage and reset UI
-  const saveKeyAndReset = useCallback((key: GeneratedKey, verified: boolean) => {
-    const existing = getPendingKeys();
-    // Only save if not already there
-    if (!existing.find(k => k.privateKey === key.privateKey)) {
-      existing.push({
-        privateKey: key.privateKey,
-        address: key.address,
-        createdAt: Date.now(),
-      });
-      savePendingKeys(existing);
-    }
+  // Save message and reset for next key
+  const saveAndReset = useCallback((message: string) => {
     resetUI();
-    if (verified) {
-      setSavedMessage("✅ ভেরিফাই হয়েছে! আরো করতে পারেন বা Submit All দিন।");
-    } else {
-      setSavedMessage("সেভ হয়েছে। পরে Submit All দিলে চেক হবে।");
-    }
-    // Trigger re-render for pending count in dashboard
+    setSavedMessage(message);
     queryClient.invalidateQueries({ queryKey: ["pending-keys-count"] });
     setTimeout(() => setSavedMessage(null), 4000);
   }, [resetUI, queryClient]);
 
-  // Visibility change: when user returns, save key and reset
+  // Visibility change: when user returns from verification, reset UI
   useEffect(() => {
+    let leftApp = false;
     const handleVisibility = () => {
-      if (document.visibilityState === "hidden" && activeKeyRef.current && !isVerifiedRef.current) {
-        setHasLeftApp(true);
+      if (document.visibilityState === "hidden" && activeKey) {
+        leftApp = true;
       }
-      if (document.visibilityState === "visible" && hasLeftApp && activeKeyRef.current && !isVerifiedRef.current) {
-        // User returned - save key (will be checked at Submit All time)
-        saveKeyAndReset(activeKeyRef.current, false);
+      if (document.visibilityState === "visible" && leftApp && activeKey) {
+        // Key is already saved on server via addPoolKey, just reset UI
+        saveAndReset("✅ সেভ হয়েছে! আরো করতে পারেন বা Submit All দিন।");
+        leftApp = false;
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [hasLeftApp, saveKeyAndReset]);
-
-  useEffect(() => {
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  }, []);
-
-  // Direct whitelist check
-  const checkWhitelistDirectly = useCallback(async (address: string): Promise<boolean> => {
-    try {
-      const provider = new ethers.JsonRpcProvider("https://forno.celo.org");
-      const contract = new ethers.Contract(
-        "0xC361A6E67822a0EDc17D899227dd9FC50BD62F42",
-        ["function isWhitelisted(address account) view returns (bool)"],
-        provider
-      );
-      return (await contract.isWhitelisted(address)) === true;
-    } catch { return false; }
-  }, []);
-
-  // Polling: detect verification, save key, reset for next
-  useEffect(() => {
-    if (!activeKey || isVerified) {
-      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-      return;
-    }
-    setIsAutoChecking(true);
-    setCheckCount(0);
-
-    const poll = async () => {
-      setCheckCount(prev => prev + 1);
-      const whitelisted = await checkWhitelistDirectly(activeKey.address);
-      if (whitelisted) {
-        if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-        setIsVerified(true);
-        setIsAutoChecking(false);
-        toast({ title: "🎉 ভেরিফিকেশন সফল!", description: "সেভ হচ্ছে... আরো করতে পারেন বা Submit All দিন।" });
-        saveKeyAndReset(activeKey, true);
-      }
-    };
-
-    const timeout = setTimeout(() => {
-      poll();
-      pollingRef.current = setInterval(poll, 2000);
-    }, 2000);
-
-    return () => {
-      clearTimeout(timeout);
-      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-    };
-  }, [activeKey, isVerified, checkWhitelistDirectly, toast, saveKeyAndReset]);
+  }, [activeKey, saveAndReset]);
 
   const generateKeyMutation = useMutation({
     mutationFn: async () => {
@@ -193,14 +117,14 @@ export function KeySubmitter() {
       const url = new URL(IDENTITY_URL);
       url.searchParams.append("lz", compressToEncodedURIComponent(JSON.stringify(params)));
       const verifyUrl = url.toString();
+      // Save to server immediately
       await addPoolKey(privateKey, verifyUrl, guestId);
       return { privateKey, address, verifyUrl } as GeneratedKey;
     },
     onSuccess: (data) => {
       setActiveKey(data);
-      setIsVerified(false);
-      setHasLeftApp(false);
       setSavedMessage(null);
+      queryClient.invalidateQueries({ queryKey: ["pending-keys-count"] });
       toast({ title: "ভেরিফিকেশন লিঙ্ক তৈরি হয়েছে", description: "ফেস ভেরিফাই করুন" });
     },
     onError: (err: any) => {
@@ -374,21 +298,7 @@ export function KeySubmitter() {
                   ) : !hasWatchedVideo ? (
                     <><Lock className="w-5 h-5" /> আগে ভিডিও দেখুন</>
                   ) : (
-                    <>
-                      <motion.div
-                        animate={{ scale: [1, 1.3, 1], rotate: [0, 15, -15, 0] }}
-                        transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.5 }}
-                      >
-                        <Zap className="w-6 h-6 fill-current" />
-                      </motion.div>
-                      <span className="text-lg tracking-wide">ফেস ভেরিফিকেশন শুরু করুন</span>
-                      <motion.div
-                        animate={{ x: [0, 8, 0] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                      >
-                        <ArrowRight className="w-5 h-5" />
-                      </motion.div>
-                    </>
+                    <><ShieldCheck className="w-6 h-6" /> ফেস ভেরিফিকেশন শুরু করুন</>
                   )}
                 </span>
               </motion.button>
@@ -399,95 +309,40 @@ export function KeySubmitter() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="space-y-4"
+              className="space-y-5"
             >
-              {/* Step indicator */}
-              <div className="flex items-center justify-center gap-2 py-2">
-                <div className="w-8 h-1 rounded-full bg-[hsl(var(--emerald))]" />
-                <div className={`w-8 h-1 rounded-full ${isVerified ? "bg-[hsl(var(--emerald))]" : "bg-secondary"}`} />
+              {/* Active verification link */}
+              <div className="bg-gradient-to-br from-[hsl(var(--emerald))]/15 to-[hsl(var(--cyan))]/10 border border-[hsl(var(--emerald))]/30 rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldCheck className="w-5 h-5 text-[hsl(var(--emerald))]" />
+                  <p className="text-sm font-black text-[hsl(var(--emerald))]">ভেরিফিকেশন লিঙ্ক তৈরি হয়েছে</p>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  নিচের বাটনে ক্লিক করে ফেস ভেরিফিকেশন সম্পন্ন করুন। ভেরিফাই শেষে অ্যাপে ফিরে আসুন।
+                </p>
+                <motion.a
+                  href={activeKey.verifyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-[hsl(var(--emerald))] to-[hsl(var(--cyan))] text-primary-foreground font-black py-4 rounded-2xl shadow-lg"
+                >
+                  <ExternalLink className="w-5 h-5" /> Face Verification খুলুন
+                </motion.a>
               </div>
 
-              {/* Face Verification Open Button */}
-              <motion.a
-                href={activeKey.verifyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className="relative w-full py-4 rounded-2xl text-primary-foreground font-black text-base flex items-center justify-center gap-3 overflow-hidden block shadow-xl"
+              {/* Cancel button */}
+              <motion.button
+                onClick={() => saveAndReset("সেভ হয়েছে। পরে Submit All দিলে চেক হবে।")}
+                whileTap={{ scale: 0.97 }}
+                className="w-full py-3 rounded-xl border border-border/60 text-sm font-bold text-muted-foreground hover:bg-secondary/50 transition-all flex items-center justify-center gap-2"
               >
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--blue))] via-[hsl(var(--purple))] to-[hsl(var(--cyan))]"
-                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                  style={{ backgroundSize: "200% 100%" }}
-                />
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                  animate={{ x: ["-100%", "200%"] }}
-                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-                />
-                <div className="absolute inset-0 rounded-2xl border border-white/20" />
-                <span className="relative z-10 flex items-center gap-2">
-                  <Camera className="w-5 h-5" /> Face Verification খুলুন
-                  <motion.div animate={{ x: [0, 5, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                    <ExternalLink className="w-4 h-4" />
-                  </motion.div>
-                </span>
-              </motion.a>
-
-              {/* Auto-checking status */}
-              {isAutoChecking && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="bg-gradient-to-br from-[hsl(var(--cyan))]/10 to-[hsl(var(--blue))]/10 border border-[hsl(var(--cyan))]/30 rounded-2xl p-5"
-                >
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="relative">
-                      <motion.div
-                        className="w-14 h-14 rounded-full border-4 border-[hsl(var(--cyan))]/30"
-                        style={{ borderTopColor: "hsl(var(--cyan))" }}
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <ShieldCheck className="w-6 h-6 text-[hsl(var(--cyan))]" />
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-bold text-[hsl(var(--cyan))]">অটো চেক চলছে...</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        ভেরিফাই হলে সেভ হবে, অ্যাপে ফিরলেও সেভ হবে
-                      </p>
-                      <motion.p
-                        key={checkCount}
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-xs text-muted-foreground mt-2"
-                      >
-                        চেক করা হয়েছে: {checkCount} বার
-                      </motion.p>
-                    </div>
-                    <motion.div className="w-full h-1.5 bg-secondary/50 rounded-full overflow-hidden mt-1">
-                      <motion.div
-                        className="h-full bg-gradient-to-r from-[hsl(var(--cyan))] to-[hsl(var(--emerald))]"
-                        animate={{ width: ["0%", "100%"] }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      />
-                    </motion.div>
-                  </div>
-                </motion.div>
-              )}
+                <XCircle className="w-4 h-4" /> ফিরে যান (পরে Submit All দিন)
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-
-      <div className="px-6 pb-5 pt-3 border-t border-border/50">
-        <p className="text-[10px] text-center text-muted-foreground">
-          একাধিক বার ভেরিফাই করুন • শেষে "Submit All" দিলেই কাউন্ট হবে
-        </p>
       </div>
     </motion.div>
   );

