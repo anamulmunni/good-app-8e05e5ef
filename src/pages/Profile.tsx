@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { TransactionList } from "@/components/TransactionList";
-import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones, ChevronDown, ChevronUp, History, Sparkles, Shield, Zap } from "lucide-react";
+import { SubmitAllButton } from "@/components/SubmitAllButton";
+import { ArrowLeft, Camera, User, Copy, Check, Pencil, X, Save, Key, Calendar, Phone, MessageCircle, Send, Headphones, ChevronDown, ChevronUp, History, Sparkles, Shield, Zap, Lock } from "lucide-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -361,6 +362,15 @@ export default function Profile() {
             </div>
           </motion.div>
         </div>
+
+        {/* Submit All Button */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 15, delay: 0.3 }}
+        >
+          <SubmitAllButton />
+        </motion.div>
 
         {/* Sent Request History */}
         <motion.div

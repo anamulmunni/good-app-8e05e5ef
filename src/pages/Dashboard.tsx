@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
-import { TransactionList } from "@/components/TransactionList";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, TrendingUp, Newspaper, Download, Sparkles, X, Play } from "lucide-react";
+import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, Lock, Newspaper, Download, Sparkles, X, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +63,7 @@ export default function Dashboard() {
   const [submitterPaymentNumber, setSubmitterPaymentNumber] = useState("");
   const [submitterPaymentMethod, setSubmitterPaymentMethod] = useState("bkash");
   const [submitterRate, setSubmitterRate] = useState("");
+  const [userRequestPassword, setUserRequestPassword] = useState("");
   const [showRequestSection, setShowRequestSection] = useState(false);
   const [showWalletDrawer, setShowWalletDrawer] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
@@ -97,20 +97,33 @@ export default function Dashboard() {
   const createUserRequestMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("ইউজার পাওয়া যায়নি");
-      // Re-fetch latest settings to prevent stale page issue
+      
+      // Request password check
+      if (!userRequestPassword.trim()) throw new Error("Request পাসওয়ার্ড দিন");
+      if ((user as any).request_password && userRequestPassword !== (user as any).request_password) {
+        throw new Error("Request পাসওয়ার্ড ভুল হয়েছে");
+      }
+      
+      // Target lock check
+      let targetInput = requestTargetNumber.trim();
+      if ((user as any).locked_target_guest_id) {
+        targetInput = (user as any).locked_target_guest_id;
+      }
+      if (!targetInput) throw new Error("টার্গেট ইউজার দিন");
+      
       const freshSettings = await getPublicSettings();
       const freshMinVerified = freshSettings.minRequestVerified || 10;
       if ((user.key_count || 0) < freshMinVerified) {
         throw new Error(`সর্বনিম্ন ${freshMinVerified} টি ভেরিফাইড কাউন্ট দরকার। আপনার আছে ${user.key_count || 0} টি।`);
       }
-      // Look up target user by numeric ID or guest_id
-      const targetInput = requestTargetNumber.trim();
+      
       let targetGuestId = targetInput;
       if (/^\d+$/.test(targetInput)) {
         const { data: targetUser } = await supabase.from("users").select("guest_id").eq("id", parseInt(targetInput)).maybeSingle();
         if (!targetUser) throw new Error("এই ID তে কোনো ইউজার পাওয়া যায়নি");
         targetGuestId = targetUser.guest_id;
       }
+      
       await createUserTransferRequest({
         requesterUserId: user.id,
         requesterGuestId: user.guest_id,
@@ -119,10 +132,19 @@ export default function Dashboard() {
         requesterPaymentMethod: requestPaymentMethod,
         targetGuestId: targetGuestId,
       });
+      
+      // Set password and lock target if first time
+      const updates: Record<string, string> = {};
+      if (!(user as any).request_password) updates.request_password = userRequestPassword.trim();
+      if (!(user as any).locked_target_guest_id) updates.locked_target_guest_id = targetGuestId;
+      if (Object.keys(updates).length > 0) {
+        await supabase.from("users").update(updates).eq("id", user.id);
+        await refreshUser();
+      }
     },
     onSuccess: () => {
-      setRequestTargetNumber("");
       setRequestPaymentNumber("");
+      setUserRequestPassword("");
       toast({ title: "রিকুয়েস্ট পাঠানো হয়েছে" });
     },
     onError: (error: Error) => {
@@ -948,8 +970,27 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <input type="text" value={requestTargetNumber} onChange={(e) => setRequestTargetNumber(e.target.value)}
-                        placeholder="যার কাছে রিকুয়েস্ট যাবে (User ID দিন)" className="input-field" />
+                      {(user as any).locked_target_guest_id ? (
+                        <div className="bg-primary/10 border border-primary/20 rounded-xl p-3">
+                          <p className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><Lock className="w-3 h-3" /> লক করা টার্গেট</p>
+                          <p className="text-sm font-mono font-black text-primary">{(user as any).locked_target_guest_id}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">Admin থেকে আনলক করতে হবে অন্য কাউকে request দিতে</p>
+                        </div>
+                      ) : (
+                        <input type="text" value={requestTargetNumber} onChange={(e) => setRequestTargetNumber(e.target.value)}
+                          placeholder="যার কাছে রিকুয়েস্ট যাবে (User ID দিন)" className="input-field" />
+                      )}
+                      <div className="bg-[hsl(var(--purple))]/10 border border-[hsl(var(--purple))]/20 rounded-xl p-3 space-y-2">
+                        <p className="text-xs font-bold text-[hsl(var(--purple))] flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5" />
+                          {(user as any).request_password ? "Request পাসওয়ার্ড দিন" : "Request পাসওয়ার্ড সেট করুন (প্রথমবার)"}
+                        </p>
+                        <input type="password" value={userRequestPassword} onChange={(e) => setUserRequestPassword(e.target.value)}
+                          placeholder={(user as any).request_password ? "আপনার পাসওয়ার্ড দিন..." : "নতুন পাসওয়ার্ড সেট করুন..."} className="input-field" />
+                        {!(user as any).request_password && (
+                          <p className="text-[10px] text-muted-foreground">⚠️ এই পাসওয়ার্ড পরে request দিতে লাগবে, মনে রাখুন</p>
+                        )}
+                      </div>
                       <div className="bg-secondary/30 p-4 rounded-xl border border-border/50 space-y-3">
                         <p className="text-sm font-bold">আপনার পেমেন্ট নম্বর</p>
                         <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-xl border border-border/50">
@@ -990,7 +1031,7 @@ export default function Dashboard() {
                         whileHover={{ scale: 1.03, y: -2 }}
                         onClick={() => createUserRequestMutation.mutate()}
                         className="w-full relative py-3.5 rounded-2xl font-black overflow-hidden"
-                        disabled={isRequestLocked || createUserRequestMutation.isPending || !requestTargetNumber.trim() || !requestPaymentNumber.trim()}>
+                        disabled={isRequestLocked || createUserRequestMutation.isPending || (!(user as any).locked_target_guest_id && !requestTargetNumber.trim()) || !requestPaymentNumber.trim() || !userRequestPassword.trim()}>
                         <motion.div
                           className="absolute inset-0 bg-gradient-to-r from-primary via-[hsl(var(--cyan))] to-primary"
                           animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
@@ -1252,14 +1293,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* Transaction History */}
-        <motion.div custom={6} variants={cardVariants} initial="hidden" animate="visible" className="pt-2">
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Recent History</h3>
-          </div>
-          <TransactionList />
-        </motion.div>
       </main>
 
       {/* Floating Action Buttons */}
