@@ -329,7 +329,6 @@ export default function Dashboard() {
     return null;
   }
 
-  const userHasRealEmail = user?.email && !user.email.endsWith("@goodapp.local");
 
 
 
