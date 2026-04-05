@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
-import { User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, Lock, Newspaper, Download, Sparkles, X, Play, Mail } from "lucide-react";
+import { User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, Lock, Newspaper, Download, Sparkles, X, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
