@@ -378,7 +378,7 @@ export default function Dashboard() {
         await supabase.from("users").update(updates).eq("id", user.id);
         localStorage.removeItem(PENDING_EMAIL_LINK_KEY);
         await refreshUser();
-        setShowGmailPrompt(false);
+        // Gmail verified
         toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
       } catch (err: any) {
         toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "Gmail link open করে আবার চেষ্টা করুন", variant: "destructive" });
