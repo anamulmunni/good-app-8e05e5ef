@@ -72,7 +72,7 @@ export default function Dashboard() {
   const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
-  const [showGmailPrompt, setShowGmailPrompt] = useState(true);
+  const [showGmailPrompt] = useState(false);
   const [gmailInput, setGmailInput] = useState("");
   const [gmailStep, setGmailStep] = useState<"email" | "link">("email");
   const [gmailSubmitting, setGmailSubmitting] = useState(false);
