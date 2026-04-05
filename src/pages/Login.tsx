@@ -135,19 +135,17 @@ export default function Login() {
 
   // (OTP step removed - using direct password login)
 
-  // Login Step 2b: Password login for old users (without Gmail)
+  // Login Step 2: Password login
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const normalizedPhone = normalizePhone(phone.trim());
     if (!normalizedPhone || !password) return;
     setIsSubmitting(true);
     try {
-      // Try with real email first if we have it
       let loginEmailToUse = loginEmail || `${normalizedPhone}@goodapp.local`;
       let { error } = await supabase.auth.signInWithPassword({ email: loginEmailToUse, password });
       
       if (error && error.message === "Invalid login credentials") {
-        // Fallback: try with the other email format
         const fakeEmail = `${normalizedPhone}@goodapp.local`;
         if (loginEmailToUse !== fakeEmail) {
           const retryResult = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
