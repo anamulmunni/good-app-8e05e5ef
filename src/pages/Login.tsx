@@ -375,9 +375,6 @@ export default function Login() {
 
                 {loginStep === "password" && (
                   <form onSubmit={handlePasswordLogin} className="space-y-3.5">
-                    <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-xl p-3 mb-2">
-                      <p className="text-xs text-[hsl(var(--amber))] font-bold">⚠️ আপনার অ্যাকাউন্টে Gmail যোগ করা নেই। লগইন করে Gmail যোগ করুন।</p>
-                    </div>
                     <div>
                       <label className="block text-xs font-semibold text-muted-foreground mb-1.5 ml-1 flex items-center gap-1.5">
                         <Lock className="w-3.5 h-3.5" /> পাসওয়ার্ড
