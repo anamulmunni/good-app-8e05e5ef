@@ -253,8 +253,8 @@ export default function Login() {
         throw error;
       }
       
-      toast({ title: "✅ রেজিস্ট্রেশন সফল!", description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।" });
-      navigate("/dashboard");
+      toast({ title: "📧 কোড পাঠানো হয়েছে!", description: `${regEmail.trim()} এ ৬ ডিজিটের কোড পাঠানো হয়েছে। Gmail চেক করুন।` });
+      setRegStep("otp");
     } catch (err: unknown) {
       toast({ title: "রেজিস্ট্রেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
