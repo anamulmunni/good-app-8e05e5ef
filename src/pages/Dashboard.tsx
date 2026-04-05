@@ -72,7 +72,7 @@ export default function Dashboard() {
   const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
-  const [showGmailPrompt, setShowGmailPrompt] = useState(true);
+  const [showGmailPrompt] = useState(false);
   const [gmailInput, setGmailInput] = useState("");
   const [gmailStep, setGmailStep] = useState<"email" | "link">("email");
   const [gmailSubmitting, setGmailSubmitting] = useState(false);
@@ -378,7 +378,7 @@ export default function Dashboard() {
         await supabase.from("users").update(updates).eq("id", user.id);
         localStorage.removeItem(PENDING_EMAIL_LINK_KEY);
         await refreshUser();
-        setShowGmailPrompt(false);
+        // Gmail verified
         toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
       } catch (err: any) {
         toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "Gmail link open করে আবার চেষ্টা করুন", variant: "destructive" });
@@ -390,74 +390,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
-      {/* Gmail force prompt for old users */}
-      <AnimatePresence>
-        {showGmailPrompt && !userHasRealEmail && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] bg-background/95 backdrop-blur-md flex items-center justify-center p-6"
-          >
-            <motion.div
-              initial={{ scale: 0.8, y: 30 }}
-              animate={{ scale: 1, y: 0 }}
-              transition={{ type: "spring", damping: 20 }}
-              className="w-full max-w-sm text-center space-y-5"
-            >
-              <motion.div
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-primary to-[hsl(var(--cyan))] flex items-center justify-center shadow-2xl shadow-primary/30"
-              >
-                <Mail className="w-10 h-10 text-primary-foreground" />
-              </motion.div>
-              <div className="space-y-2">
-                <h2 className="text-xl font-black">Gmail যোগ করুন 📧</h2>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  আপনার অ্যাকাউন্টের সুরক্ষার জন্য Gmail ভেরিফাই করতে হবে। Gmail-এ পাঠানো verification link-এ tap করলেই ভেরিফাই হবে।
-                </p>
-              </div>
-              {gmailStep === "email" ? (
-                <div className="space-y-3">
-                  <input
-                    type="email"
-                    value={gmailInput}
-                    onChange={(e) => setGmailInput(e.target.value)}
-                    placeholder="আপনার Gmail লিখুন..."
-                    className="input-field text-center"
-                  />
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleGmailSubmit}
-                    disabled={gmailSubmitting}
-                    className="w-full py-3.5 rounded-2xl font-black text-primary-foreground bg-gradient-to-r from-primary to-[hsl(var(--cyan))]"
-                  >
-                      {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "লিংক পাঠান"}
-                  </motion.button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      <span className="text-primary font-bold">{gmailInput}</span> এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন, তারপর আবার এখানে ফিরে আসুন।
-                    </p>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleGmailSubmit}
-                    disabled={gmailSubmitting}
-                    className="w-full py-3.5 rounded-2xl font-black text-primary-foreground bg-gradient-to-r from-[hsl(var(--emerald))] to-primary"
-                  >
-                      {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "আমি লিংকে ক্লিক করেছি"}
-                  </motion.button>
-                  <button onClick={() => setGmailStep("email")} className="text-xs text-muted-foreground hover:text-primary">
-                    অন্য Gmail ব্যবহার করুন
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">

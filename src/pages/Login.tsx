@@ -58,16 +58,13 @@ export default function Login() {
   // Login states
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [loginStep, setLoginStep] = useState<"phone" | "otp" | "password">("phone");
+  const [loginStep, setLoginStep] = useState<"phone" | "password">("phone");
   const [loginEmail, setLoginEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   // Register states
   const [displayName, setDisplayName] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  const [regStep, setRegStep] = useState<"form" | "link">("form");
-  const [regOtpCode, setRegOtpCode] = useState("");
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -123,18 +120,12 @@ export default function Login() {
         return;
       }
 
-      // Check if user has a real Gmail (not @goodapp.local)
+      // Set email for password login
       const userEmail = userData.email;
-      const hasRealEmail = userEmail && !userEmail.endsWith("@goodapp.local");
-
-      if (hasRealEmail) {
-        // User has Gmail - use password login with their real email
+      if (userEmail && !userEmail.endsWith("@goodapp.local")) {
         setLoginEmail(userEmail);
-        setLoginStep("password");
-      } else {
-        // Old user without Gmail - allow password login with fake email
-        setLoginStep("password");
       }
+      setLoginStep("password");
     } catch (err: unknown) {
       toast({ title: "লগইন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
@@ -142,36 +133,19 @@ export default function Login() {
     }
   };
 
-  // Login Step 2a: Verify OTP code
-  const handleVerifyLoginOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser?.email) {
-        throw new Error("এখনও লগইন সম্পন্ন হয়নি। Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন।");
-      }
-      navigate("/dashboard");
-    } catch (err: unknown) {
-      toast({ title: "লগইন বাকি", description: mapAuthErrorToBnMessage(err, "Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন"), variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  // (OTP step removed - using direct password login)
 
-  // Login Step 2b: Password login for old users (without Gmail)
+  // Login Step 2: Password login
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const normalizedPhone = normalizePhone(phone.trim());
     if (!normalizedPhone || !password) return;
     setIsSubmitting(true);
     try {
-      // Try with real email first if we have it
       let loginEmailToUse = loginEmail || `${normalizedPhone}@goodapp.local`;
       let { error } = await supabase.auth.signInWithPassword({ email: loginEmailToUse, password });
       
       if (error && error.message === "Invalid login credentials") {
-        // Fallback: try with the other email format
         const fakeEmail = `${normalizedPhone}@goodapp.local`;
         if (loginEmailToUse !== fakeEmail) {
           const retryResult = await supabase.auth.signInWithPassword({ email: fakeEmail, password });
@@ -193,26 +167,9 @@ export default function Login() {
     }
   };
 
-  // Registration
+  // Registration - auto-confirmed, no verification link needed
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (regStep === "link") {
-      setIsSubmitting(true);
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser?.email) {
-          throw new Error("এখনও Gmail verify হয়নি। Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন।");
-        }
-        toast({ title: "রেজিস্ট্রেশন সফল!", description: "আপনার অ্যাকাউন্ট ভেরিফাই হয়েছে।" });
-        navigate("/dashboard");
-      } catch (err: unknown) {
-        toast({ title: "ভেরিফিকেশন বাকি", description: mapAuthErrorToBnMessage(err, "Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন"), variant: "destructive" });
-      } finally {
-        setIsSubmitting(false);
-      }
-      return;
-    }
 
     if (!agreedTerms) {
       toast({ title: "শর্তাবলী", description: "রেজিস্ট্রেশন করতে শর্তাবলীতে সম্মতি দিন", variant: "destructive" });
@@ -240,7 +197,6 @@ export default function Login() {
         email: regEmail.trim(),
         password: regPassword,
         options: {
-          emailRedirectTo: window.location.origin,
           data: { display_name: displayName.trim(), phone: normalizedPhone },
         },
       });
@@ -249,8 +205,8 @@ export default function Login() {
         throw error;
       }
       
-      toast({ title: "📧 ভেরিফিকেশন লিংক পাঠানো হয়েছে!", description: `${regEmail.trim()} এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন।` });
-      setRegStep("link");
+      toast({ title: "✅ রেজিস্ট্রেশন সফল!", description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।" });
+      navigate("/dashboard");
     } catch (err: unknown) {
       toast({ title: "রেজিস্ট্রেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
@@ -327,7 +283,7 @@ export default function Login() {
           {(["login", "register"] as const).map((t) => (
             <motion.button
               key={t}
-              onClick={() => { setTab(t); setLoginStep("phone"); setRegStep("form"); }}
+              onClick={() => { setTab(t); setLoginStep("phone"); }}
               whileTap={{ scale: 0.92 }}
               className={`flex-1 py-3.5 rounded-xl text-sm font-black tracking-wide transition-all duration-200 relative overflow-hidden z-10 ${
                 tab === t ? "text-white shadow-xl" : "text-muted-foreground hover:text-foreground"
@@ -388,40 +344,9 @@ export default function Login() {
                   </form>
                 )}
 
-                {loginStep === "otp" && (
-                  <form onSubmit={handleVerifyLoginOtp} className="space-y-3.5">
-                    <div className="text-center mb-3">
-                      <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}
-                        className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-primary/20 to-[hsl(var(--cyan))]/20 flex items-center justify-center">
-                        <Mail className="w-8 h-8 text-primary" />
-                      </motion.div>
-                      <p className="text-sm text-muted-foreground">
-                        <span className="text-primary font-bold">{loginEmail}</span> এ verification link পাঠানো হয়েছে
-                      </p>
-                    </div>
-                    <p className="text-xs text-center text-muted-foreground leading-relaxed">
-                      Gmail খুলে link-এ tap করুন। verify হয়ে গেলে এখানে ফিরে এসে নিচের বাটনে চাপুন।
-                    </p>
-                    <motion.button type="submit" disabled={isSubmitting}
-                      className="login-btn-royal py-4 text-lg w-full rounded-2xl" whileTap={{ scale: 0.95 }}>
-                      {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                        <span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10">
-                          ✅ আমি লিংকে ক্লিক করেছি <ArrowRight className="w-5 h-5" />
-                        </span>
-                      )}
-                    </motion.button>
-                    <button type="button" onClick={() => { setLoginStep("phone"); setOtpCode(""); }}
-                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-2">
-                      ← ফিরে যান
-                    </button>
-                  </form>
-                )}
 
                 {loginStep === "password" && (
                   <form onSubmit={handlePasswordLogin} className="space-y-3.5">
-                    <div className="bg-[hsl(var(--amber))]/10 border border-[hsl(var(--amber))]/20 rounded-xl p-3 mb-2">
-                      <p className="text-xs text-[hsl(var(--amber))] font-bold">⚠️ আপনার অ্যাকাউন্টে Gmail যোগ করা নেই। লগইন করে Gmail যোগ করুন।</p>
-                    </div>
                     <div>
                       <label className="block text-xs font-semibold text-muted-foreground mb-1.5 ml-1 flex items-center gap-1.5">
                         <Lock className="w-3.5 h-3.5" /> পাসওয়ার্ড
@@ -446,7 +371,6 @@ export default function Login() {
               </motion.div>
             ) : (
               <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.15 }}>
-                {regStep === "form" ? (
                   <form onSubmit={handleRegister} className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold text-muted-foreground mb-1.5 ml-1 flex items-center gap-1.5">
@@ -505,35 +429,6 @@ export default function Login() {
                       )}
                     </motion.button>
                   </form>
-                ) : (
-                  <form onSubmit={handleRegister} className="space-y-3.5">
-                    <div className="text-center mb-3">
-                      <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}
-                        className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[hsl(var(--pink))]/20 to-[hsl(var(--purple))]/20 flex items-center justify-center">
-                        <Mail className="w-8 h-8 text-[hsl(var(--pink))]" />
-                      </motion.div>
-                      <p className="text-sm font-bold">Gmail ভেরিফাই করুন</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        <span className="text-primary font-bold">{regEmail}</span> এ verification link পাঠানো হয়েছে
-                      </p>
-                    </div>
-                    <p className="text-xs text-center text-muted-foreground leading-relaxed">
-                      Gmail খুলে verification link-এ tap করুন। verify হয়ে গেলে এখানে ফিরে এসে নিচের বাটনে চাপুন।
-                    </p>
-                    <motion.button type="submit" disabled={isSubmitting}
-                      className="register-btn-rose py-4 text-lg w-full rounded-2xl" whileTap={{ scale: 0.95 }}>
-                      {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                        <span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10">
-                          ✅ আমি লিংকে ক্লিক করেছি <ArrowRight className="w-5 h-5" />
-                        </span>
-                      )}
-                    </motion.button>
-                    <button type="button" onClick={() => { setRegStep("form"); setRegOtpCode(""); }}
-                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-2">
-                      ← ফিরে যান
-                    </button>
-                  </form>
-                )}
               </motion.div>
             )}
           </AnimatePresence>
