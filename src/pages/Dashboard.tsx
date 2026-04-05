@@ -49,7 +49,7 @@ const cardVariants = {
   }),
 };
 
-const PENDING_EMAIL_LINK_KEY = "goodapp_pending_email_link";
+
 
 export default function Dashboard() {
   const { user, logout, isLoading, refreshUser } = useAuth();
