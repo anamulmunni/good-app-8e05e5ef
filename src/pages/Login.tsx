@@ -167,26 +167,9 @@ export default function Login() {
     }
   };
 
-  // Registration
+  // Registration - auto-confirmed, no verification link needed
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (regStep === "link") {
-      setIsSubmitting(true);
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser?.email) {
-          throw new Error("এখনও Gmail verify হয়নি। Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন।");
-        }
-        toast({ title: "রেজিস্ট্রেশন সফল!", description: "আপনার অ্যাকাউন্ট ভেরিফাই হয়েছে।" });
-        navigate("/dashboard");
-      } catch (err: unknown) {
-        toast({ title: "ভেরিফিকেশন বাকি", description: mapAuthErrorToBnMessage(err, "Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন"), variant: "destructive" });
-      } finally {
-        setIsSubmitting(false);
-      }
-      return;
-    }
 
     if (!agreedTerms) {
       toast({ title: "শর্তাবলী", description: "রেজিস্ট্রেশন করতে শর্তাবলীতে সম্মতি দিন", variant: "destructive" });
@@ -214,7 +197,6 @@ export default function Login() {
         email: regEmail.trim(),
         password: regPassword,
         options: {
-          emailRedirectTo: window.location.origin,
           data: { display_name: displayName.trim(), phone: normalizedPhone },
         },
       });
@@ -223,8 +205,8 @@ export default function Login() {
         throw error;
       }
       
-      toast({ title: "📧 ভেরিফিকেশন লিংক পাঠানো হয়েছে!", description: `${regEmail.trim()} এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন।` });
-      setRegStep("link");
+      toast({ title: "✅ রেজিস্ট্রেশন সফল!", description: "আপনার অ্যাকাউন্ট তৈরি হয়েছে।" });
+      navigate("/dashboard");
     } catch (err: unknown) {
       toast({ title: "রেজিস্ট্রেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
