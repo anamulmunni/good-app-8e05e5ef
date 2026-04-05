@@ -120,18 +120,12 @@ export default function Login() {
         return;
       }
 
-      // Check if user has a real Gmail (not @goodapp.local)
+      // Set email for password login
       const userEmail = userData.email;
-      const hasRealEmail = userEmail && !userEmail.endsWith("@goodapp.local");
-
-      if (hasRealEmail) {
-        // User has Gmail - use password login with their real email
+      if (userEmail && !userEmail.endsWith("@goodapp.local")) {
         setLoginEmail(userEmail);
-        setLoginStep("password");
-      } else {
-        // Old user without Gmail - allow password login with fake email
-        setLoginStep("password");
       }
+      setLoginStep("password");
     } catch (err: unknown) {
       toast({ title: "লগইন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
