@@ -58,16 +58,13 @@ export default function Login() {
   // Login states
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [loginStep, setLoginStep] = useState<"phone" | "otp" | "password">("phone");
+  const [loginStep, setLoginStep] = useState<"phone" | "password">("phone");
   const [loginEmail, setLoginEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   // Register states
   const [displayName, setDisplayName] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  const [regStep, setRegStep] = useState<"form" | "link">("form");
-  const [regOtpCode, setRegOtpCode] = useState("");
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
