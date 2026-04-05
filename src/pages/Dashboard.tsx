@@ -72,7 +72,7 @@ export default function Dashboard() {
   const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
-  const [showGmailPrompt] = useState(false);
+  
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
