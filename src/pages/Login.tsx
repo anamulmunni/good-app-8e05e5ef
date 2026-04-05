@@ -133,22 +133,7 @@ export default function Login() {
     }
   };
 
-  // Login Step 2a: Verify OTP code
-  const handleVerifyLoginOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser?.email) {
-        throw new Error("এখনও লগইন সম্পন্ন হয়নি। Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন।");
-      }
-      navigate("/dashboard");
-    } catch (err: unknown) {
-      toast({ title: "লগইন বাকি", description: mapAuthErrorToBnMessage(err, "Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন"), variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  // (OTP step removed - using direct password login)
 
   // Login Step 2b: Password login for old users (without Gmail)
   const handlePasswordLogin = async (e: React.FormEvent) => {
