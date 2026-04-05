@@ -331,59 +331,7 @@ export default function Dashboard() {
 
   const userHasRealEmail = user?.email && !user.email.endsWith("@goodapp.local");
 
-  const handleGmailSubmit = async () => {
-    if (gmailStep === "email") {
-      if (!gmailInput.trim() || !gmailInput.includes("@")) {
-        toast({ title: "সঠিক Gmail দিন", variant: "destructive" });
-        return;
-      }
-      setGmailSubmitting(true);
-      try {
-        const nextEmail = gmailInput.trim().toLowerCase();
-        localStorage.setItem(
-          PENDING_EMAIL_LINK_KEY,
-          JSON.stringify({ appUserId: user.id, email: nextEmail, createdAt: Date.now() }),
-        );
 
-        const { error } = await supabase.auth.signInWithOtp({
-          email: nextEmail,
-          options: {
-            emailRedirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
-        setGmailStep("link");
-        toast({
-          title: "📧 ভেরিফিকেশন লিংক পাঠানো হয়েছে",
-          description: `${nextEmail} এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন।`,
-        });
-      } catch (err: any) {
-        toast({ title: "ব্যর্থ", description: err.message || "কিছু ভুল হয়েছে", variant: "destructive" });
-      } finally {
-        setGmailSubmitting(false);
-      }
-    } else {
-      setGmailSubmitting(true);
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser?.email) {
-          throw new Error("এখনও Gmail verify হয়নি। Gmail-এ গিয়ে verification link-এ tap করুন, তারপর আবার চেষ্টা করুন।");
-        }
-
-        const updates: Record<string, any> = { email: authUser.email };
-        if (authUser?.id) updates.auth_id = authUser.id;
-        await supabase.from("users").update(updates).eq("id", user.id);
-        localStorage.removeItem(PENDING_EMAIL_LINK_KEY);
-        await refreshUser();
-        // Gmail verified
-        toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
-      } catch (err: any) {
-        toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "Gmail link open করে আবার চেষ্টা করুন", variant: "destructive" });
-      } finally {
-        setGmailSubmitting(false);
-      }
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
