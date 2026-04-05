@@ -49,6 +49,8 @@ const cardVariants = {
   }),
 };
 
+const PENDING_EMAIL_LINK_KEY = "goodapp_pending_email_link";
+
 export default function Dashboard() {
   const { user, logout, isLoading, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -72,8 +74,7 @@ export default function Dashboard() {
   const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
   const [showGmailPrompt, setShowGmailPrompt] = useState(true);
   const [gmailInput, setGmailInput] = useState("");
-  const [gmailOtpCode, setGmailOtpCode] = useState("");
-  const [gmailStep, setGmailStep] = useState<"email" | "otp">("email");
+  const [gmailStep, setGmailStep] = useState<"email" | "link">("email");
   const [gmailSubmitting, setGmailSubmitting] = useState(false);
 
   const { data: publicSettings } = useQuery({
@@ -341,36 +342,46 @@ export default function Dashboard() {
       }
       setGmailSubmitting(true);
       try {
-        // Use signInWithOtp instead of updateUser - works without an existing auth session
-        const { error } = await supabase.auth.signInWithOtp({ email: gmailInput.trim() });
+        const nextEmail = gmailInput.trim().toLowerCase();
+        localStorage.setItem(
+          PENDING_EMAIL_LINK_KEY,
+          JSON.stringify({ appUserId: user.id, email: nextEmail, createdAt: Date.now() }),
+        );
+
+        const { error } = await supabase.auth.signInWithOtp({
+          email: nextEmail,
+          options: {
+            emailRedirectTo: window.location.origin,
+          },
+        });
         if (error) throw error;
-        setGmailStep("otp");
-        toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${gmailInput.trim()} এ ভেরিফিকেশন কোড পাঠানো হয়েছে` });
+        setGmailStep("link");
+        toast({
+          title: "📧 ভেরিফিকেশন লিংক পাঠানো হয়েছে",
+          description: `${nextEmail} এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন।`,
+        });
       } catch (err: any) {
         toast({ title: "ব্যর্থ", description: err.message || "কিছু ভুল হয়েছে", variant: "destructive" });
       } finally {
         setGmailSubmitting(false);
       }
     } else {
-      if (!gmailOtpCode.trim()) return;
       setGmailSubmitting(true);
       try {
-        const { error } = await supabase.auth.verifyOtp({
-          email: gmailInput.trim(),
-          token: gmailOtpCode.trim(),
-          type: "email",
-        });
-        if (error) throw error;
-        // Update email in users table and link auth_id
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        const updates: Record<string, any> = { email: gmailInput.trim() };
+        if (!authUser?.email) {
+          throw new Error("এখনও Gmail verify হয়নি। Gmail-এ গিয়ে verification link-এ tap করুন, তারপর আবার চেষ্টা করুন।");
+        }
+
+        const updates: Record<string, any> = { email: authUser.email };
         if (authUser?.id) updates.auth_id = authUser.id;
         await supabase.from("users").update(updates).eq("id", user.id);
+        localStorage.removeItem(PENDING_EMAIL_LINK_KEY);
         await refreshUser();
         setShowGmailPrompt(false);
         toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
       } catch (err: any) {
-        toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "ভুল কোড", variant: "destructive" });
+        toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "Gmail link open করে আবার চেষ্টা করুন", variant: "destructive" });
       } finally {
         setGmailSubmitting(false);
       }
@@ -404,7 +415,7 @@ export default function Dashboard() {
               <div className="space-y-2">
                 <h2 className="text-xl font-black">Gmail যোগ করুন 📧</h2>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  আপনার অ্যাকাউন্টের সুরক্ষার জন্য Gmail ভেরিফাই করতে হবে। পরবর্তী লগইনে Gmail কোড দিয়ে লগইন করতে হবে।
+                  আপনার অ্যাকাউন্টের সুরক্ষার জন্য Gmail ভেরিফাই করতে হবে। Gmail-এ পাঠানো verification link-এ tap করলেই ভেরিফাই হবে।
                 </p>
               </div>
               {gmailStep === "email" ? (
@@ -422,27 +433,21 @@ export default function Dashboard() {
                     disabled={gmailSubmitting}
                     className="w-full py-3.5 rounded-2xl font-black text-primary-foreground bg-gradient-to-r from-primary to-[hsl(var(--cyan))]"
                   >
-                    {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "কোড পাঠান"}
+                      {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "লিংক পাঠান"}
                   </motion.button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">{gmailInput} এ কোড পাঠানো হয়েছে</p>
-                  <input
-                    type="text"
-                    value={gmailOtpCode}
-                    onChange={(e) => setGmailOtpCode(e.target.value)}
-                    placeholder="৬ সংখ্যার কোড..."
-                    className="input-field text-center text-2xl tracking-[0.5em] font-mono"
-                    maxLength={6}
-                  />
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <span className="text-primary font-bold">{gmailInput}</span> এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন, তারপর আবার এখানে ফিরে আসুন।
+                    </p>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={handleGmailSubmit}
                     disabled={gmailSubmitting}
                     className="w-full py-3.5 rounded-2xl font-black text-primary-foreground bg-gradient-to-r from-[hsl(var(--emerald))] to-primary"
                   >
-                    {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "ভেরিফাই করুন"}
+                      {gmailSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "আমি লিংকে ক্লিক করেছি"}
                   </motion.button>
                   <button onClick={() => setGmailStep("email")} className="text-xs text-muted-foreground hover:text-primary">
                     অন্য Gmail ব্যবহার করুন

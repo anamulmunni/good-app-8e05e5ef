@@ -36,7 +36,6 @@ export default function Profile() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOtpEmail, setSettingsOtpEmail] = useState("");
-  const [settingsOtpCode, setSettingsOtpCode] = useState("");
   const [settingsOtpSent, setSettingsOtpSent] = useState(false);
   const [settingsOtpVerified, setSettingsOtpVerified] = useState(false);
   const [settingsSubmitting, setSettingsSubmitting] = useState(false);
@@ -423,7 +422,7 @@ export default function Profile() {
 
                       {!settingsOtpVerified ? (
                         <div className="space-y-3">
-                          <p className="text-xs text-muted-foreground">পাসওয়ার্ড পরিবর্তন করতে Gmail কোড দিয়ে ভেরিফাই করুন</p>
+                          <p className="text-xs text-muted-foreground">পাসওয়ার্ড পরিবর্তন করতে Gmail-এ পাঠানো verification link-এ tap করে ভেরিফাই করুন</p>
                           {!settingsOtpSent ? (
                             <motion.button
                               whileTap={{ scale: 0.95 }}
@@ -431,11 +430,16 @@ export default function Profile() {
                               onClick={async () => {
                                 setSettingsSubmitting(true);
                                 try {
-                                  const { error } = await supabase.auth.signInWithOtp({ email: user!.email! });
+                                  const { error } = await supabase.auth.signInWithOtp({
+                                    email: user!.email!,
+                                    options: {
+                                      emailRedirectTo: window.location.origin,
+                                    },
+                                  });
                                   if (error) throw error;
                                   setSettingsOtpSent(true);
                                   setSettingsOtpEmail(user!.email!);
-                                  toast({ title: "📧 কোড পাঠানো হয়েছে", description: `${user!.email} এ কোড পাঠানো হয়েছে` });
+                                  toast({ title: "📧 ভেরিফিকেশন লিংক পাঠানো হয়েছে", description: `${user!.email} এ verification link পাঠানো হয়েছে` });
                                 } catch (err: any) {
                                   toast({ title: "ব্যর্থ", description: err.message, variant: "destructive" });
                                 } finally {
@@ -444,42 +448,32 @@ export default function Profile() {
                               }}
                               className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-[hsl(var(--amber))] to-[hsl(var(--orange))] text-primary-foreground"
                             >
-                              {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "📧 Gmail এ কোড পাঠান"}
+                              {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "📧 Gmail এ লিংক পাঠান"}
                             </motion.button>
                           ) : (
                             <div className="space-y-3">
-                              <p className="text-xs text-muted-foreground">{settingsOtpEmail} এ কোড পাঠানো হয়েছে</p>
-                              <input
-                                type="text"
-                                value={settingsOtpCode}
-                                onChange={(e) => setSettingsOtpCode(e.target.value)}
-                                placeholder="৬ সংখ্যার কোড..."
-                                className="input-field text-center text-xl tracking-[0.4em] font-mono"
-                                maxLength={6}
-                              />
+                              <p className="text-xs text-muted-foreground leading-relaxed">{settingsOtpEmail} এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন, তারপর আবার এখানে ফিরে আসুন।</p>
                               <motion.button
                                 whileTap={{ scale: 0.95 }}
-                                disabled={settingsSubmitting || !settingsOtpCode.trim()}
+                                disabled={settingsSubmitting}
                                 onClick={async () => {
                                   setSettingsSubmitting(true);
                                   try {
-                                    const { error } = await supabase.auth.verifyOtp({
-                                      email: settingsOtpEmail,
-                                      token: settingsOtpCode.trim(),
-                                      type: "email",
-                                    });
-                                    if (error) throw error;
+                                    const { data: { user: authUser } } = await supabase.auth.getUser();
+                                    if (!authUser?.email) {
+                                      throw new Error("এখনও verification সম্পন্ন হয়নি। Gmail-এর link-এ tap করে আবার চেষ্টা করুন।");
+                                    }
                                     setSettingsOtpVerified(true);
                                     toast({ title: "✅ ভেরিফাই হয়েছে!" });
                                   } catch (err: any) {
-                                    toast({ title: "ভুল কোড", description: err.message, variant: "destructive" });
+                                    toast({ title: "ভেরিফিকেশন বাকি", description: err.message, variant: "destructive" });
                                   } finally {
                                     setSettingsSubmitting(false);
                                   }
                                 }}
                                 className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-[hsl(var(--emerald))] to-primary text-primary-foreground"
                               >
-                                {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "ভেরিফাই করুন"}
+                                {settingsSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "আমি লিংকে ক্লিক করেছি"}
                               </motion.button>
                             </div>
                           )}
