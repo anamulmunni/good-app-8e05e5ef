@@ -417,7 +417,7 @@ export default function Profile() {
                       {/* Email info */}
                       <div className="bg-secondary/40 rounded-xl p-3 flex items-center gap-2">
                         <Mail className="w-4 h-4 text-primary" />
-                        <p className="text-sm">{user?.email || "Gmail সেট করা হয়নি"}</p>
+                        <p className="text-sm">{user?.email && !user.email.endsWith("@goodapp.local") ? user.email : "Gmail সেট করা হয়নি"}</p>
                       </div>
 
                       {!settingsOtpVerified ? (
