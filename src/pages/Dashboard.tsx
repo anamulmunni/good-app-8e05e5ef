@@ -556,14 +556,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => { logout(); navigate("/"); }}
-            className="p-2.5 hover:bg-destructive/10 rounded-xl text-muted-foreground hover:text-destructive transition-all"
-          >
-            <LogOut className="w-5 h-5" />
-          </motion.button>
         </div>
       </header>
 
