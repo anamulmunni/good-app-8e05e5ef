@@ -42,6 +42,7 @@ const ChannelPage = lazyRetry(() => import("./pages/ChannelPage"));
 const WatchVideo = lazyRetry(() => import("./pages/WatchVideo"));
 const CallPage = lazyRetry(() => import("./pages/CallPage"));
 const Install = lazyRetry(() => import("./pages/Install"));
+const ResetPassword = lazyRetry(() => import("./pages/ResetPassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
