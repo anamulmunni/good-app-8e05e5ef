@@ -283,7 +283,7 @@ export default function Login() {
           {(["login", "register"] as const).map((t) => (
             <motion.button
               key={t}
-              onClick={() => { setTab(t); setLoginStep("phone"); setRegStep("form"); }}
+              onClick={() => { setTab(t); setLoginStep("phone"); }}
               whileTap={{ scale: 0.92 }}
               className={`flex-1 py-3.5 rounded-xl text-sm font-black tracking-wide transition-all duration-200 relative overflow-hidden z-10 ${
                 tab === t ? "text-white shadow-xl" : "text-muted-foreground hover:text-foreground"
