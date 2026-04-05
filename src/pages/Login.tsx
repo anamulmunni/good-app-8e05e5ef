@@ -362,10 +362,36 @@ export default function Login() {
                         </span>
                       )}
                     </motion.button>
-                    <button type="button" onClick={() => { setLoginStep("phone"); setPassword(""); }}
-                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-2">
-                      ← ফিরে যান
-                    </button>
+                    <div className="flex items-center justify-between">
+                      <button type="button" onClick={() => { setLoginStep("phone"); setPassword(""); }}
+                        className="text-xs text-muted-foreground hover:text-foreground py-2">
+                        ← ফিরে যান
+                      </button>
+                      <button type="button" onClick={async () => {
+                        const normalizedPhone = normalizePhone(phone.trim());
+                        if (!normalizedPhone) return;
+                        setIsSubmitting(true);
+                        try {
+                          const { data: userData } = await supabase.from("users").select("email").eq("guest_id", normalizedPhone).maybeSingle();
+                          const userEmail = userData?.email;
+                          if (!userEmail || userEmail.endsWith("@goodapp.local")) {
+                            toast({ title: "Gmail সেট করা নেই", description: "এই অ্যাকাউন্টে Gmail যুক্ত নেই। পাসওয়ার্ড রিসেট করা যাবে না।", variant: "destructive" });
+                            return;
+                          }
+                          const { error } = await supabase.auth.resetPasswordForEmail(userEmail, {
+                            redirectTo: `${window.location.origin}/reset-password`,
+                          });
+                          if (error) throw error;
+                          toast({ title: "📧 রিসেট লিংক পাঠানো হয়েছে", description: `${userEmail} এ পাসওয়ার্ড রিসেট লিংক পাঠানো হয়েছে। Gmail খুলে লিংকে ক্লিক করুন।` });
+                        } catch (err: any) {
+                          toast({ title: "ব্যর্থ", description: err.message, variant: "destructive" });
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }} className="text-xs text-primary hover:text-primary/80 font-bold py-2">
+                        🔐 পাসওয়ার্ড ভুলে গেছেন?
+                      </button>
+                    </div>
                   </form>
                 )}
               </motion.div>
