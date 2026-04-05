@@ -66,7 +66,7 @@ export default function Login() {
   const [regPhone, setRegPhone] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  const [regStep, setRegStep] = useState<"form" | "otp">("form");
+  const [regStep, setRegStep] = useState<"form" | "link">("form");
   const [regOtpCode, setRegOtpCode] = useState("");
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -145,18 +145,15 @@ export default function Login() {
   // Login Step 2a: Verify OTP code
   const handleVerifyLoginOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otpCode.trim()) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: loginEmail,
-        token: otpCode.trim(),
-        type: "email",
-      });
-      if (error) throw error;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.email) {
+        throw new Error("এখনও লগইন সম্পন্ন হয়নি। Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন।");
+      }
       navigate("/dashboard");
     } catch (err: unknown) {
-      toast({ title: "ভেরিফিকেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
+      toast({ title: "লগইন বাকি", description: mapAuthErrorToBnMessage(err, "Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -200,21 +197,17 @@ export default function Login() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (regStep === "otp") {
-      // Verify OTP
-      if (!regOtpCode.trim()) return;
+    if (regStep === "link") {
       setIsSubmitting(true);
       try {
-        const { error } = await supabase.auth.verifyOtp({
-          email: regEmail.trim(),
-          token: regOtpCode.trim(),
-          type: "signup",
-        });
-        if (error) throw error;
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser?.email) {
+          throw new Error("এখনও Gmail verify হয়নি। Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন।");
+        }
         toast({ title: "রেজিস্ট্রেশন সফল!", description: "আপনার অ্যাকাউন্ট ভেরিফাই হয়েছে।" });
         navigate("/dashboard");
       } catch (err: unknown) {
-        toast({ title: "ভেরিফিকেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
+        toast({ title: "ভেরিফিকেশন বাকি", description: mapAuthErrorToBnMessage(err, "Gmail-এ পাঠানো verification link-এ tap করে আবার চেষ্টা করুন"), variant: "destructive" });
       } finally {
         setIsSubmitting(false);
       }
@@ -246,15 +239,18 @@ export default function Login() {
       const { error } = await supabase.auth.signUp({
         email: regEmail.trim(),
         password: regPassword,
-        options: { data: { display_name: displayName.trim(), phone: normalizedPhone } },
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: { display_name: displayName.trim(), phone: normalizedPhone },
+        },
       });
       if (error) {
         if (error.message.includes("already registered")) throw new Error("এই Gmail দিয়ে আগেই অ্যাকাউন্ট তৈরি হয়েছে");
         throw error;
       }
       
-      toast({ title: "📧 কোড পাঠানো হয়েছে!", description: `${regEmail.trim()} এ ৬ ডিজিটের কোড পাঠানো হয়েছে। Gmail চেক করুন।` });
-      setRegStep("otp");
+      toast({ title: "📧 ভেরিফিকেশন লিংক পাঠানো হয়েছে!", description: `${regEmail.trim()} এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন।` });
+      setRegStep("link");
     } catch (err: unknown) {
       toast({ title: "রেজিস্ট্রেশন ব্যর্থ", description: mapAuthErrorToBnMessage(err), variant: "destructive" });
     } finally {
@@ -400,21 +396,17 @@ export default function Login() {
                         <Mail className="w-8 h-8 text-primary" />
                       </motion.div>
                       <p className="text-sm text-muted-foreground">
-                        <span className="text-primary font-bold">{loginEmail}</span> এ কোড পাঠানো হয়েছে
+                        <span className="text-primary font-bold">{loginEmail}</span> এ verification link পাঠানো হয়েছে
                       </p>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-muted-foreground mb-1.5 ml-1 flex items-center gap-1.5">
-                        <KeyRound className="w-3.5 h-3.5" /> ভেরিফিকেশন কোড
-                      </label>
-                      <input type="text" value={otpCode} onChange={(e) => setOtpCode(e.target.value)}
-                        placeholder="৬ ডিজিটের কোড দিন" className="input-field text-center text-2xl tracking-[0.5em] py-4 font-mono" autoFocus maxLength={6} />
-                    </div>
-                    <motion.button type="submit" disabled={isSubmitting || otpCode.length < 6}
+                    <p className="text-xs text-center text-muted-foreground leading-relaxed">
+                      Gmail খুলে link-এ tap করুন। verify হয়ে গেলে এখানে ফিরে এসে নিচের বাটনে চাপুন।
+                    </p>
+                    <motion.button type="submit" disabled={isSubmitting}
                       className="login-btn-royal py-4 text-lg w-full rounded-2xl" whileTap={{ scale: 0.95 }}>
                       {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : (
                         <span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10">
-                          ✅ লগইন করুন <ArrowRight className="w-5 h-5" />
+                          ✅ আমি লিংকে ক্লিক করেছি <ArrowRight className="w-5 h-5" />
                         </span>
                       )}
                     </motion.button>
@@ -522,18 +514,17 @@ export default function Login() {
                       </motion.div>
                       <p className="text-sm font-bold">Gmail ভেরিফাই করুন</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        <span className="text-primary font-bold">{regEmail}</span> এ কোড পাঠানো হয়েছে
+                        <span className="text-primary font-bold">{regEmail}</span> এ verification link পাঠানো হয়েছে
                       </p>
                     </div>
-                    <div>
-                      <input type="text" value={regOtpCode} onChange={(e) => setRegOtpCode(e.target.value)}
-                        placeholder="৬ ডিজিটের কোড দিন" className="input-field text-center text-2xl tracking-[0.5em] py-4 font-mono" autoFocus maxLength={6} />
-                    </div>
-                    <motion.button type="submit" disabled={isSubmitting || regOtpCode.length < 6}
+                    <p className="text-xs text-center text-muted-foreground leading-relaxed">
+                      Gmail খুলে verification link-এ tap করুন। verify হয়ে গেলে এখানে ফিরে এসে নিচের বাটনে চাপুন।
+                    </p>
+                    <motion.button type="submit" disabled={isSubmitting}
                       className="register-btn-rose py-4 text-lg w-full rounded-2xl" whileTap={{ scale: 0.95 }}>
                       {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : (
                         <span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10">
-                          ✅ ভেরিফাই করুন <ArrowRight className="w-5 h-5" />
+                          ✅ আমি লিংকে ক্লিক করেছি <ArrowRight className="w-5 h-5" />
                         </span>
                       )}
                     </motion.button>

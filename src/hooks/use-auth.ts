@@ -13,6 +13,41 @@ function withTimeout(promise: any, timeoutMs = 8000, message = "Request timeout"
   });
 }
 
+const PENDING_EMAIL_LINK_KEY = "goodapp_pending_email_link";
+
+type PendingEmailLink = {
+  appUserId?: number;
+  email?: string;
+  createdAt?: number;
+};
+
+function readPendingEmailLink(): PendingEmailLink | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = localStorage.getItem(PENDING_EMAIL_LINK_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as PendingEmailLink;
+    if (!parsed?.email) return null;
+
+    if (parsed.createdAt && Date.now() - parsed.createdAt > 1000 * 60 * 60) {
+      localStorage.removeItem(PENDING_EMAIL_LINK_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingEmailLink() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(PENDING_EMAIL_LINK_KEY);
+  }
+}
+
 export function useAuth() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,6 +64,30 @@ export function useAuth() {
     if (existing) {
       setUser(existing);
       return existing;
+    }
+
+    const pendingEmailLink = readPendingEmailLink();
+    if (
+      authUser.email &&
+      pendingEmailLink?.appUserId &&
+      pendingEmailLink.email?.toLowerCase() === authUser.email.toLowerCase()
+    ) {
+      const { data: linkedUser, error: linkError } = await withTimeout((supabase
+        .from("users")
+        .update({
+          auth_id: authUser.id,
+          email: authUser.email,
+        } as any)
+        .eq("id", pendingEmailLink.appUserId)
+        .select() as any)
+        .single(), 12000, "User email link timeout");
+
+      clearPendingEmailLink();
+
+      if (!linkError && linkedUser) {
+        setUser(linkedUser);
+        return linkedUser;
+      }
     }
 
     const meta = authUser.user_metadata || {};
