@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KeySubmitter } from "@/components/KeySubmitter";
 import { WithdrawForm } from "@/components/WithdrawForm";
-import { LogOut, User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, Lock, Newspaper, Download, Sparkles, X, Play, Mail } from "lucide-react";
+import { User, Wallet, Copy, Check, Bell, Send, Loader2, ChevronDown, MessageCircle, Shield, Lock, Newspaper, Download, Sparkles, X, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +49,7 @@ const cardVariants = {
   }),
 };
 
-const PENDING_EMAIL_LINK_KEY = "goodapp_pending_email_link";
+
 
 export default function Dashboard() {
   const { user, logout, isLoading, refreshUser } = useAuth();
@@ -72,10 +72,7 @@ export default function Dashboard() {
   const [prevKeyCount, setPrevKeyCount] = useState<number | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [loadedAppVersion, setLoadedAppVersion] = useState<number | null>(null);
-  const [showGmailPrompt] = useState(false);
-  const [gmailInput, setGmailInput] = useState("");
-  const [gmailStep, setGmailStep] = useState<"email" | "link">("email");
-  const [gmailSubmitting, setGmailSubmitting] = useState(false);
+  
 
   const { data: publicSettings } = useQuery({
     queryKey: ["public-settings"],
@@ -332,61 +329,8 @@ export default function Dashboard() {
     return null;
   }
 
-  const userHasRealEmail = user?.email && !user.email.endsWith("@goodapp.local");
 
-  const handleGmailSubmit = async () => {
-    if (gmailStep === "email") {
-      if (!gmailInput.trim() || !gmailInput.includes("@")) {
-        toast({ title: "সঠিক Gmail দিন", variant: "destructive" });
-        return;
-      }
-      setGmailSubmitting(true);
-      try {
-        const nextEmail = gmailInput.trim().toLowerCase();
-        localStorage.setItem(
-          PENDING_EMAIL_LINK_KEY,
-          JSON.stringify({ appUserId: user.id, email: nextEmail, createdAt: Date.now() }),
-        );
 
-        const { error } = await supabase.auth.signInWithOtp({
-          email: nextEmail,
-          options: {
-            emailRedirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
-        setGmailStep("link");
-        toast({
-          title: "📧 ভেরিফিকেশন লিংক পাঠানো হয়েছে",
-          description: `${nextEmail} এ verification link পাঠানো হয়েছে। Gmail খুলে link-এ tap করুন।`,
-        });
-      } catch (err: any) {
-        toast({ title: "ব্যর্থ", description: err.message || "কিছু ভুল হয়েছে", variant: "destructive" });
-      } finally {
-        setGmailSubmitting(false);
-      }
-    } else {
-      setGmailSubmitting(true);
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser?.email) {
-          throw new Error("এখনও Gmail verify হয়নি। Gmail-এ গিয়ে verification link-এ tap করুন, তারপর আবার চেষ্টা করুন।");
-        }
-
-        const updates: Record<string, any> = { email: authUser.email };
-        if (authUser?.id) updates.auth_id = authUser.id;
-        await supabase.from("users").update(updates).eq("id", user.id);
-        localStorage.removeItem(PENDING_EMAIL_LINK_KEY);
-        await refreshUser();
-        // Gmail verified
-        toast({ title: "✅ Gmail ভেরিফাই হয়েছে!" });
-      } catch (err: any) {
-        toast({ title: "ভেরিফিকেশন ব্যর্থ", description: err.message || "Gmail link open করে আবার চেষ্টা করুন", variant: "destructive" });
-      } finally {
-        setGmailSubmitting(false);
-      }
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background pb-24 relative">
@@ -556,14 +500,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => { logout(); navigate("/"); }}
-            className="p-2.5 hover:bg-destructive/10 rounded-xl text-muted-foreground hover:text-destructive transition-all"
-          >
-            <LogOut className="w-5 h-5" />
-          </motion.button>
         </div>
       </header>
 

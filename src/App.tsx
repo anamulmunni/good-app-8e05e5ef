@@ -42,6 +42,7 @@ const ChannelPage = lazyRetry(() => import("./pages/ChannelPage"));
 const WatchVideo = lazyRetry(() => import("./pages/WatchVideo"));
 const CallPage = lazyRetry(() => import("./pages/CallPage"));
 const Install = lazyRetry(() => import("./pages/Install"));
+const ResetPassword = lazyRetry(() => import("./pages/ResetPassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -97,6 +98,7 @@ function AppInner() {
           <Route path="/watch/:postId" element={<WatchVideo />} />
           <Route path="/call/:userId" element={<CallPage />} />
           <Route path="/install" element={<Install />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/~oauth" element={<Login />} />
           <Route path="/~c" element={<Login />} />
           <Route path="*" element={<NotFound />} />
