@@ -344,34 +344,6 @@ export default function Login() {
                   </form>
                 )}
 
-                {loginStep === "otp" && (
-                  <form onSubmit={handleVerifyLoginOtp} className="space-y-3.5">
-                    <div className="text-center mb-3">
-                      <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}
-                        className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-primary/20 to-[hsl(var(--cyan))]/20 flex items-center justify-center">
-                        <Mail className="w-8 h-8 text-primary" />
-                      </motion.div>
-                      <p className="text-sm text-muted-foreground">
-                        <span className="text-primary font-bold">{loginEmail}</span> এ verification link পাঠানো হয়েছে
-                      </p>
-                    </div>
-                    <p className="text-xs text-center text-muted-foreground leading-relaxed">
-                      Gmail খুলে link-এ tap করুন। verify হয়ে গেলে এখানে ফিরে এসে নিচের বাটনে চাপুন।
-                    </p>
-                    <motion.button type="submit" disabled={isSubmitting}
-                      className="login-btn-royal py-4 text-lg w-full rounded-2xl" whileTap={{ scale: 0.95 }}>
-                      {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                        <span className="inline-flex items-center gap-2.5 text-lg font-black relative z-10">
-                          ✅ আমি লিংকে ক্লিক করেছি <ArrowRight className="w-5 h-5" />
-                        </span>
-                      )}
-                    </motion.button>
-                    <button type="button" onClick={() => { setLoginStep("phone"); setOtpCode(""); }}
-                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-2">
-                      ← ফিরে যান
-                    </button>
-                  </form>
-                )}
 
                 {loginStep === "password" && (
                   <form onSubmit={handlePasswordLogin} className="space-y-3.5">
